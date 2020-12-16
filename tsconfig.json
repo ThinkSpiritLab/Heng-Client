@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "outDir": "./built",
+        // "outFile": "./built/index.js",
+        "module": "commonjs",
+        "target": "es6",
+        "declaration": true
+    },
+    "include": ["./src/**/*"],
+    "exclude": ["built"]
+}
