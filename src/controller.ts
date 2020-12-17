@@ -1,7 +1,7 @@
 import { getLogger } from "log4js";
 import * as crypto from "crypto";
 import { orderBy, toUpper } from "lodash";
-import Axios from "axios";
+import Axios, { AxiosResponse } from "axios";
 import { InternalProtocol } from "heng-protocol";
 import * as WebSocket from "ws";
 class Param {
@@ -14,10 +14,16 @@ class Param {
 
 type Req = {
     params: { [key: string]: string | number };
-    body?: any;
+    body?: unknown;
     path: string;
     method: "put" | "post" | "get" | "delete";
 };
+
+export class ControllerConfig {
+    host: string;
+    SecrectKey: string;
+    AccessKey: string;
+}
 
 export class Controller {
     host: string;
@@ -26,18 +32,14 @@ export class Controller {
     ws: WebSocket;
     static MaxNonce = 0xffff;
     _nonce = crypto.randomInt(Controller.MaxNonce);
-    get nonce() {
+    get nonce(): number {
         return this._nonce++;
     }
     logger = getLogger("Controller");
-    constructor(config: any) {
-        if (config && config.host && config.SecrectKey && config.AccessKey) {
-            this.host = config.host;
-            this.SecrectKey = config.SecrectKey;
-            this.AccessKey = config.AccessKey;
-        } else {
-            this.logger.fatal(`Controller Config is Broken`);
-        }
+    constructor(config: ControllerConfig) {
+        this.host = config.host;
+        this.SecrectKey = config.SecrectKey;
+        this.AccessKey = config.AccessKey;
     }
     sign(req: Req): void {
         let params: Param[] = [];
@@ -66,14 +68,20 @@ export class Controller {
             .digest("hex");
         req.params.signature = signature;
     }
-    exec(req: Req) {
-        return Axios.request({
+    async exec(
+        req: Req
+    ): Promise<
+        AxiosResponse<InternalProtocol.HTTPProtocolDefinition.HttpResponse>
+    > {
+        return (await Axios.request({
             url: `/v1${req.path}`,
             method: req.method,
             baseURL: this.host,
             data: req.body,
             params: req.params,
-        });
+        })) as AxiosResponse<
+            InternalProtocol.HTTPProtocolDefinition.HttpResponse
+        >;
     }
 
     async getToken(
@@ -81,7 +89,7 @@ export class Controller {
         coreCount?: number,
         name?: string,
         software?: string
-    ) {
+    ): Promise<InternalProtocol.HTTPProtocolDefinition.AuthenticationResponse> {
         const req = {
             body: {
                 maxTaskCount,
@@ -95,18 +103,20 @@ export class Controller {
         } as Req;
         this.sign(req);
         try {
-            return (await this.exec(req)).data;
+            const res = (await this.exec(req)).data;
+            return res as InternalProtocol.HTTPProtocolDefinition.AuthenticationResponse;
         } catch (error) {
             this.logger.fatal(error);
         }
     }
 
-    async connectWs(token: string) {
+    async connectWs(token: string): Promise<Controller> {
         this.ws = new WebSocket(
             `${this.host.replace("http", "ws")}/v1/judger/ws?token=${token}`
         );
         this.ws.on("open", () => {
             this.logger.info("Ws Opened");
         });
+        return this;
     }
 }

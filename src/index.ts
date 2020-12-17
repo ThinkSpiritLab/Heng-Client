@@ -1,8 +1,8 @@
 import { configure, getLogger } from "log4js";
 import * as TOML from "@iarna/toml";
 import * as fs from "fs";
-import * as ws from "ws";
-import { Controller } from "./controller";
+import { plainToClass } from "class-transformer";
+import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
 async function main() {
     configure({
@@ -17,7 +17,8 @@ async function main() {
     const configToml = fs.readFileSync("config.toml").toString();
     const config = TOML.parse(configToml);
     const logger = getLogger("main");
-    const controller = new Controller(config.controller);
+    const controllerConfig = plainToClass(ControllerConfig, config.controller);
+    const controller = new Controller(controllerConfig as ControllerConfig);
     const token = await controller.getToken(
         config.self["judgeCapability"],
         cpus().length,
@@ -25,7 +26,7 @@ async function main() {
         config.self["version"]
     );
     logger.info(`Token is ${token}`);
-    controller.connectWs(token);
+    controller.connectWs(token.body.JWTToken);
     logger.info("Started");
 }
 
