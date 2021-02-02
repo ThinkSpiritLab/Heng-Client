@@ -2,7 +2,15 @@ import { getLogger } from "log4js";
 import * as crypto from "crypto";
 import { orderBy, toUpper } from "lodash";
 import Axios, { AxiosResponse } from "axios";
-import { InternalProtocol } from "heng-protocol";
+import {
+    ControllerMethod,
+    JudgerMethod,
+    Message,
+    Request,
+    Response,
+    ErrorInfo,
+} from "heng-protocol/internal-protocol/ws";
+import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
 import * as WebSocket from "ws";
 class Param {
     key: string;
@@ -12,8 +20,11 @@ class Param {
     }
 }
 
+type Header = Param;
+
 type Req = {
     params: { [key: string]: string | number };
+    headers: { [key: string]: string | number };
     body?: unknown;
     path: string;
     method: "put" | "post" | "get" | "delete";
@@ -30,6 +41,15 @@ export class Controller {
     SecrectKey: string;
     AccessKey: string;
     ws: WebSocket;
+    judgerMethods: Map<JudgerMethod, (unknown) => Promise<unknown>>;
+    messageCallbackMap: Map<
+        number,
+        {
+            resolve: (unkown) => void;
+            reject: (any) => void;
+            timer: NodeJS.Timeout;
+        }
+    >;
     static MaxNonce = 0xffff;
     _nonce = crypto.randomInt(Controller.MaxNonce);
     get nonce(): number {
@@ -40,15 +60,23 @@ export class Controller {
         this.host = config.host;
         this.SecrectKey = config.SecrectKey;
         this.AccessKey = config.AccessKey;
+        this.judgerMethods = new Map();
+        this.messageCallbackMap = new Map();
     }
     sign(req: Req): void {
         let params: Param[] = [];
+        let headers: Header[] = [];
         for (const key in req.params) {
             params.push({ key, val: req.params[key].toString() });
         }
-        params.push({ key: "nonce", val: this.nonce.toString() });
-        params.push({ key: "timestamp", val: Date.now().toString() });
-        params.push({ key: "AccessKey", val: this.AccessKey });
+        for (const key in req.headers) {
+            if (key !== "x-heng-signature") {
+                headers.push({ key, val: req.headers[key].toString() });
+            }
+        }
+        headers.push({ key: "x-heng-nonce", val: this.nonce.toString() });
+        headers.push({ key: "x-heng-timestamp", val: Date.now().toString() });
+        headers.push({ key: "x-heng-accesskey", val: this.AccessKey });
         if (req.body !== undefined) {
             params.push({
                 key: "body",
@@ -59,29 +87,30 @@ export class Controller {
             });
         }
         params = orderBy(params, "key");
-        const reqStr = `${toUpper(req.method)}:${req.path}?${params
+        headers = orderBy(headers, "key");
+        const reqStr = `${toUpper(req.method)}:${headers
+            .map((h) => h.toString())
+            .join("&")}:${req.path}?${params
             .map((p) => p.toString())
             .join("&")}`;
         const signature = crypto
             .createHmac("sha256", this.SecrectKey)
             .update(reqStr)
             .digest("hex");
-        req.params.signature = signature;
+        if (!req.headers) {
+            req.headers = {};
+        }
+        req.headers["x-heng-signature"] = signature;
     }
-    async exec(
-        req: Req
-    ): Promise<
-        AxiosResponse<InternalProtocol.HTTPProtocolDefinition.HttpResponse>
-    > {
+    async exec(req: Req): Promise<AxiosResponse<unknown>> {
         return (await Axios.request({
             url: `/v1${req.path}`,
             method: req.method,
             baseURL: this.host,
             data: req.body,
             params: req.params,
-        })) as AxiosResponse<
-            InternalProtocol.HTTPProtocolDefinition.HttpResponse
-        >;
+            headers: req.headers,
+        })) as AxiosResponse<unknown>;
     }
 
     async getToken(
@@ -89,7 +118,7 @@ export class Controller {
         coreCount?: number,
         name?: string,
         software?: string
-    ): Promise<InternalProtocol.HTTPProtocolDefinition.AuthenticationResponse> {
+    ): Promise<AcquireTokenOutput> {
         const req = {
             body: {
                 maxTaskCount,
@@ -99,24 +128,117 @@ export class Controller {
             },
             params: {},
             path: "/judger/token",
-            method: "post",
+            method: "get",
         } as Req;
         this.sign(req);
         try {
             const res = (await this.exec(req)).data;
-            return res as InternalProtocol.HTTPProtocolDefinition.AuthenticationResponse;
+            return res as AcquireTokenOutput;
         } catch (error) {
             this.logger.fatal(error);
         }
     }
 
-    async connectWs(token: string): Promise<Controller> {
-        this.ws = new WebSocket(
-            `${this.host.replace("http", "ws")}/v1/judger/ws?token=${token}`
-        );
-        this.ws.on("open", () => {
-            this.logger.info("Ws Opened");
-        });
+    on(method: JudgerMethod, cb: (unknown) => Promise<unknown>): Controller {
+        this.judgerMethods.set(method, cb);
         return this;
+    }
+
+    async do(method: ControllerMethod, args: unknown): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const nonce = this.nonce;
+            this.messageCallbackMap.set(nonce, {
+                resolve,
+                reject,
+                timer: setTimeout(() => {
+                    this.messageCallbackMap.delete(nonce);
+                    reject("Time out");
+                }, 10000),
+            });
+            const msg = JSON.stringify({
+                type: "req",
+                seq: nonce,
+                time: new Date().toISOString(),
+                body: {
+                    method,
+                    args,
+                },
+            } as Request<ControllerMethod>);
+            this.ws.send(msg);
+        });
+    }
+
+    handleRes(msg: Response): void {
+        const cb = this.messageCallbackMap.get(msg.seq);
+        if (cb) {
+            clearTimeout(cb.timer);
+            this.messageCallbackMap.delete(msg.seq);
+            const { output, error } = msg.body as {
+                output: unknown;
+                error: unknown;
+            };
+            if (error) {
+                cb.reject(error);
+            } else {
+                cb.resolve(output);
+            }
+        } else {
+            this.logger.info(`Res received but timeout`);
+        }
+    }
+
+    async handleReq(msg: Request<JudgerMethod>): Promise<unknown> {
+        if (this.judgerMethods.has(msg.body.method)) {
+            return (await this.judgerMethods.get(msg.body.method))(
+                msg.body.args
+            );
+        } else {
+            throw `Method ${msg.body.method} doesn't exist or not inited.`;
+        }
+    }
+
+    async connectWs(token: string): Promise<Controller> {
+        return new Promise((resolve, reject) => {
+            this.ws = new WebSocket(
+                `${this.host}v1/judger/websocket?token=${token}`
+            );
+            this.ws.on("open", () => {
+                this.logger.info("Ws Opened");
+                resolve(this);
+            });
+            this.ws.on("close", () => {
+                this.logger.fatal("Ws Closed");
+            });
+            this.ws.on("message", async (msg) => {
+                const message = JSON.parse(msg) as Message;
+                if (message.type === "req") {
+                    try {
+                        const res: Response = {
+                            type: "res",
+                            seq: message.seq,
+                            time: new Date().toISOString(),
+                            body: {
+                                output: await this.handleReq(
+                                    message as Request<JudgerMethod>
+                                ),
+                            },
+                        };
+                        this.ws.send(JSON.stringify(res));
+                    } catch (e) {
+                        const res: Response = {
+                            type: "res",
+                            seq: message.seq,
+                            time: new Date().toISOString(),
+                            body: {
+                                error: { code: 500, message: e.toString() },
+                            },
+                        };
+                        this.ws.send(JSON.stringify(res));
+                    }
+                } else if (message.type === "res") {
+                    this.handleRes(message as Response);
+                }
+            });
+        });
     }
 }

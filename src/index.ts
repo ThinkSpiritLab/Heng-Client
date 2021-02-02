@@ -4,6 +4,12 @@ import * as fs from "fs";
 import { plainToClass } from "class-transformer";
 import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
+import { JudgeState, StatusReport } from "heng-protocol/internal-protocol/ws";
+
+async function wait(ms: number) {
+    return new Promise((resolve, reject) => setTimeout(() => resolve(null), ms));
+}
+
 async function main() {
     configure({
         appenders: {
@@ -25,8 +31,57 @@ async function main() {
         config.self["name"],
         config.self["version"]
     );
-    logger.info(`Token is ${token}`);
-    controller.connectWs(token.body.JWTToken);
+    controller.on("Judge", (task) => {
+        setTimeout(() => {
+            controller.do("UpdateJudges", [
+                { id: task.id, state: JudgeState.Confirmed },
+            ]);
+        }, 100);
+        setTimeout(() => {
+            controller.do("UpdateJudges", [
+                { id: task.id, state: JudgeState.Preparing },
+            ]);
+        }, 200);
+        setTimeout(() => {
+            controller.do("UpdateJudges", [
+                { id: task.id, state: JudgeState.Pending },
+            ]);
+        }, 300);
+        setTimeout(() => {
+            controller.do("UpdateJudges", [
+                { id: task.id, state: JudgeState.Judging },
+            ]);
+        }, 400);
+        setTimeout(() => {
+            controller.do("FinishJudges", [{ id: task.id }]);
+        }, 100);
+        return new Promise((resolve, reject) => {
+            resolve(undefined);
+        });
+    });
+    logger.info(`Token is ${token.token}`);
+    await controller.connectWs(token.token);
+    setInterval(
+        () =>
+            controller.do("ReportStatus", {
+                hardware: {
+                    cpu: { percentage: 50 },
+                    memory: { percentage: 50 },
+                },
+                task: {
+                    pending: 0,
+                    preparing: {
+                        downloading: 0,
+                        readingCache: 0,
+                        compiling: 0,
+                    },
+                    judging: 0,
+                    finished: 0,
+                    total: 0,
+                },
+            } as StatusReport),
+        1000
+    );
     logger.info("Started");
 }
 
