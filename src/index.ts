@@ -5,9 +5,12 @@ import { plainToClass } from "class-transformer";
 import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
 import { JudgeState, StatusReport } from "heng-protocol/internal-protocol/ws";
+import { meterSpawn } from "./Spawn/Meter";
 
 async function wait(ms: number) {
-    return new Promise((resolve, reject) => setTimeout(() => resolve(null), ms));
+    return new Promise((resolve, reject) =>
+        setTimeout(() => resolve(null), ms)
+    );
 }
 
 async function main() {
@@ -54,7 +57,7 @@ async function main() {
         }, 400);
         setTimeout(() => {
             controller.do("FinishJudges", [{ id: task.id }]);
-        }, 100);
+        }, 1000);
         return new Promise((resolve, reject) => {
             resolve(undefined);
         });
@@ -83,6 +86,9 @@ async function main() {
         1000
     );
     logger.info("Started");
+    const meteredSubprocess = meterSpawn("/usr/bin/ls", [], {});
+    const res = await meteredSubprocess.result;
+    logger.info(res);
 }
 
 main();
