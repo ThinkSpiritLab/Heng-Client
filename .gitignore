@@ -3,3 +3,4 @@ built
 .vscode
 config.json
 config.toml
+*.log

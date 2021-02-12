@@ -69,14 +69,14 @@ export class Controller {
         for (const key in req.params) {
             params.push({ key, val: req.params[key].toString() });
         }
+        req.headers["x-heng-nonce"] = this.nonce.toString();
+        req.headers["x-heng-timestamp"] = Date.now().toString();
+        req.headers["x-heng-accesskey"] = this.AccessKey;
         for (const key in req.headers) {
             if (key !== "x-heng-signature") {
                 headers.push({ key, val: req.headers[key].toString() });
             }
         }
-        headers.push({ key: "x-heng-nonce", val: this.nonce.toString() });
-        headers.push({ key: "x-heng-timestamp", val: Date.now().toString() });
-        headers.push({ key: "x-heng-accesskey", val: this.AccessKey });
         if (req.body !== undefined) {
             params.push({
                 key: "body",
@@ -140,6 +140,7 @@ export class Controller {
     }
 
     on(method: JudgerMethod, cb: (unknown) => Promise<unknown>): Controller {
+        this.logger.info(`Method ${method} Registered`);
         this.judgerMethods.set(method, cb);
         return this;
     }
@@ -175,7 +176,7 @@ export class Controller {
             this.messageCallbackMap.delete(msg.seq);
             const { output, error } = msg.body as {
                 output: unknown;
-                error: unknown;
+                error: ErrorInfo;
             };
             if (error) {
                 cb.reject(error);
@@ -183,7 +184,7 @@ export class Controller {
                 cb.resolve(output);
             }
         } else {
-            this.logger.info(`Res received but timeout`);
+            this.logger.info(`Res ${msg.seq} received but timeout or Never Send`);
         }
     }
 
@@ -198,7 +199,7 @@ export class Controller {
     }
 
     async connectWs(token: string): Promise<Controller> {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.ws = new WebSocket(
                 `${this.host}v1/judger/websocket?token=${token}`
             );
