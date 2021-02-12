@@ -1,6 +1,5 @@
-import { Writable, Readable, Stream, Pipe } from "stream";
+import { Writable, Readable, Stream } from "stream";
 import * as events from "events";
-import { StdioOptions } from "child_process";
 
 export interface BasicSpawnOption {
     cwd?: string;
@@ -47,14 +46,14 @@ export interface BasicChildProcess extends events.EventEmitter {
      * 5. message
      */
 
-    addListener(event: string, listener: (...args: any[]) => void): this;
+    addListener(event: string, listener: (...args: unknown[]) => void): this;
     addListener(event: "error", listener: (err: Error) => void): this;
     addListener(
         event: "exit",
         listener: (code: number | null, signal: NodeJS.Signals | null) => void
     ): this;
 
-    emit(event: string | symbol, ...args: any[]): boolean;
+    emit(event: string | symbol, ...args: unknown[]): boolean;
     emit(event: "error", err: Error): boolean;
     emit(
         event: "exit",
@@ -81,7 +80,7 @@ export interface BasicChildProcess extends events.EventEmitter {
 
     prependOnceListener(
         event: string,
-        listener: (...args: any[]) => void
+        listener: (...args: unknown[]) => void
     ): this;
     prependOnceListener(event: "error", listener: (err: Error) => void): this;
     prependOnceListener(

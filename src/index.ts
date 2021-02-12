@@ -1,12 +1,10 @@
 import { configure, getLogger } from "log4js";
-import * as TOML from "@iarna/toml";
-import * as fs from "fs";
 import { plainToClass } from "class-transformer";
 import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
 import { JudgeState, StatusReport } from "heng-protocol/internal-protocol/ws";
 import { meterSpawn } from "./Spawn/Meter";
-
+import { config } from "./Config";
 async function wait(ms: number) {
     return new Promise((resolve, reject) =>
         setTimeout(() => resolve(null), ms)
@@ -23,8 +21,7 @@ async function main() {
             default: { appenders: ["cheese", "console"], level: "info" },
         },
     });
-    const configToml = fs.readFileSync("config.toml").toString();
-    const config = TOML.parse(configToml);
+
     const logger = getLogger("main");
     const controllerConfig = plainToClass(ControllerConfig, config.controller);
     const controller = new Controller(controllerConfig as ControllerConfig);
@@ -86,7 +83,12 @@ async function main() {
         1000
     );
     logger.info("Started");
-    const meteredSubprocess = meterSpawn("/usr/bin/ls", [], {});
+    const meteredSubprocess = meterSpawn(
+        "/usr/bin/ls",
+        [],
+        {},
+        { timelimit: 1, memlimit: 10, pidlimit: 1 }
+    );
     const res = await meteredSubprocess.result;
     logger.info(res);
 }
