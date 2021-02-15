@@ -83,6 +83,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
             hcargs.push("-f", meterFd.toString());
             options.stdio[meterFd] = "pipe";
             hcargs.push("--args", ...args);
+            logger.info(hcargs);
             const subProcess = (spawnFunction(
                 meterConfig.path,
                 hcargs,
@@ -99,6 +100,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
                     resultStream.on("data", (chunk) => (resultStr += chunk));
                     resultStream.on("end", () => {
                         try {
+                            logger.log(resultStr);
                             resolve(JSON.parse(resultStr));
                         } catch (e) {
                             reject(e);
