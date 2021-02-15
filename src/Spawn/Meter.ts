@@ -4,7 +4,7 @@ import { getLogger } from "log4js";
 import { Readable } from "stream";
 import { config } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
-
+import { JailSpawnOption, useJail } from "./Jail";
 class MeterConfig {
     path: string;
 }
@@ -13,7 +13,7 @@ const meterConfig = plainToClass(MeterConfig, config.hc);
 
 interface MeterSpawnOption {
     timelimit?: number; //second
-    memlimit?: number; //MB
+    memorylimit?: number; //MB
     pidlimit?: number;
 }
 
@@ -52,8 +52,8 @@ export function useMeter(meterOption: MeterSpawnOption) {
             if (meterOption.timelimit) {
                 hcargs.push("-t", meterOption.timelimit.toString());
             }
-            if (meterOption.memlimit) {
-                hcargs.push("-m", meterOption.memlimit.toString());
+            if (meterOption.memorylimit) {
+                hcargs.push("-m", meterOption.memorylimit.toString());
             }
             if (meterOption.pidlimit) {
                 hcargs.push("-p", meterOption.pidlimit.toString());
@@ -119,4 +119,27 @@ export function meterSpawn(
     meterOption: MeterSpawnOption
 ) {
     return useMeter(meterOption)(spawn)(command, args, option);
+}
+
+export function jailMeterSpawn(
+    command: string,
+    args: string[],
+    option: BasicSpawnOption,
+    jailOption: JailSpawnOption
+) {
+    const meterOption = {
+        timelimit: jailOption.timelimit,
+        memorylimit: jailOption.memorylimit,
+        pidlimit: jailOption.pidlimit,
+    };
+    jailOption.timelimit *= 2;
+    jailOption.memorylimit *= 2;
+    jailOption.pidlimit += 3;
+    return useMeter(meterOption)(
+        useJail(jailOption)((command, args, option) => {
+            logger.info(`${command} ${args.join(" ")}`);
+            logger.info(option);
+            return spawn(command, args, option);
+        })
+    )(command, args, option);
 }
