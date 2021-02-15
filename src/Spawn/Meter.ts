@@ -60,7 +60,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
             }
             if (options.cwd) {
                 hcargs.push("-c", options.cwd);
-                options.cwd = undefined;
+                // options.cwd = undefined;
             }
             if (options.uid) {
                 hcargs.push("-u", options.uid.toString());

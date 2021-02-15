@@ -74,7 +74,7 @@ export function useJail(jailOption: JailSpawnOption) {
             // }
             if (options.cwd) {
                 jailArgs.push("--cwd", options.cwd);
-                options.cwd = undefined;
+                // options.cwd = undefined;
                 /*
                 --cwd|-D VALUE
                     Directory in the namespace the process will run (default: '/')
