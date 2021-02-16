@@ -2,7 +2,7 @@ import { configure, getLogger } from "log4js";
 import { plainToClass } from "class-transformer";
 import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
-import { JudgeState, StatusReport } from "heng-protocol/internal-protocol/ws";
+import { JudgeState } from "heng-protocol";
 import { jailMeterSpawn } from "./Spawn";
 import { config } from "./Config";
 async function wait(ms: number) {
@@ -43,7 +43,7 @@ async function main() {
         config.self["name"],
         config.self["version"]
     );
-    controller.on("Judge", (task) => {
+    controller.on("CreateJudge", (task) => {
         setTimeout(() => {
             controller.do("UpdateJudges", [
                 { id: task.id, state: JudgeState.Confirmed },
@@ -65,7 +65,9 @@ async function main() {
             ]);
         }, 400);
         setTimeout(() => {
-            controller.do("FinishJudges", [{ id: task.id }]);
+            controller.do("FinishJudges", [
+                { id: task.id, result: { cases: [] } },
+            ]);
         }, 1000);
         return new Promise((resolve, reject) => {
             resolve(undefined);
@@ -76,22 +78,26 @@ async function main() {
     setInterval(
         () =>
             controller.do("ReportStatus", {
-                hardware: {
-                    cpu: { percentage: 50 },
-                    memory: { percentage: 50 },
-                },
-                task: {
-                    pending: 0,
-                    preparing: {
-                        downloading: 0,
-                        readingCache: 0,
-                        compiling: 0,
+                collectTime: new Date().toISOString(),
+                nextReportTime: "1926-08-17",
+                report: {
+                    hardware: {
+                        cpu: { percentage: 50 },
+                        memory: { percentage: 50 },
                     },
-                    judging: 0,
-                    finished: 0,
-                    total: 0,
+                    judge: {
+                        pending: 0,
+                        preparing: {
+                            downloading: 0,
+                            readingCache: 0,
+                            compiling: 0,
+                        },
+                        judging: 0,
+                        finished: 0,
+                        total: 0,
+                    },
                 },
-            } as StatusReport),
+            }),
         1000
     );
     logger.info("Started");

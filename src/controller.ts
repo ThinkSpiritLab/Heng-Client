@@ -8,10 +8,19 @@ import {
     Message,
     Request,
     Response,
-    ErrorInfo,
+    CreateJudgeArgs,
+    ExitArgs,
+    ControlArgs,
+    JudgerArgs,
+    LogArgs,
+    ControllerArgs,
+    ReportStatusArgs,
+    FinishJudgesArgs,
+    UpdateJudgesArgs,
 } from "heng-protocol/internal-protocol/ws";
 import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
 import * as WebSocket from "ws";
+import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 class Param {
     key: string;
     val: string;
@@ -139,13 +148,35 @@ export class Controller {
         }
     }
 
-    on(method: JudgerMethod, cb: (unknown) => Promise<unknown>): Controller {
+    on(
+        method: "CreateJudge",
+        cb: (args: CreateJudgeArgs) => Promise<void>
+    ): Controller;
+    on(method: "Exit", cb: (args: ExitArgs) => Promise<void>): Controller;
+    on(
+        method: "Control",
+        cb: (args: ControlArgs) => Promise<ConnectionSettings>
+    ): Controller;
+
+    on(
+        method: JudgerMethod,
+        cb:
+            | ((args: CreateJudgeArgs) => Promise<void>)
+            | ((args: ExitArgs) => Promise<void>)
+            | ((args: ControlArgs) => Promise<ConnectionSettings>)
+    ): Controller {
         this.logger.info(`Method ${method} Registered`);
         this.judgerMethods.set(method, cb);
         return this;
     }
 
-    async do(method: ControllerMethod, args: unknown): Promise<unknown> {
+    async do(method: "Exit", args: ExitArgs): Promise<void>;
+    async do(method: "Log", args: LogArgs): Promise<void>;
+    async do(method: "ReportStatus", args: ReportStatusArgs): Promise<void>;
+    async do(method: "UpdateJudges", args: UpdateJudgesArgs): Promise<void>;
+    async do(method: "FinishJudges", args: FinishJudgesArgs): Promise<void>;
+
+    async do(method: ControllerMethod, args: ControllerArgs): Promise<unknown> {
         return new Promise((resolve, reject) => {
             const nonce = this.nonce;
             this.messageCallbackMap.set(nonce, {
@@ -184,7 +215,9 @@ export class Controller {
                 cb.resolve(output);
             }
         } else {
-            this.logger.info(`Res ${msg.seq} received but timeout or Never Send`);
+            this.logger.info(
+                `Res ${msg.seq} received but timeout or Never Send`
+            );
         }
     }
 
