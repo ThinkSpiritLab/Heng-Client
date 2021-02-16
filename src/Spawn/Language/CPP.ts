@@ -1,10 +1,16 @@
-import { Language, languageConfig, registerLanguage } from ".";
+import {
+    ConfiguredLanguage,
+    generateCompileGenerator,
+    Language,
+    languageConfig,
+    registerLanguage,
+} from ".";
 
 export const CPP: Language = function (version: string, ...other: string[]) {
     if (languageConfig.cpp) {
         const extraOptions = new Set(other);
-        return [
-            function (
+        return new ConfiguredLanguage(
+            generateCompileGenerator(function (
                 src: string, //path
                 output: string //path
             ) {
@@ -17,10 +23,18 @@ export const CPP: Language = function (version: string, ...other: string[]) {
                 if (extraOptions.has("O2")) {
                     compilerOptions.push("-O2");
                 }
-                return [languageConfig.cpp, compilerOptions, {}];
-            },
-            undefined,
-        ];
+                if (extraOptions.has("static")) {
+                    compilerOptions.push("-static");
+                }
+                if (extraOptions.has("lm")) {
+                    compilerOptions.push("-lm");
+                }
+                return [languageConfig.cpp, compilerOptions];
+            }),
+            null,
+            "src.cpp",
+            "src.o"
+        );
     } else {
         throw "C++ compiler not configed";
     }

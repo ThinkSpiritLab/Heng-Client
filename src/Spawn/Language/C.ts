@@ -1,11 +1,17 @@
-import { Language, languageConfig, registerLanguage } from ".";
+import {
+    ConfiguredLanguage,
+    Language,
+    languageConfig,
+    registerLanguage,
+    generateCompileGenerator,
+} from ".";
 
 export const C: Language = function (version: string, ...other: string[]) {
     if (languageConfig.c) {
         const extraOptions = new Set(other);
-        return [
-            function (
-                src: string, //path
+        return new ConfiguredLanguage(
+            generateCompileGenerator(function (
+                src: string,
                 output: string //path
             ) {
                 const compilerOptions: string[] = [
@@ -17,10 +23,18 @@ export const C: Language = function (version: string, ...other: string[]) {
                 if (extraOptions.has("O2")) {
                     compilerOptions.push("-O2");
                 }
-                return [languageConfig.c, compilerOptions, {}];
-            },
-            undefined,
-        ];
+                if (extraOptions.has("static")) {
+                    compilerOptions.push("-static");
+                }
+                if (extraOptions.has("lm")) {
+                    compilerOptions.push("-lm");
+                }
+                return [languageConfig.c, compilerOptions];
+            }),
+            null,
+            "src.c",
+            "src.o"
+        );
     } else {
         throw "C compiler not configed";
     }

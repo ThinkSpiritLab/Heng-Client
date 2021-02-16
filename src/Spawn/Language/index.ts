@@ -1,23 +1,84 @@
 import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
+import {
+    BasicSpawnOption,
+    jailMeterSpawn,
+    JailSpawnOption,
+    MeteredChildProcess,
+} from "..";
 import { config } from "../../Config";
 
-export type compileGenerator = (
+export type CompileGenerator = (
+    src: string, //path
+    output: string, //path
+    options: BasicSpawnOption,
+    jailOption: JailSpawnOption
+) => MeteredChildProcess; //compiler argv env
+
+export type BasicCompileGenerator = (
     src: string, //path
     output: string //path
-) => [string, string[], { [key: string]: string }]; //compiler argv env
+) => [string, string[]]; //compiler argv
 
-export const notCompile: compileGenerator = (src, output) => [
-    "dd",
-    [`if=${src}`, `of=${output}`],
-    {},
-];
+export function generateCompileGenerator(
+    basicCompileGenerator: BasicCompileGenerator
+): CompileGenerator {
+    return function (
+        src: string, //path
+        output: string, //path
+        options: BasicSpawnOption,
+        jailOption: JailSpawnOption
+    ): MeteredChildProcess {
+        const [compiler, argv] = basicCompileGenerator(src, output);
+        return jailMeterSpawn(
+            compiler,
+            argv,
+            options,
+            jailOption
+        );
+    };
+}
 
-export type excuteGenerator = undefined;
+export const notCompile: CompileGenerator = generateCompileGenerator(
+    (src, output) => ["dd", [`if=${src}`, `of=${output}`]]
+);
 
-export type Language = (
-    ...args: string[]
-) => [compileGenerator, excuteGenerator];
+export type BasicExcuteGenerator = (
+    command: string,
+    args: string[]
+) => [command: string, args: string[], options: BasicSpawnOption];
+
+export type ExcuteGenerator = (
+    command: string,
+    args: string[],
+    options: BasicSpawnOption,
+    jailOption: JailSpawnOption
+) => MeteredChildProcess;
+
+export function generateExcuterGenerator(
+    basicExcuteGenerator: BasicExcuteGenerator
+): ExcuteGenerator {
+    return function (
+        command: string,
+        args: string[],
+        options: BasicSpawnOption,
+        jailOption: JailSpawnOption
+    ): MeteredChildProcess {
+        const [excuter, argv] = basicExcuteGenerator(command, args);
+        return jailMeterSpawn(excuter, argv, options, jailOption);
+    };
+}
+
+export class ConfiguredLanguage {
+    constructor(
+        readonly compileGenerator: CompileGenerator | null,
+        readonly excuteGenerator: ExcuteGenerator | null,
+        readonly sourceFileName: string,
+        readonly compiledFileName: string
+    ) {}
+}
+
+export type Language = (...args: string[]) => ConfiguredLanguage;
 
 const logger = getLogger("LanguageService");
 
@@ -26,6 +87,7 @@ const languageMap = new Map<string, Language>();
 class LanguageConfig {
     c?: string;
     cpp?: string;
+    python?: string;
 }
 
 export const languageConfig = plainToClass(LanguageConfig, config.language);
