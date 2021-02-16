@@ -3,7 +3,7 @@ import { plainToClass } from "class-transformer";
 import { Controller, ControllerConfig } from "./controller";
 import { cpus } from "os";
 import { JudgeState, StatusReport } from "heng-protocol/internal-protocol/ws";
-import { jailMeterSpawn, meterSpawn } from "./Spawn/Meter";
+import { jailMeterSpawn } from "./Spawn";
 import { config } from "./Config";
 async function wait(ms: number) {
     return new Promise((resolve, reject) =>

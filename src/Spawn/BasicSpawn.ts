@@ -39,11 +39,8 @@ export interface BasicChildProcess extends events.EventEmitter {
 
     /**
      * events.EventEmitter
-     * 1. close
-     * 2. disconnect
-     * 3. error
-     * 4. exit
-     * 5. message
+     * 1. error
+     * 2. exit
      */
 
     addListener(event: string, listener: (...args: unknown[]) => void): this;
