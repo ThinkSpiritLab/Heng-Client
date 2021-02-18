@@ -46,7 +46,7 @@ export const notCompile: CompileGenerator = generateCompileGenerator(
 export type BasicExcuteGenerator = (
     command: string,
     args: string[]
-) => [command: string, args: string[], options: BasicSpawnOption];
+) => [string,string[],BasicSpawnOption];
 
 export type ExcuteGenerator = (
     command: string,
