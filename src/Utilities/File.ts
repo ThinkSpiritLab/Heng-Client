@@ -34,9 +34,14 @@ export class FileAgent {
             })
             .then(async (dir) => {
                 if (this.primaryFile) {
-                    (await readableFromFile(this.primaryFile)).pipe(
+                    const pipe = pipeline(
+                        await readableFromFile(this.primaryFile),
                         unzip.Extract({ path: path.join(this.dir, "data") })
                     );
+                    return new Promise((resolve, reject) => {
+                        pipe.on("close", () => resolve());
+                        pipe.on("error", (err) => reject(err));
+                    });
                 }
                 return;
             });
@@ -55,7 +60,7 @@ export class FileAgent {
     }
     async getStream(name: string): Promise<Readable> {
         await this.ready;
-        return fs.createReadStream(await this.getPath(name))
+        return fs.createReadStream(await this.getPath(name));
     }
     async getPath(name: string): Promise<string> {
         await this.ready;
@@ -74,7 +79,10 @@ export class FileAgent {
                         await readableFromFile(file),
                         fs.createWriteStream(subpath)
                     );
-                    pipe.on("close", () => resolve(subpath));
+                    pipe.on("close", () => {
+                        this.nameToFile.set(name, [undefined, subpath, true]);
+                        resolve(subpath);
+                    });
                     pipe.on("error", (err) => reject(err));
                 });
             }
