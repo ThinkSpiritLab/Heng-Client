@@ -19,11 +19,12 @@ import {
     UpdateJudgesArgs,
 } from "heng-protocol/internal-protocol/ws";
 import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
-import * as WebSocket from "ws";
+import WebSocket from "ws";
 import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
+import { ControllerConfig } from "./Config";
 class Param {
-    key: string;
-    val: string;
+    key!: string;
+    val!: string;
     toString(): string {
         return `${this.key}=${this.val}`;
     }
@@ -39,23 +40,17 @@ type Req = {
     method: "put" | "post" | "get" | "delete";
 };
 
-export class ControllerConfig {
-    host: string;
-    SecrectKey: string;
-    AccessKey: string;
-}
-
 export class Controller {
     host: string;
     SecrectKey: string;
     AccessKey: string;
-    ws: WebSocket;
-    judgerMethods: Map<JudgerMethod, (unknown) => Promise<unknown>>;
+    ws!: WebSocket;
+    judgerMethods: Map<JudgerMethod, (args: any) => Promise<any>>;
     messageCallbackMap: Map<
         number,
         {
-            resolve: (unkown) => void;
-            reject: (any) => void;
+            resolve: (arg0: any) => void;
+            reject: (arg0: any) => void;
             timer: NodeJS.Timeout;
         }
     >;
@@ -145,6 +140,7 @@ export class Controller {
             return res as AcquireTokenOutput;
         } catch (error) {
             this.logger.fatal(error);
+            throw error;
         }
     }
 
@@ -196,7 +192,9 @@ export class Controller {
                     args,
                 },
             } as Request<ControllerMethod>);
-            this.ws.send(msg);
+            if (this.ws !== undefined) {
+                this.ws.send(msg);
+            }
         });
     }
 
@@ -222,10 +220,9 @@ export class Controller {
     }
 
     async handleReq(msg: Request<JudgerMethod>): Promise<unknown> {
-        if (this.judgerMethods.has(msg.body.method)) {
-            return (await this.judgerMethods.get(msg.body.method))(
-                msg.body.args
-            );
+        const method = this.judgerMethods.get(msg.body.method);
+        if (method !== undefined) {
+            return method(msg.body.args);
         } else {
             throw `Method ${msg.body.method} doesn't exist or not inited.`;
         }
@@ -244,33 +241,35 @@ export class Controller {
                 this.logger.fatal("Ws Closed");
             });
             this.ws.on("message", async (msg) => {
-                const message = JSON.parse(msg) as Message;
-                if (message.type === "req") {
-                    try {
-                        const res: Response = {
-                            type: "res",
-                            seq: message.seq,
-                            time: new Date().toISOString(),
-                            body: {
-                                output: await this.handleReq(
-                                    message as Request<JudgerMethod>
-                                ),
-                            },
-                        };
-                        this.ws.send(JSON.stringify(res));
-                    } catch (e) {
-                        const res: Response = {
-                            type: "res",
-                            seq: message.seq,
-                            time: new Date().toISOString(),
-                            body: {
-                                error: { code: 500, message: e.toString() },
-                            },
-                        };
-                        this.ws.send(JSON.stringify(res));
+                if (typeof msg === "string") {
+                    const message = JSON.parse(msg) as Message;
+                    if (message.type === "req") {
+                        try {
+                            const res: Response = {
+                                type: "res",
+                                seq: message.seq,
+                                time: new Date().toISOString(),
+                                body: {
+                                    output: await this.handleReq(
+                                        message as Request<JudgerMethod>
+                                    ),
+                                },
+                            };
+                            this.ws.send(JSON.stringify(res));
+                        } catch (e) {
+                            const res: Response = {
+                                type: "res",
+                                seq: message.seq,
+                                time: new Date().toISOString(),
+                                body: {
+                                    error: { code: 500, message: e.toString() },
+                                },
+                            };
+                            this.ws.send(JSON.stringify(res));
+                        }
+                    } else if (message.type === "res") {
+                        this.handleRes(message as Response);
                     }
-                } else if (message.type === "res") {
-                    this.handleRes(message as Response);
                 }
             });
         });

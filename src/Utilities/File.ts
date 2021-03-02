@@ -70,21 +70,25 @@ export class FileAgent {
             if (writed) {
                 return subpath;
             } else {
-                await fs.promises.mkdir(path.dirname(subpath), {
-                    recursive: true,
-                    mode: 0o700,
-                });
-                return new Promise(async function (resolve, reject) {
-                    const pipe = pipeline(
-                        await readableFromFile(file),
-                        fs.createWriteStream(subpath)
-                    );
-                    pipe.on("close", () => {
-                        this.nameToFile.set(name, [undefined, subpath, true]);
-                        resolve(subpath);
+                if (file) {
+                    await fs.promises.mkdir(path.dirname(subpath), {
+                        recursive: true,
+                        mode: 0o700,
                     });
-                    pipe.on("error", (err) => reject(err));
-                });
+                    return new Promise(async (resolve, reject) => {
+                        const pipe = pipeline(
+                            await readableFromFile(file),
+                            fs.createWriteStream(subpath)
+                        );
+                        pipe.on("close", () => {
+                            this.nameToFile.set(name, [null, subpath, true]);
+                            resolve(subpath);
+                        });
+                        pipe.on("error", (err) => reject(err));
+                    });
+                } else {
+                    throw "File not found nor writen";
+                }
             }
         } else {
             return path.join(this.dir, "data", name);

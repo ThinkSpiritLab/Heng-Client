@@ -2,14 +2,12 @@ import { spawn } from "child_process";
 import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
 import { Readable } from "stream";
-import { config } from "../Config";
+import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 import { JailSpawnOption, useJail } from "./Jail";
-class MeterConfig {
-    path: string;
-}
 
-const meterConfig = plainToClass(MeterConfig, config.hc);
+
+const meterConfig = getConfig().hc;
 
 interface MeterSpawnOption {
     timelimit?: number; //second
@@ -84,6 +82,9 @@ export function useMeter(meterOption: MeterSpawnOption) {
             options.stdio[meterFd] = "pipe";
             hcargs.push("--args", ...args);
             logger.info(hcargs);
+            if (!meterConfig.path) {
+                throw "Meter not configed";
+            }
             const subProcess = (spawnFunction(
                 meterConfig.path,
                 hcargs,

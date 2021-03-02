@@ -1,4 +1,3 @@
-import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
 import {
     BasicSpawnOption,
@@ -6,7 +5,6 @@ import {
     JailSpawnOption,
     MeteredChildProcess,
 } from "..";
-import { config } from "../../Config";
 
 export type CompileGenerator = (
     src: string, //path
@@ -30,12 +28,7 @@ export function generateCompileGenerator(
         jailOption: JailSpawnOption
     ): MeteredChildProcess {
         const [compiler, argv] = basicCompileGenerator(src, output);
-        return jailMeterSpawn(
-            compiler,
-            argv,
-            options,
-            jailOption
-        );
+        return jailMeterSpawn(compiler, argv, options, jailOption);
     };
 }
 
@@ -46,7 +39,7 @@ export const notCompile: CompileGenerator = generateCompileGenerator(
 export type BasicExcuteGenerator = (
     command: string,
     args: string[]
-) => [string,string[],BasicSpawnOption];
+) => [string, string[], BasicSpawnOption];
 
 export type ExcuteGenerator = (
     command: string,
@@ -83,14 +76,6 @@ export type Language = (...args: string[]) => ConfiguredLanguage;
 const logger = getLogger("LanguageService");
 
 const languageMap = new Map<string, Language>();
-
-class LanguageConfig {
-    c?: string;
-    cpp?: string;
-    python?: string;
-}
-
-export const languageConfig = plainToClass(LanguageConfig, config.language);
 
 export function registerLanguage(name: string, language: Language) {
     name = name.toLowerCase();

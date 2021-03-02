@@ -1,16 +1,12 @@
 import { spawn } from "child_process";
 import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
-import { config } from "../Config";
+import { getConfig } from "src/Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 
-class JailConfig {
-    path: string;
-    configFile?: string;
-}
 
-const jailConfig = plainToClass(JailConfig, config.nsjail);
 
+const jailConfig = getConfig().nsjail
 export interface JailMountingPoint {
     path: string;
     mode: "ro" | "rw";
@@ -44,6 +40,9 @@ export function useJail(jailOption: JailSpawnOption) {
             const jailArgs: string[] = [];
             if (jailConfig.configFile) {
                 jailArgs.push("-C", jailConfig.configFile);
+            }
+            if (!jailConfig.path) {
+                throw "Jail not configured";
             }
             if (jailOption.mount) {
                 for (const mountPoint of jailOption.mount) {

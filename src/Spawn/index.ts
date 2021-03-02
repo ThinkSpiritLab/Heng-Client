@@ -24,9 +24,15 @@ function useJailAndMeter(jailOption: JailSpawnOption) {
                 memorylimit: jailOption.memorylimit,
                 pidlimit: jailOption.pidlimit,
             };
-            jailOption.timelimit *= 2;
-            jailOption.memorylimit *= 2;
-            jailOption.pidlimit += 3;
+            if (jailOption.timelimit) {
+                jailOption.timelimit *= 2;
+            }
+            if (jailOption.memorylimit) {
+                jailOption.memorylimit *= 2;
+            }
+            if (jailOption.pidlimit) {
+                jailOption.pidlimit += 3;
+            }
             return useMeter(meterOption)(
                 useJail(jailOption)((command, args, option) => {
                     logger.info(`${command} ${args.join(" ")}`);
