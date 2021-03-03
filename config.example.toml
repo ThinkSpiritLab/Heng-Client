@@ -1,5 +1,5 @@
 [controller]
-host = "http://localhost:8080/"
+host = "http://localhost:8000/"
 SecrectKey = "0xffffffff"
 AccessKey = "ox00000000"
 [self]
@@ -11,13 +11,7 @@ path = "/usr/local/bin/hc"
 [nsjail]
 path = "/usr/bin/nsjail"
 configFile = "./jailConfig.cfg"
-[language.c]
-compiler = "/usr/bin/gcc"
-[language.c.c99]
-compilearg = [":input", "-O2", "-std=c99", "-o", ":output"]
-[language.c.c11]
-compilearg = [":input", "-O2", "-std=c11", "-o", ":output"]
-[language.cpp]
-compiler = "/usr/bin/g++"
-[language.cpp.cpp20]
-compilearg = [":input", "-O2", "-std=c++20", "-o", ":output"]
+[language]
+c = "/usr/bin/gcc"
+cpp = "/usr/bin/g++"
+python = "/usr/bin/python3"

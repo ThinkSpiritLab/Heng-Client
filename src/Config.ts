@@ -3,6 +3,7 @@ import { Type, plainToClass } from "class-transformer";
 import {
     IsInt,
     IsNotEmpty,
+    IsOptional,
     IsString,
     ValidateNested,
     validateSync,
@@ -57,8 +58,8 @@ export class SelfConfig {
     @IsNotEmpty()
     version!: string;
     @IsString()
-    @IsNotEmpty()
-    software!: string;
+    @IsOptional()
+    software?: string;
 }
 export class Config {
     @ValidateNested()
@@ -67,30 +68,45 @@ export class Config {
     controller!: ControllerConfig;
     @ValidateNested()
     @IsNotEmpty()
+    @Type(() => SelfConfig)
     self!: SelfConfig;
     @ValidateNested()
     @IsNotEmpty()
+    @Type(() => LanguageConfig)
     language!: LanguageConfig;
     @ValidateNested()
     @IsNotEmpty()
+    @Type(() => JailConfig)
     nsjail!: JailConfig;
     @ValidateNested()
     @IsNotEmpty()
+    @Type(() => MeterConfig)
     hc!: MeterConfig;
 }
 let config: Config | undefined = undefined;
 export function getConfig() {
     if (config === undefined) {
+        logger.info("Loading Config from file");
         const rawConfig = TOML.parse(configToml);
         config = plainToClass(Config, rawConfig);
         const errs = validateSync(config);
         if (errs.length !== 0) {
             for (const err of errs) {
                 logger.fatal(`Config check failed on property ${err.property}`);
+                if (err.constraints !== undefined) {
+                    for (const constrings in err.constraints) {
+                        logger.fatal(
+                            `because ${constrings} failed(${err.constraints[constrings]})`
+                        );
+                    }
+                } else {
+                    logger.fatal(`No details avaiable`);
+                }
             }
             config = undefined;
             throw `Failed to get Config,Please check configToml`;
         }
+        logger.info("Loaded Config from file");
     }
     return config;
 }

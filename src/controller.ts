@@ -22,6 +22,7 @@ import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
 import WebSocket from "ws";
 import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 import { ControllerConfig } from "./Config";
+import { StatusReport } from "heng-protocol";
 class Param {
     key!: string;
     val!: string;
@@ -45,7 +46,9 @@ export class Controller {
     SecrectKey: string;
     AccessKey: string;
     ws!: WebSocket;
-    judgerMethods: Map<JudgerMethod, (args: any) => Promise<any>>;
+    connectingSettings: ConnectionSettings = { statusReportInterval: 1000 };
+    statusReportTimer?: NodeJS.Timer;
+    judgerMethods: Map<JudgerMethod | "Report", (args: any) => Promise<any>>;
     messageCallbackMap: Map<
         number,
         {
@@ -66,12 +69,53 @@ export class Controller {
         this.AccessKey = config.AccessKey;
         this.judgerMethods = new Map();
         this.messageCallbackMap = new Map();
+        this.on("Control", async (args) => {
+            if (args !== null) {
+                if (args.statusReportInterval !== undefined) {
+                    this.connectingSettings.statusReportInterval =
+                        args.statusReportInterval;
+                    this.logger.info(
+                        `报告间隔改为${args.statusReportInterval}ms`
+                    );
+                }
+            }
+            this.startReport(this.connectingSettings.statusReportInterval);
+            return this.connectingSettings;
+        });
+    }
+    startReport(interval: number) {
+        if (this.statusReportTimer !== undefined) {
+            this.stopReport();
+        }
+        this.statusReportTimer = setInterval(async () => {
+            const reportFunction = this.judgerMethods.get("Report");
+            if (reportFunction !== undefined) {
+                this.do("ReportStatus", {
+                    collectTime: new Date().toISOString(),
+                    nextReportTime: new Date(
+                        new Date().valueOf() + interval
+                    ).toISOString(),
+                    report: (await reportFunction(undefined)) as StatusReport,
+                });
+            } else {
+                this.logger.warn("找不到状态获取回调，无法报告状态。");
+            }
+        }, interval);
+    }
+    stopReport() {
+        if (this.statusReportTimer !== undefined) {
+            clearInterval(this.statusReportTimer);
+            this.statusReportTimer = undefined;
+        }
     }
     sign(req: Req): void {
         let params: Param[] = [];
         let headers: Header[] = [];
         for (const key in req.params) {
             params.push({ key, val: req.params[key].toString() });
+        }
+        if (req.headers === undefined) {
+            req.headers = {};
         }
         req.headers["x-heng-nonce"] = this.nonce.toString();
         req.headers["x-heng-timestamp"] = Date.now().toString();
@@ -132,7 +176,7 @@ export class Controller {
             },
             params: {},
             path: "/judger/token",
-            method: "get",
+            method: "post",
         } as Req;
         this.sign(req);
         try {
@@ -153,13 +197,14 @@ export class Controller {
         method: "Control",
         cb: (args: ControlArgs) => Promise<ConnectionSettings>
     ): Controller;
-
+    on(method: "Report", cb: (args: void) => Promise<StatusReport>): Controller;
     on(
-        method: JudgerMethod,
+        method: JudgerMethod | "Report",
         cb:
             | ((args: CreateJudgeArgs) => Promise<void>)
             | ((args: ExitArgs) => Promise<void>)
             | ((args: ControlArgs) => Promise<ConnectionSettings>)
+            | ((args: void) => Promise<StatusReport>)
     ): Controller {
         this.logger.info(`Method ${method} Registered`);
         this.judgerMethods.set(method, cb);
@@ -235,6 +280,7 @@ export class Controller {
             );
             this.ws.on("open", () => {
                 this.logger.info("Ws Opened");
+                this.startReport(this.connectingSettings.statusReportInterval);
                 resolve(this);
             });
             this.ws.on("close", () => {
