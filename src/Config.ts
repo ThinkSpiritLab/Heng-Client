@@ -84,25 +84,64 @@ export class Config {
     hc!: MeterConfig;
 }
 let config: Config | undefined = undefined;
+
+function tryValidate(
+    args: any,
+    padding: number = 0,
+    prefix: string = ""
+): boolean {
+    const errs = validateSync(args, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+    });
+    if (errs.length !== 0) {
+        for (const err of errs) {
+            logger.fatal(
+                `${new String().padEnd(
+                    padding,
+                    " "
+                )}│ Config check failed on property ${prefix}${err.property}`
+            );
+            if (err.constraints !== undefined) {
+                for (const constrings in err.constraints) {
+                    logger.fatal(
+                        `${new String().padEnd(
+                            padding,
+                            " "
+                        )}├ because ${constrings} failed(${
+                            err.constraints[constrings]
+                        })`
+                    );
+                }
+            } else if (err.value !== undefined) {
+                logger.fatal(
+                    `${new String().padEnd(
+                        padding,
+                        " "
+                    )}└─┬${new String().padEnd(10, "─")}`
+                );
+                tryValidate(
+                    err.value,
+                    padding + 2,
+                    `${prefix}${err.property}.`
+                );
+            } else {
+                logger.fatal(
+                    `${new String().padEnd(padding, " ")}│ No details avaiable`
+                );
+            }
+        }
+        return false;
+    }
+    return true;
+}
+
 export function getConfig() {
     if (config === undefined) {
         logger.info("Loading Config from file");
         const rawConfig = TOML.parse(configToml);
         config = plainToClass(Config, rawConfig);
-        const errs = validateSync(config);
-        if (errs.length !== 0) {
-            for (const err of errs) {
-                logger.fatal(`Config check failed on property ${err.property}`);
-                if (err.constraints !== undefined) {
-                    for (const constrings in err.constraints) {
-                        logger.fatal(
-                            `because ${constrings} failed(${err.constraints[constrings]})`
-                        );
-                    }
-                } else {
-                    logger.fatal(`No details avaiable`);
-                }
-            }
+        if (!tryValidate(config)) {
             config = undefined;
             throw `Failed to get Config,Please check configToml`;
         }
