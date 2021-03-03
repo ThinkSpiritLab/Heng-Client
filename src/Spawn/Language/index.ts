@@ -71,7 +71,9 @@ export class ConfiguredLanguage {
     ) {}
 }
 
-export type Language = (...args: string[]) => ConfiguredLanguage;
+export type Language = (args: {
+    [key: string]: string | boolean | number;
+}) => ConfiguredLanguage;
 
 const logger = getLogger("LanguageService");
 

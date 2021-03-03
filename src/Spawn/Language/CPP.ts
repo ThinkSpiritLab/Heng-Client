@@ -6,11 +6,7 @@ import {
     registerLanguage,
 } from ".";
 
-export const CPP: Language =  function (
-    version: string,
-    ...other: string[]
-) {
-    const extraOptions = new Set(other);
+export const CPP: Language = function (args) {
     const cpp = getConfig().language.cpp;
     return new ConfiguredLanguage(
         generateCompileGenerator(function (
@@ -21,15 +17,17 @@ export const CPP: Language =  function (
                 src,
                 "-o",
                 output,
-                `--std=${version}`,
+                args.version !== undefined
+                    ? `--std=${args.version}`
+                    : "--std=C++17",
             ];
-            if (extraOptions.has("O2")) {
+            if (args.o2) {
                 compilerOptions.push("-O2");
             }
-            if (extraOptions.has("static")) {
+            if (args.static) {
                 compilerOptions.push("-static");
             }
-            if (extraOptions.has("lm")) {
+            if (args.lm) {
                 compilerOptions.push("-lm");
             }
             return [cpp, compilerOptions];

@@ -6,8 +6,7 @@ import {
     generateCompileGenerator,
 } from ".";
 
-export const C: Language = function (version: string, ...other: string[]) {
-    const extraOptions = new Set(other);
+export const C: Language = function (args) {
     const c = getConfig().language.c;
     return new ConfiguredLanguage(
         generateCompileGenerator(function (
@@ -18,15 +17,17 @@ export const C: Language = function (version: string, ...other: string[]) {
                 src,
                 "-o",
                 output,
-                `--std=${version}`,
+                args.version !== undefined
+                    ? `--std=${args.version}`
+                    : "--std=C99",
             ];
-            if (extraOptions.has("O2")) {
+            if (args.o2) {
                 compilerOptions.push("-O2");
             }
-            if (extraOptions.has("static")) {
+            if (args.static) {
                 compilerOptions.push("-static");
             }
-            if (extraOptions.has("lm")) {
+            if (args.lm) {
                 compilerOptions.push("-lm");
             }
             return [c, compilerOptions];
