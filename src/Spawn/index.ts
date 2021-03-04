@@ -36,7 +36,7 @@ function useJailAndMeter(jailOption: JailSpawnOption) {
             return useMeter(meterOption)(
                 useJail(jailOption)((command, args, option) => {
                     logger.info(`${command} ${args.join(" ")}`);
-                    logger.info(option);
+                    // logger.info(option);
                     return spawnFunction(command, args, option);
                 })
             )(command, args, options);

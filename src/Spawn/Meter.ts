@@ -81,7 +81,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
             hcargs.push("-f", meterFd.toString());
             options.stdio[meterFd] = "pipe";
             hcargs.push("--args", ...args);
-            logger.info(hcargs);
+            // logger.info(hcargs);
             if (!meterConfig.path) {
                 throw "Meter not configed";
             }
