@@ -2,7 +2,7 @@ import * as os from "os";
 import * as fs from "fs";
 import * as path from "path";
 import { pipeline, Readable } from "stream";
-import * as unzip from "unzip";
+import * as unzip from "unzip-stream";
 import Axios from "axios";
 
 export type File = {
@@ -10,6 +10,28 @@ export type File = {
     content?: string;
     url?: string;
 };
+
+export function copy(source: string, dest: string) {
+    let done = false;
+    return new Promise<void>((resolve, reject) => {
+        let finish = (err?: any) => {
+            if (!done) {
+                if (err !== undefined) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
+                done = true;
+            }
+        };
+        const ifd = fs.createReadStream(source);
+        const ofd = fs.createWriteStream(dest);
+        const pipe = pipeline(ifd, ofd, (err) => finish());
+        ifd.on("error", (err) => finish(err));
+        ofd.on("error", (err) => finish(err));
+        pipe.on("close", () => finish());
+    });
+}
 
 export function readableFromFile(file: File): Promise<Readable> {
     if (file.content !== undefined) {

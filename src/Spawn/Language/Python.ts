@@ -1,4 +1,4 @@
-import { getConfig } from "src/Config";
+import { getConfig } from "../../Config";
 import {
     ConfiguredLanguage,
     generateExcuterGenerator,
@@ -19,7 +19,4 @@ export const PYTHON: Language = function () {
         "src.py"
     );
 };
-registerLanguage("py", PYTHON);
-registerLanguage("py3", PYTHON);
-registerLanguage("python", PYTHON);
-registerLanguage("python3", PYTHON);
+

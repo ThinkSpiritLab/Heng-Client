@@ -1,11 +1,11 @@
 import { spawn } from "child_process";
 import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
+import path from "path";
 import { Readable } from "stream";
 import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 import { JailSpawnOption, useJail } from "./Jail";
-
 
 const meterConfig = getConfig().hc;
 
@@ -57,7 +57,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
                 hcargs.push("-p", meterOption.pidlimit.toString());
             }
             if (options.cwd) {
-                hcargs.push("-c", options.cwd);
+                hcargs.push("-c", path.resolve(options.cwd));
                 // options.cwd = undefined;
             }
             if (options.uid) {
@@ -101,7 +101,7 @@ export function useMeter(meterOption: MeterSpawnOption) {
                     resultStream.on("data", (chunk) => (resultStr += chunk));
                     resultStream.on("end", () => {
                         try {
-                            logger.log(resultStr);
+                            logger.info(`Result : ${resultStr}`);
                             resolve(JSON.parse(resultStr));
                         } catch (e) {
                             reject(e);

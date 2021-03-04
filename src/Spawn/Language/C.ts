@@ -1,4 +1,4 @@
-import { getConfig } from "src/Config";
+import { getConfig } from "../../Config";
 import {
     ConfiguredLanguage,
     Language,
@@ -37,4 +37,3 @@ export const C: Language = function (args) {
         "src.o"
     );
 };
-registerLanguage("c", C);

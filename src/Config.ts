@@ -1,10 +1,18 @@
 import * as TOML from "@iarna/toml";
 import { Type, plainToClass } from "class-transformer";
 import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    ArrayNotEmpty,
+    IsArray,
     IsInt,
     IsNotEmpty,
+    IsNumber,
     IsOptional,
+    IsPositive,
     IsString,
+    Max,
+    Min,
     ValidateNested,
     validateSync,
 } from "class-validator";
@@ -61,6 +69,44 @@ export class SelfConfig {
     @IsOptional()
     software?: string;
 }
+
+export class JudgeFactoryTestCase {
+    @IsString()
+    @IsNotEmpty()
+    src!: string;
+    @IsString()
+    @IsNotEmpty()
+    cwd!: string;
+    @ValidateNested()
+    @IsString()
+    @IsOptional()
+    @Type(() => String)
+    args?: string[];
+    @IsString()
+    @IsNotEmpty()
+    language!: string;
+    @IsString()
+    @IsOptional()
+    input?: string;
+    @IsInt()
+    @Max(10)
+    @Min(1)
+    timeExpected!: number;
+}
+export class JudgeFactoryConfig {
+    @IsNotEmpty()
+    @IsArray()
+    @ValidateNested()
+    @ArrayNotEmpty()
+    // @ArrayMinSize(2)
+    @ArrayMaxSize(20)
+    @Type(() => JudgeFactoryTestCase)
+    testcases!: JudgeFactoryTestCase[];
+    @IsNumber()
+    @IsNotEmpty()
+    @IsPositive()
+    timeRatioTolerance!: number;
+}
 export class Config {
     @ValidateNested()
     @IsNotEmpty()
@@ -82,6 +128,10 @@ export class Config {
     @IsNotEmpty()
     @Type(() => MeterConfig)
     hc!: MeterConfig;
+    @ValidateNested()
+    @IsNotEmpty()
+    @Type(() => JudgeFactoryConfig)
+    judger!: JudgeFactoryConfig;
 }
 let config: Config | undefined = undefined;
 
@@ -99,7 +149,7 @@ function tryValidate(
             logger.fatal(
                 `${new String().padEnd(
                     padding,
-                    " "
+                    "│ "
                 )}│ Config check failed on property ${prefix}${err.property}`
             );
             if (err.constraints !== undefined) {
@@ -107,31 +157,36 @@ function tryValidate(
                     logger.fatal(
                         `${new String().padEnd(
                             padding,
-                            " "
+                            "│ "
                         )}├ because ${constrings} failed(${
                             err.constraints[constrings]
                         })`
                     );
                 }
-            } else if (err.value !== undefined) {
+            }
+            if (err.value !== undefined) {
                 logger.fatal(
                     `${new String().padEnd(
                         padding,
-                        " "
-                    )}└─┬${new String().padEnd(10, "─")}`
+                        "│ "
+                    )}├─┬${new String().padEnd(10, "─")}`
                 );
                 tryValidate(
                     err.value,
                     padding + 2,
                     `${prefix}${err.property}.`
                 );
-            } else {
+            }
+            {
                 logger.fatal(
-                    `${new String().padEnd(padding, " ")}│ No details avaiable`
+                    `${new String().padEnd(
+                        padding,
+                        "│ "
+                    )}└ No More details avaiable`
                 );
+                return false;
             }
         }
-        return false;
     }
     return true;
 }

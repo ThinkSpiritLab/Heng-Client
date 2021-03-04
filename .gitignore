@@ -5,3 +5,6 @@ dist
 config.json
 config.toml
 *.log
+*.out
+*.o
+src.*

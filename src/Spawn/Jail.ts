@@ -1,12 +1,11 @@
 import { spawn } from "child_process";
 import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
-import { getConfig } from "src/Config";
+import path from "path";
+import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 
-
-
-const jailConfig = getConfig().nsjail
+const jailConfig = getConfig().nsjail;
 export interface JailMountingPoint {
     path: string;
     mode: "ro" | "rw";
@@ -39,7 +38,7 @@ export function useJail(jailOption: JailSpawnOption) {
         ): JailedChildProcess {
             const jailArgs: string[] = [];
             if (jailConfig.configFile) {
-                jailArgs.push("-C", jailConfig.configFile);
+                jailArgs.push("-C", path.resolve(jailConfig.configFile));
             }
             if (!jailConfig.path) {
                 throw "Jail not configured";
@@ -48,10 +47,10 @@ export function useJail(jailOption: JailSpawnOption) {
                 for (const mountPoint of jailOption.mount) {
                     switch (mountPoint.mode) {
                         case "ro":
-                            jailArgs.push("-R", mountPoint.path);
+                            jailArgs.push("-R", path.resolve(mountPoint.path));
                             break;
                         case "rw":
-                            jailArgs.push("-B", mountPoint.path);
+                            jailArgs.push("-B", path.resolve(mountPoint.path));
                             break;
                         default:
                             throw `Unkown mount type ${mountPoint.mode}`;
@@ -72,7 +71,7 @@ export function useJail(jailOption: JailSpawnOption) {
             //     );
             // }
             if (options.cwd) {
-                jailArgs.push("--cwd", options.cwd);
+                jailArgs.push("--cwd", path.resolve(options.cwd));
                 // options.cwd = undefined;
                 /*
                 --cwd|-D VALUE

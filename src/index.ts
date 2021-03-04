@@ -3,8 +3,8 @@ import { configure, getLogger } from "log4js";
 import { Controller } from "./controller";
 import { cpus } from "os";
 import { JudgeState } from "heng-protocol";
-import { jailMeterSpawn } from "./Spawn";
 import { getConfig } from "./Config";
+import { getJudgerFactory } from "./Utilities/Judge";
 async function wait(ms: number) {
     return new Promise((resolve, reject) =>
         setTimeout(() => resolve(null), ms)
@@ -21,14 +21,16 @@ async function main() {
             default: { appenders: ["cheese", "console"], level: "info" },
         },
     });
-    getConfig();
     const logger = getLogger("main");
+    logger.info("Lunched");
+    const config = getConfig().self;
+    const judgerFactory = await getJudgerFactory();
     const controller = new Controller(getConfig().controller);
     const token = await controller.getToken(
-        getConfig().self.judgeCapability,
+        config.judgeCapability,
         cpus().length,
-        getConfig().self.name,
-        getConfig().self.version
+        config.name,
+        config.version
     );
     controller.on("Report", () => {
         return Promise.resolve({

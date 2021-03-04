@@ -1,4 +1,4 @@
-import { getConfig } from "src/Config";
+import { getConfig } from "../../Config";
 import {
     ConfiguredLanguage,
     generateCompileGenerator,
@@ -19,7 +19,7 @@ export const CPP: Language = function (args) {
                 output,
                 args.version !== undefined
                     ? `--std=${args.version}`
-                    : "--std=C++17",
+                    : "--std=c++17",
             ];
             if (args.o2) {
                 compilerOptions.push("-O2");
@@ -37,5 +37,4 @@ export const CPP: Language = function (args) {
         "src.o"
     );
 };
-registerLanguage("cpp", CPP);
-registerLanguage("cxx", CPP);
+

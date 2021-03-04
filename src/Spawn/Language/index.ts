@@ -89,7 +89,7 @@ export function registerLanguage(name: string, language: Language) {
     }
 }
 
-export function getlanguage(name: string): Language {
+export function getLanguage(name: string): Language {
     name = name.toLowerCase();
     const lan = languageMap.get(name);
     if (lan !== undefined) {
@@ -98,3 +98,15 @@ export function getlanguage(name: string): Language {
         throw `Language ${name} not exists`;
     }
 }
+
+import { CPP } from "./CPP";
+registerLanguage("cpp", CPP);
+registerLanguage("cxx", CPP);
+import { C } from "./C";
+registerLanguage("c", C);
+import { PYTHON } from "./Python";
+registerLanguage("py", PYTHON);
+registerLanguage("py3", PYTHON);
+registerLanguage("python", PYTHON);
+registerLanguage("python3", PYTHON);
+export { CPP, C, PYTHON };
