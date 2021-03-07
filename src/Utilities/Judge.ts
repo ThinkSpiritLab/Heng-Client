@@ -1,27 +1,144 @@
-import { Judge, JudgeType } from "heng-protocol";
+import {
+    Executable,
+    Judge,
+    JudgeResult,
+    JudgeStatus,
+    JudgeType,
+} from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
-import { getConfig } from "../Config";
-import { getLanguage } from "../Spawn/Language";
-import { copy } from "./File";
 import * as fs from "fs";
-import { jailMeterSpawn } from "../Spawn";
 import { getLogger } from "log4js";
+import { JudgeFactoryConfig } from "../Config";
+import { ConfiguredLanguage, getLanguage } from "../Spawn/Language";
+import { copy, FileAgent } from "./File";
+import { BasicSpawnOption, jailMeterSpawn, JailSpawnOption } from "../Spawn";
+import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
+import { StdioType } from "src/Spawn/BasicSpawn";
 
-export class JudgeAgent {
+function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
+    return getLanguage(excutable.environment.language)(
+        excutable.environment.options
+    );
+}
+
+export class ExcutableAgent {
+    compiled: boolean = false;
+    configuredLanguage: ConfiguredLanguage;
     constructor(
-        readonly factory: JudgeFactory,
-        private judge: CreateJudgeArgs
-    ) {}
+        readonly excutable: Executable,
+        private fileAgent: FileAgent,
+        readonly name: string,
+        readonly cwdPrefix: string
+    ) {
+        this.configuredLanguage = languageFromExcutable(excutable);
+        fileAgent.add(
+            name,
+            excutable.source,
+            path.join(cwdPrefix, this.configuredLanguage.sourceFileName)
+        );
+    }
+
+    needCompile(): boolean {
+        return (
+            this.configuredLanguage.compileGenerator !== null && //compile is needed
+            !this.compiled
+        ); //not compiled
+    }
+
+    async compile(): Promise<MeterResult | void> {
+        const srcpath = await this.fileAgent.getPath(this.name);
+        if (
+            this.needCompile() &&
+            this.configuredLanguage.compileGenerator !== null
+        ) {
+            const compileLogFileStream = fs.createWriteStream(
+                path.resolve(this.fileAgent.dir, this.cwdPrefix, "compile.log")
+            );
+            const compileProcess = this.configuredLanguage.compileGenerator(
+                path.resolve(
+                    this.fileAgent.dir,
+                    this.cwdPrefix,
+                    this.configuredLanguage.sourceFileName
+                ),
+                path.resolve(
+                    this.fileAgent.dir,
+                    this.cwdPrefix,
+                    this.configuredLanguage.compiledFileName
+                ),
+                {
+                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
+                    stdio: ["pipe", compileLogFileStream, compileLogFileStream],
+                },
+                {
+                    timelimit: this.excutable.limit.compiler.cpuTime,
+                    memorylimit: this.excutable.limit.compiler.memory,
+                    filelimit: Math.max(
+                        this.excutable.limit.compiler.output,
+                        this.excutable.limit.compiler.message
+                    ),
+                    mount: [
+                        {
+                            path: path.resolve(
+                                this.fileAgent.dir,
+                                this.cwdPrefix
+                            ),
+                            mode: "rw",
+                        },
+                    ],
+                }
+            );
+            this.compiled = true;
+            return await compileProcess.result;
+        } else {
+            return;
+        }
+    }
+
+    async exec(stdio: StdioType): Promise<MeteredChildProcess> {
+        if (this.needCompile()) {
+            throw "Excutable not compiled";
+        } else {
+            const excutablePath = path.resolve(
+                this.fileAgent.dir,
+                this.cwdPrefix,
+                this.configuredLanguage.compiledFileName
+            );
+            const excuter =
+                this.configuredLanguage.excuteGenerator ?? jailMeterSpawn;
+            return excuter(
+                excutablePath,
+                [],
+                {
+                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
+                    stdio,
+                },
+                {
+                    timelimit: this.excutable.limit.runtime.cpuTime,
+                    memorylimit: this.excutable.limit.runtime.memory,
+                    filelimit: this.excutable.limit.runtime.output,
+                    mount: [{ path: excutablePath, mode: "ro" }],
+                }
+            );
+        }
+    }
+}
+
+export abstract class JudgeAgent {
+    abstract getResult(): Promise<JudgeResult>;
+    abstract getState(): JudgeStatus;
 }
 
 export class JudgeFactory {
     constructor(readonly timeRatio: number, readonly timeIntercept: number) {}
+
+    // async getJudgerAgent(judge: CreateJudgeArgs): Promise<JudgeAgent> {}
 }
 
-export async function getJudgerFactory(): Promise<JudgeFactory> {
+export async function getJudgerFactory(
+    judgerConfig: JudgeFactoryConfig
+): Promise<JudgeFactory> {
     const logger = getLogger("JudgeFactoryFactory");
-    const judgerConfig = getConfig().judger;
     logger.info("self test loaded");
     const timeIntercept = 0;
     const result = (
@@ -98,7 +215,7 @@ export async function getJudgerFactory(): Promise<JudgeFactory> {
                 if (testResult.returnCode !== 0 || testResult.signal !== -1) {
                     throw `TestProc for testcase ${index} Failed`;
                 }
-                return [testcase.timeExpected*1e9, testResult.time.real];
+                return [testcase.timeExpected * 1e9, testResult.time.real];
             })
         )
     ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
