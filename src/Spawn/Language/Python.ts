@@ -3,7 +3,6 @@ import {
     ConfiguredLanguage,
     generateExcuterGenerator,
     Language,
-    registerLanguage,
 } from ".";
 
 export const PYTHON: Language = function () {

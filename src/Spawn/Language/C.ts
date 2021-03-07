@@ -2,7 +2,6 @@ import { getConfig } from "../../Config";
 import {
     ConfiguredLanguage,
     Language,
-    registerLanguage,
     generateCompileGenerator,
 } from ".";
 

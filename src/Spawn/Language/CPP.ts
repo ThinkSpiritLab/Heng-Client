@@ -3,7 +3,6 @@ import {
     ConfiguredLanguage,
     generateCompileGenerator,
     Language,
-    registerLanguage,
 } from ".";
 
 export const CPP: Language = function (args) {
