@@ -1,19 +1,14 @@
 import { Writable, Readable, Stream } from "stream";
 import * as events from "events";
 
+export type StdioType = Array<
+    "pipe" | "ipc" | "ignore" | "inherit" | Stream | number | null | undefined
+>;
+
 export interface BasicSpawnOption {
     cwd?: string;
     env?: { [key: string]: string };
-    stdio?: Array<
-        | "pipe"
-        | "ipc"
-        | "ignore"
-        | "inherit"
-        | Stream
-        | number
-        | null
-        | undefined
-    >;
+    stdio?: StdioType;
     uid?: number;
     gid?: number;
 }
