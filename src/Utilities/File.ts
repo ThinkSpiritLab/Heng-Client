@@ -6,7 +6,7 @@ import * as unzip from "unzip-stream";
 import Axios from "axios";
 
 export type File = {
-    hashsum: string;
+    hashsum?: string;
     content?: string;
     url?: string;
 };
