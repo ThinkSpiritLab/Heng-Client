@@ -15,3 +15,12 @@ configFile = "./jailConfig.cfg"
 c = "/usr/bin/gcc"
 cpp = "/usr/bin/g++"
 python = "/usr/bin/python3"
+java = "/usr/bin/java"
+javac = "/usr/bin/javac"
+[judger]
+timeRatioTolerance = 5
+[[judger.testcases]]
+cwd = "./selfTest/5s"
+src = "5s.cpp"
+language = "cpp"
+timeExpected = 5

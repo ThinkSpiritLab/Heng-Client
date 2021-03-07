@@ -30,6 +30,12 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     python!: string;
+    @IsString()
+    @IsNotEmpty()
+    java!: string;
+    @IsString()
+    @IsNotEmpty()
+    javac!: string;
 }
 export class JailConfig {
     @IsString()
