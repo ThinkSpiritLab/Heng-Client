@@ -15,7 +15,7 @@ interface MeterSpawnOption {
     pidlimit?: number;
 }
 
-interface MeterResult {
+export interface MeterResult {
     memory: number; //bytes
     returnCode: number;
     signal: number;
