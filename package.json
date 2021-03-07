@@ -10,6 +10,7 @@
     "main": "built/index.js",
     "types": "built/index.d.ts",
     "description": "Judge Client of Heng",
+    "repository": "https://github.com/ThinkSpiritLab/Heng-Client",
     "devDependencies": {
         "@types/lodash": "^4.14.168",
         "@types/ws": "^7.4.0",
@@ -36,7 +37,7 @@
         "axios": "^0.21.0",
         "class-transformer": "^0.3.1",
         "class-validator": "^0.12.2",
-        "heng-protocol": "https://github.com/ThinkSpiritLab/Heng-Protocol",
+        "heng-protocol": "github:ThinkSpiritLab/Heng-Protocol#c178c87",
         "lodash": "^4.17.20",
         "log4js": "^6.3.0",
         "queue-typescript": "^1.0.1",
