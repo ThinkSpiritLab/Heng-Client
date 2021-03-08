@@ -1,5 +1,5 @@
 import { getLogger } from "log4js";
-import * as crypto from "crypto";
+import { createHmac, randomInt } from "crypto";
 import { orderBy, toUpper } from "lodash";
 import Axios, { AxiosResponse } from "axios";
 import {
@@ -58,7 +58,7 @@ export class Controller {
         }
     >;
     static MaxNonce = 0xffff;
-    _nonce = crypto.randomInt(Controller.MaxNonce);
+    _nonce = randomInt(Controller.MaxNonce);
     get nonce(): number {
         return this._nonce++;
     }
@@ -141,8 +141,7 @@ export class Controller {
             .join("&")}:${req.path}?${params
             .map((p) => p.toString())
             .join("&")}`;
-        const signature = crypto
-            .createHmac("sha256", this.SecrectKey)
+        const signature = createHmac("sha256", this.SecrectKey)
             .update(reqStr)
             .digest("hex");
         if (!req.headers) {
