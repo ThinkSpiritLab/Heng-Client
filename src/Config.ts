@@ -64,6 +64,7 @@ export class ControllerConfig {
 export class SelfConfig {
     @IsInt()
     @IsNotEmpty()
+    @IsPositive()
     judgeCapability!: number;
     @IsString()
     @IsNotEmpty()
