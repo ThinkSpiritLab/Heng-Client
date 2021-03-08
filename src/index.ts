@@ -24,7 +24,7 @@ async function main() {
     const logger = getLogger("main");
     logger.info("Lunched");
     const config = getConfig().self;
-    const judgerFactory = await getJudgerFactory();
+    const judgerFactory = await getJudgerFactory(getConfig().judger);
     const controller = new Controller(getConfig().controller);
     const token = await controller.getToken(
         config.judgeCapability,
