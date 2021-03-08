@@ -189,9 +189,9 @@ export class Controller {
 
     on(
         method: "CreateJudge",
-        cb: (args: CreateJudgeArgs) => Promise<void>
+        cb: (args: CreateJudgeArgs) => Promise<null>
     ): Controller;
-    on(method: "Exit", cb: (args: ExitArgs) => Promise<void>): Controller;
+    on(method: "Exit", cb: (args: ExitArgs) => Promise<null>): Controller;
     on(
         method: "Control",
         cb: (args: ControlArgs) => Promise<ConnectionSettings>
@@ -200,8 +200,8 @@ export class Controller {
     on(
         method: JudgerMethod | "Report",
         cb:
-            | ((args: CreateJudgeArgs) => Promise<void>)
-            | ((args: ExitArgs) => Promise<void>)
+            | ((args: CreateJudgeArgs) => Promise<null>)
+            | ((args: ExitArgs) => Promise<null>)
             | ((args: ControlArgs) => Promise<ConnectionSettings>)
             | ((args: void) => Promise<StatusReport>)
     ): Controller {
@@ -210,11 +210,11 @@ export class Controller {
         return this;
     }
 
-    async do(method: "Exit", args: ExitArgs): Promise<void>;
-    async do(method: "Log", args: LogArgs): Promise<void>;
-    async do(method: "ReportStatus", args: ReportStatusArgs): Promise<void>;
-    async do(method: "UpdateJudges", args: UpdateJudgesArgs): Promise<void>;
-    async do(method: "FinishJudges", args: FinishJudgesArgs): Promise<void>;
+    async do(method: "Exit", args: ExitArgs): Promise<null>;
+    async do(method: "Log", args: LogArgs): Promise<null>;
+    async do(method: "ReportStatus", args: ReportStatusArgs): Promise<null>;
+    async do(method: "UpdateJudges", args: UpdateJudgesArgs): Promise<null>;
+    async do(method: "FinishJudges", args: FinishJudgesArgs): Promise<null>;
 
     async do(method: ControllerMethod, args: ControllerArgs): Promise<unknown> {
         return new Promise((resolve, reject) => {

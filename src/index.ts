@@ -80,7 +80,7 @@ async function main() {
             });
         }, 1000);
         return new Promise((resolve, reject) => {
-            resolve(undefined);
+            resolve(null);
         });
     });
     logger.info(`Token is ${token.token}`);
