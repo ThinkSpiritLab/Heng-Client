@@ -109,4 +109,6 @@ registerLanguage("py", PYTHON);
 registerLanguage("py3", PYTHON);
 registerLanguage("python", PYTHON);
 registerLanguage("python3", PYTHON);
-export { CPP, C, PYTHON };
+import { JAVA } from "./Java";
+registerLanguage("java", JAVA);
+export { CPP, C, PYTHON, JAVA };

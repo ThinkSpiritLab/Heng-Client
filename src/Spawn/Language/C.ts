@@ -1,9 +1,5 @@
 import { getConfig } from "../../Config";
-import {
-    ConfiguredLanguage,
-    Language,
-    generateCompileGenerator,
-} from ".";
+import { ConfiguredLanguage, Language, generateCompileGenerator } from ".";
 
 export const C: Language = function (args) {
     const c = getConfig().language.c;
@@ -20,7 +16,7 @@ export const C: Language = function (args) {
                     ? `--std=${args.version}`
                     : "--std=C99",
             ];
-            if (args.o2) {
+            if (args.o2 !== false) {
                 compilerOptions.push("-O2");
             }
             if (args.static) {

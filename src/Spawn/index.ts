@@ -6,6 +6,24 @@ import { MeteredChildProcess, useMeter } from "./Meter";
 
 const logger = getLogger("JailMeterSpawn");
 
+export function loggedSpawn(
+    spawnFunction: (
+        command: string,
+        args: string[],
+        options: BasicSpawnOption
+    ) => BasicChildProcess
+) {
+    return function (
+        command: string,
+        args: string[],
+        options: BasicSpawnOption
+    ) {
+        logger.info(`${command} ${args.join(" ")}`);
+        // logger.info(option);
+        return spawnFunction(command, args, options);
+    };
+}
+
 function useJailAndMeter(jailOption: JailSpawnOption) {
     return function (
         spawnFunction: (
@@ -34,11 +52,7 @@ function useJailAndMeter(jailOption: JailSpawnOption) {
                 jailOption.pidlimit += 3;
             }
             return useMeter(meterOption)(
-                useJail(jailOption)((command, args, option) => {
-                    logger.info(`${command} ${args.join(" ")}`);
-                    // logger.info(option);
-                    return spawnFunction(command, args, option);
-                })
+                useJail(jailOption)(loggedSpawn(spawnFunction))
             )(command, args, options);
         };
     };

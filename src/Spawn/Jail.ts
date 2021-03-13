@@ -5,7 +5,6 @@ import path from "path";
 import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 
-const jailConfig = getConfig().nsjail;
 export interface JailMountingPoint {
     path: string;
     mode: "ro" | "rw";
@@ -24,6 +23,7 @@ export type JailedChildProcess = BasicChildProcess;
 const logger = getLogger("JailSpawn");
 
 export function useJail(jailOption: JailSpawnOption) {
+    const jailConfig = getConfig().nsjail;
     return function (
         spawnFunction: (
             command: string,

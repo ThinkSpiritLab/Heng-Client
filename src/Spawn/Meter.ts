@@ -7,7 +7,6 @@ import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 import { JailSpawnOption, useJail } from "./Jail";
 
-const meterConfig = getConfig().hc;
 
 interface MeterSpawnOption {
     timelimit?: number; //second
@@ -34,6 +33,7 @@ export interface MeteredChildProcess extends BasicChildProcess {
 const logger = getLogger("MeterSpawn");
 
 export function useMeter(meterOption: MeterSpawnOption) {
+    const meterConfig = getConfig().hc;
     return function (
         spawnFunction: (
             command: string,

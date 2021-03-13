@@ -81,9 +81,9 @@ export class JudgeFactoryTestCase {
     @IsString()
     @IsNotEmpty()
     src!: string;
-    @IsString()
-    @IsNotEmpty()
-    cwd!: string;
+    // @IsString()
+    // @IsNotEmpty()
+    // cwd!: string;
     @ValidateNested()
     @IsString()
     @IsOptional()
@@ -96,7 +96,7 @@ export class JudgeFactoryTestCase {
     @IsOptional()
     input?: string;
     @IsInt()
-    @Max(10)
+    @Max(40)
     @Min(1)
     timeExpected!: number;
 }
@@ -203,6 +203,8 @@ export function getConfig() {
         logger.info("Loading Config from file");
         const rawConfig = TOML.parse(configToml);
         config = plainToClass(Config, rawConfig);
+        // logger.fatal(JSON.stringify(rawConfig));
+        // logger.fatal(JSON.stringify(config));
         if (!tryValidate(config)) {
             config = undefined;
             throw `Failed to get Config,Please check configToml`;

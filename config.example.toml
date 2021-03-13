@@ -3,7 +3,7 @@ host = "http://localhost:8000/"
 SecrectKey = "0xffffffff"
 AccessKey = "ox00000000"
 [self]
-judgeCapability = 6
+judgeCapability = 1000
 name = "TestJudger"
 version = "0.0.1"
 [hc]
@@ -20,7 +20,14 @@ javac = "/usr/bin/javac"
 [judger]
 timeRatioTolerance = 5
 [[judger.testcases]]
-cwd = "./selfTest/5s"
-src = "5s.cpp"
+src = "./selfTest/src.cpp"
 language = "cpp"
-timeExpected = 5
+timeExpected = 1
+[[judger.testcases]]
+src = "./selfTest/Main.java"
+language = "java"
+timeExpected = 1
+[[judger.testcases]]
+src = "./selfTest/src.py"
+language = "py3"
+timeExpected = 2

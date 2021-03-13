@@ -145,77 +145,86 @@ export async function getJudgerFactory(
         await Promise.all(
             judgerConfig.testcases.map(async (testcase, index) => {
                 logger.info(`self test ${index} loaded`);
-                const language = getLanguage(testcase.language);
-                const configuredLanguage = language({});
-                let curExcutablePath = path.resolve(testcase.cwd, testcase.src);
-                logger.info(`copying src for testcase ${index}`);
-                await fs.promises.copyFile(
-                    curExcutablePath,
-                    path.resolve(
-                        testcase.cwd,
+                const fileAgent = new FileAgent(
+                    `${process.pid}selfTest${index}`,
+                    null
+                );
+                try {
+                    await fileAgent.ready;
+                    const language = getLanguage(testcase.language);
+                    const configuredLanguage = language({});
+                    let curExcutablePath = path.resolve(
+                        fileAgent.dir,
                         configuredLanguage.sourceFileName
-                    )
-                );
-                logger.info(`copyed src for testcase ${index}`);
-                curExcutablePath = path.resolve(
-                    testcase.cwd,
-                    configuredLanguage.sourceFileName
-                );
-                if (configuredLanguage.compileGenerator !== null) {
-                    logger.info(`self test ${index} compiling`);
-                    const compileProcess = configuredLanguage.compileGenerator(
-                        path.resolve(
-                            testcase.cwd,
-                            configuredLanguage.sourceFileName
-                        ),
-                        path.resolve(
-                            testcase.cwd,
+                    );
+                    logger.info(`copying src for testcase ${index}`);
+                    await fs.promises.copyFile(
+                        path.resolve(testcase.src),
+                        curExcutablePath
+                    );
+                    logger.info(`copyed src for testcase ${index}`);
+                    if (configuredLanguage.compileGenerator !== null) {
+                        logger.info(`self test ${index} compiling`);
+                        const compileProcess = configuredLanguage.compileGenerator(
+                            path.resolve(
+                                fileAgent.dir,
+                                configuredLanguage.sourceFileName
+                            ),
+                            path.resolve(
+                                fileAgent.dir,
+                                configuredLanguage.compiledFileName
+                            ),
+                            { cwd: fileAgent.dir },
+                            {
+                                timelimit: 10,
+                                mount: [{ path: fileAgent.dir, mode: "rw" }],
+                            }
+                        );
+                        const compileResult = await compileProcess.result;
+                        if (
+                            compileResult.returnCode !== 0 ||
+                            compileResult.signal !== -1
+                        ) {
+                            throw `Compile for testcase ${index} Failed`;
+                        }
+                        logger.info(`self test ${index} compiled`);
+                        curExcutablePath = path.resolve(
+                            fileAgent.dir,
                             configuredLanguage.compiledFileName
-                        ),
-                        { cwd: testcase.cwd },
+                        );
+                    }
+                    const testProc = (
+                        configuredLanguage.excuteGenerator ?? jailMeterSpawn
+                    )(
+                        curExcutablePath,
+                        testcase.args ?? [],
                         {
-                            timelimit: 10,
-                            mount: [{ path: testcase.cwd, mode: "rw" }],
+                            cwd: fileAgent.dir,
+                            stdio:
+                                testcase.input !== undefined
+                                    ? [fs.createReadStream(testcase.input)]
+                                    : undefined,
+                        },
+                        {
+                            timelimit:
+                                judgerConfig.timeRatioTolerance *
+                                2 *
+                                testcase.timeExpected,
+                            mount: [{ path: curExcutablePath, mode: "ro" }],
                         }
                     );
-                    const compileResult = await compileProcess.result;
+                    const testResult = await testProc.result;
                     if (
-                        compileResult.returnCode !== 0 ||
-                        compileResult.signal !== -1
+                        testResult.returnCode !== 0 ||
+                        testResult.signal !== -1
                     ) {
-                        throw `Compile for testcase ${index} Failed`;
+                        throw `TestProc for testcase ${index} Failed`;
                     }
-                    logger.info(`self test ${index} compiled`);
-                    curExcutablePath = path.resolve(
-                        testcase.cwd,
-                        configuredLanguage.compiledFileName
-                    );
+                    logger.info(`Test case ${index} completed in ${testResult.time.real}`)
+                    return [testcase.timeExpected * 1e9, testResult.time.real];
+                } finally {
+                    await fileAgent.clean();
                 }
-                const testProc = (
-                    configuredLanguage.excuteGenerator ?? jailMeterSpawn
-                )(
-                    curExcutablePath,
-                    testcase.args ?? [],
-                    {
-                        cwd: testcase.cwd,
-                        stdio:
-                            testcase.input !== undefined
-                                ? [fs.createReadStream(testcase.input)]
-                                : undefined,
-                    },
-                    {
-                        timelimit:
-                            judgerConfig.timeRatioTolerance *
-                            2 *
-                            testcase.timeExpected,
-                        mount: [{ path: testcase.cwd, mode: "rw" }],
-                    }
-                );
-                const testResult = await testProc.result;
-                if (testResult.returnCode !== 0 || testResult.signal !== -1) {
-                    throw `TestProc for testcase ${index} Failed`;
-                }
-                return [testcase.timeExpected * 1e9, testResult.time.real];
             })
         )
     ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);

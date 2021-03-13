@@ -23,6 +23,13 @@ async function main() {
     });
     const logger = getLogger("main");
     logger.info("Lunched");
+    try {
+        getConfig();
+    } catch (e) {
+        logger.fatal(e);
+        await wait(2000);
+        throw e;
+    }
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(getConfig().judger);
     const controller = new Controller(getConfig().controller);
