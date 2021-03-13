@@ -116,5 +116,7 @@ export class FileAgent {
             return path.join(this.dir, "data", name);
         }
     }
-    async clean() {}
+    async clean() {
+        return await fs.promises.rmdir(this.dir, { recursive: true });
+    }
 }
