@@ -1,10 +1,8 @@
 import {
     Executable,
-    Judge,
     JudgeCaseResult,
     JudgeResult,
     JudgeResultKind,
-    JudgeStatus,
     JudgeType,
 } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
@@ -13,8 +11,8 @@ import * as fs from "fs";
 import { getLogger } from "log4js";
 import { JudgeFactoryConfig } from "../Config";
 import { ConfiguredLanguage, getLanguage } from "../Spawn/Language";
-import { copy, FileAgent, readStream, waitForOpen } from "./File";
-import { BasicSpawnOption, jailMeterSpawn, JailSpawnOption } from "../Spawn";
+import { FileAgent, readStream, waitForOpen } from "./File";
+import { jailMeterSpawn } from "../Spawn";
 import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 import { StdioType } from "src/Spawn/BasicSpawn";
 
@@ -25,7 +23,7 @@ function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
 }
 
 export class ExecutableAgent {
-    compiled: boolean = false;
+    compiled = false;
     configuredLanguage: ConfiguredLanguage;
     constructor(
         readonly excutable: Executable,
@@ -278,8 +276,6 @@ export abstract class JudgeAgent {
                     userResult.returnCode !== 0
                 ) {
                     return JudgeResultKind.RuntimeError;
-                } else if (userResult.memory > userExec.limit.runtime.memory) {
-                    return JudgeResultKind.MemoryLimitExceeded;
                 } else if (sysResult.signal === 25) {
                     return JudgeResultKind.SystemOutpuLimitExceeded;
                 } else if (
@@ -294,8 +290,6 @@ export abstract class JudgeAgent {
                     sysResult.returnCode !== 0
                 ) {
                     return JudgeResultKind.SystemRuntimeError;
-                } else if (sysResult.memory > sysExec.limit.runtime.memory) {
-                    return JudgeResultKind.SystemMemoryLimitExceeded;
                 } else if (sysJudge === "AC") {
                     return JudgeResultKind.Accepted;
                 } else if (sysJudge === "WA") {
@@ -332,46 +326,46 @@ export class NormalJudgeAgent extends JudgeAgent {
         if (compileResult !== undefined) {
             return compileResult;
         } else if (userExecutableAgent !== undefined) {
-            const result = this.judge.test?.cases?.map?.(
-                async (value, index, array) => {
-                    const [inputStream, stdPath] = await Promise.all([
-                        this.fileAgent.getStream(value.input),
-                        this.fileAgent.getPath(value.output),
-                    ]);
-                    const userProcess = userExecutableAgent.exec([
-                        inputStream,
-                        "pipe",
-                        "pipe",
-                    ]);
-                    const compProcess = jailMeterSpawn(
-                        this.cmp,
-                        ["--std", stdPath],
-                        { stdio: [userProcess.stdout] },
-                        {
-                            timelimit: this.judge.judge.user.limit.runtime
-                                .cpuTime,
-                            memorylimit: this.judge.judge.user.limit.runtime
-                                .memory,
-                            filelimit: this.judge.judge.user.limit.runtime
-                                .output,
-                        }
-                    );
-                    const [userResult, cmpResult, cmpOut] = await Promise.all([
-                        userProcess.result,
-                        compProcess.result,
-                        compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
-                            : "",
-                    ]);
-                    return this.generateResult(
-                        userResult,
-                        this.judge.judge.user,
-                        cmpResult,
-                        this.judge.judge.user,
-                        cmpOut
-                    );
-                }
-            );
+            const result = this.judge.test?.cases?.map?.(async (value) => {
+                const [inputStream, stdPath] = await Promise.all([
+                    this.fileAgent.getStream(value.input),
+                    this.fileAgent.getPath(value.output),
+                ]);
+                const userProcess = userExecutableAgent.exec([
+                    inputStream,
+                    "pipe",
+                    "pipe",
+                ]);
+                const compProcess = jailMeterSpawn(
+                    this.cmp,
+                    ["--std", stdPath],
+                    { stdio: [userProcess.stdout] },
+                    {
+                        timelimit: this.judge.judge.user.limit.runtime.cpuTime,
+                        memorylimit: this.judge.judge.user.limit.runtime.memory,
+                        filelimit: this.judge.judge.user.limit.runtime.output,
+                    }
+                );
+                const [userResult, cmpResult, cmpOut] = await Promise.all([
+                    userProcess.result,
+                    compProcess.result,
+                    compProcess.stdout !== null
+                        ? readStream(compProcess.stdout)
+                        : "",
+                ]);
+                return this.generateResult(
+                    userResult,
+                    this.judge.judge.user,
+                    cmpResult,
+                    this.judge.judge.user,
+                    cmpOut
+                );
+            });
+
+            return {
+                cases: await Promise.all(result ?? []),
+                extra: await this.getExtra(),
+            };
         }
         {
             return {
@@ -380,7 +374,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                         kind: JudgeResultKind.SystemError,
                         time: 0,
                         memory: 0,
-                        extraMessage: `Unknow Compile Failed`,
+                        extraMessage: "Unknow Compile Failed",
                     },
                 ],
             };
@@ -427,7 +421,7 @@ export class JudgeFactory {
                 );
             }
             default:
-                throw `Unkown JudgeType`;
+                throw "Unkown JudgeType";
         }
     }
 }

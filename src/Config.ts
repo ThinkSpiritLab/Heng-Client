@@ -105,7 +105,7 @@ export class JudgeFactoryConfig {
     @IsArray()
     @ValidateNested()
     @ArrayNotEmpty()
-    // @ArrayMinSize(2)
+    @ArrayMinSize(2)
     @ArrayMaxSize(20)
     @Type(() => JudgeFactoryTestCase)
     testcases!: JudgeFactoryTestCase[];
@@ -146,9 +146,9 @@ export class Config {
 let config: Config | undefined = undefined;
 
 function tryValidate(
-    args: any,
-    padding: number = 0,
-    prefix: string = ""
+    args: Record<string, unknown>,
+    padding = 0,
+    prefix = ""
 ): boolean {
     const errs = validateSync(args, {
         whitelist: true,
@@ -201,7 +201,7 @@ function tryValidate(
     return true;
 }
 
-export function getConfig() {
+export function getConfig(): Config {
     if (config === undefined) {
         logger.info("Loading Config from file");
         const rawConfig = TOML.parse(configToml);
@@ -210,7 +210,7 @@ export function getConfig() {
         // logger.fatal(JSON.stringify(config));
         if (!tryValidate(config)) {
             config = undefined;
-            throw `Failed to get Config,Please check configToml`;
+            throw "Failed to get Config,Please check configToml";
         }
         logger.info("Loaded Config from file");
     }

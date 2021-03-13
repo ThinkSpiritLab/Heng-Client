@@ -1,6 +1,5 @@
 import { spawn } from "child_process";
-import { plainToClass } from "class-transformer";
-import { getLogger } from "log4js";
+// import { getLogger } from "log4js";
 import path from "path";
 import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
@@ -20,7 +19,7 @@ export interface JailSpawnOption {
 
 export type JailedChildProcess = BasicChildProcess;
 
-const logger = getLogger("JailSpawn");
+// const logger = getLogger("JailSpawn");
 
 export function useJail(jailOption: JailSpawnOption) {
     const jailConfig = getConfig().nsjail;
@@ -85,7 +84,7 @@ export function useJail(jailOption: JailSpawnOption) {
                 );
             }
             if (options.stdio) {
-                options.stdio.forEach((value, index, arry) =>
+                options.stdio.forEach((value, index) =>
                     jailArgs.push("--pass_fd", index.toString())
                 );
             }

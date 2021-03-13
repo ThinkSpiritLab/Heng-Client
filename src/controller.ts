@@ -11,7 +11,6 @@ import {
     CreateJudgeArgs,
     ExitArgs,
     ControlArgs,
-    JudgerArgs,
     LogArgs,
     ControllerArgs,
     ReportStatusArgs,
@@ -48,7 +47,7 @@ export class Controller {
     ws!: WebSocket;
     connectingSettings: ConnectionSettings = { statusReportInterval: 1000 };
     statusReportTimer?: NodeJS.Timer;
-    judgerMethods: Map<JudgerMethod | "Report", (args: any) => Promise<any>>;
+    judgerMethods: Map<JudgerMethod | "Report", (args: any) => Promise<unknown|void>>;
     messageCallbackMap: Map<
         number,
         {

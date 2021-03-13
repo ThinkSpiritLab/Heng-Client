@@ -1,12 +1,9 @@
 import { spawn } from "child_process";
-import { plainToClass } from "class-transformer";
 import { getLogger } from "log4js";
 import path from "path";
 import { Readable } from "stream";
 import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
-import { JailSpawnOption, useJail } from "./Jail";
-
 
 interface MeterSpawnOption {
     timelimit?: number; //second

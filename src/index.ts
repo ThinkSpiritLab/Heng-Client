@@ -2,14 +2,10 @@ import "reflect-metadata";
 import { configure, getLogger } from "log4js";
 import { Controller } from "./controller";
 import { cpus } from "os";
-import { JudgeState } from "heng-protocol";
 import { getConfig } from "./Config";
 import { getJudgerFactory } from "./Utilities/Judge";
-import { result } from "lodash";
 async function wait(ms: number) {
-    return new Promise((resolve, reject) =>
-        setTimeout(() => resolve(null), ms)
-    );
+    return new Promise((resolve) => setTimeout(() => resolve(null), ms));
 }
 
 async function main() {

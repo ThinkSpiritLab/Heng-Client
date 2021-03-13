@@ -4,6 +4,7 @@ import * as path from "path";
 import { pipeline, Readable } from "stream";
 import * as unzip from "unzip-stream";
 import Axios from "axios";
+import { PlatformPath } from "node:path";
 
 export type File = {
     hashsum?: string;
@@ -11,29 +12,7 @@ export type File = {
     url?: string;
 };
 
-export function copy(source: string, dest: string) {
-    let done = false;
-    return new Promise<void>((resolve, reject) => {
-        let finish = (err?: any) => {
-            if (!done) {
-                if (err !== undefined) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-                done = true;
-            }
-        };
-        const ifd = fs.createReadStream(source);
-        const ofd = fs.createWriteStream(dest);
-        const pipe = pipeline(ifd, ofd, (err) => finish());
-        ifd.on("error", (err) => finish(err));
-        ofd.on("error", (err) => finish(err));
-        pipe.on("close", () => finish());
-    });
-}
-
-export function readStream(s: Readable) {
+export function readStream(s: Readable): Promise<string> {
     const data: string[] = [];
     s.on("data", (chunk) => {
         data.push(chunk.toString());
@@ -44,8 +23,8 @@ export function readStream(s: Readable) {
     });
 }
 
-export function waitForOpen(s: fs.WriteStream) {
-    return new Promise<null>((resolve, reject) => {
+export function waitForOpen(s: fs.WriteStream): Promise<null> {
+    return new Promise<null>((resolve) => {
         s.on("open", () => resolve(null));
     });
 }
@@ -71,7 +50,7 @@ export class FileAgent {
                 recursive: true,
                 mode: 0o700,
             })
-            .then(async (dir) => {
+            .then(async () => {
                 if (this.primaryFile) {
                     const pipe = pipeline(
                         await readableFromFile(this.primaryFile),
@@ -85,13 +64,13 @@ export class FileAgent {
                 return;
             });
     }
-    async register(name: string, subpath: string) {
+    register(name: string, subpath: string): void {
         if (!path.isAbsolute(subpath)) {
             subpath = path.join(this.dir, subpath);
         }
         this.nameToFile.set(name, [null, subpath, true]);
     }
-    async add(name: string, file: File, subpath?: string) {
+    add(name: string, file: File, subpath?: string): PlatformPath {
         if (subpath === undefined) {
             subpath = name;
         }
@@ -116,9 +95,10 @@ export class FileAgent {
                         recursive: true,
                         mode: 0o700,
                     });
-                    return new Promise(async (resolve, reject) => {
-                        const pipe = pipeline(
-                            await readableFromFile(file),
+                    const readable = await readableFromFile(file);
+                    return new Promise((resolve, reject) => {
+                        pipeline(
+                            readable,
                             fs.createWriteStream(subpath),
                             (err) => {
                                 if (err) {
@@ -142,7 +122,7 @@ export class FileAgent {
             return path.join(this.dir, "data", name);
         }
     }
-    async clean() {
+    async clean(): Promise<void> {
         return await fs.promises.rmdir(this.dir, { recursive: true });
     }
 }
