@@ -33,6 +33,23 @@ export function copy(source: string, dest: string) {
     });
 }
 
+export function readStream(s: Readable) {
+    const data: string[] = [];
+    s.on("data", (chunk) => {
+        data.push(chunk.toString());
+    });
+    return new Promise<string>((resolve, reject) => {
+        s.on("end", () => resolve(data.join()));
+        s.on("error", (err) => reject(err));
+    });
+}
+
+export function waitForOpen(s: fs.WriteStream) {
+    return new Promise<null>((resolve, reject) => {
+        s.on("open", () => resolve(null));
+    });
+}
+
 export function readableFromFile(file: File): Promise<Readable> {
     if (file.content !== undefined) {
         return Promise.resolve(Readable.from(file.content));
@@ -69,7 +86,9 @@ export class FileAgent {
             });
     }
     async register(name: string, subpath: string) {
-        subpath = path.join(this.dir, subpath);
+        if (!path.isAbsolute(subpath)) {
+            subpath = path.join(this.dir, subpath);
+        }
         this.nameToFile.set(name, [null, subpath, true]);
     }
     async add(name: string, file: File, subpath?: string) {
@@ -100,13 +119,20 @@ export class FileAgent {
                     return new Promise(async (resolve, reject) => {
                         const pipe = pipeline(
                             await readableFromFile(file),
-                            fs.createWriteStream(subpath)
+                            fs.createWriteStream(subpath),
+                            (err) => {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve(subpath);
+                                }
+                            }
                         );
-                        pipe.on("close", () => {
-                            this.nameToFile.set(name, [null, subpath, true]);
-                            resolve(subpath);
-                        });
-                        pipe.on("error", (err) => reject(err));
+                        // pipe.on("close", () => {
+                        //     this.nameToFile.set(name, [null, subpath, true]);
+                        //     resolve(subpath);
+                        // });
+                        // pipe.on("error", (err) => reject(err));
                     });
                 } else {
                     throw "File not found nor writen";

@@ -102,6 +102,7 @@ export function getLanguage(name: string): Language {
 import { CPP } from "./CPP";
 registerLanguage("cpp", CPP);
 registerLanguage("cxx", CPP);
+registerLanguage("c++", CPP);
 import { C } from "./C";
 registerLanguage("c", C);
 import { PYTHON } from "./Python";

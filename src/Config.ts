@@ -113,6 +113,9 @@ export class JudgeFactoryConfig {
     @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
+    @IsString()
+    @IsNotEmpty()
+    cmp!: string;
 }
 export class Config {
     @ValidateNested()

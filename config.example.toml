@@ -19,6 +19,7 @@ java = "/usr/bin/java"
 javac = "/usr/bin/javac"
 [judger]
 timeRatioTolerance = 5
+cmp = '/usr/bin/ojcmp'
 [[judger.testcases]]
 src = "./selfTest/src.cpp"
 language = "cpp"
