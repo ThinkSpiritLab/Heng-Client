@@ -1,5 +1,6 @@
 import * as os from "os";
 import * as fs from "fs";
+import { open } from "fs-extra";
 import * as path from "path";
 import { pipeline, Readable } from "stream";
 import * as unzip from "unzip-stream";
@@ -45,24 +46,29 @@ export class FileAgent {
     private nameToFile = new Map<string, [File | null, string, boolean]>();
     constructor(readonly prefix: string, readonly primaryFile: File | null) {
         this.dir = path.join(os.tmpdir(), prefix);
-        this.ready = fs.promises
-            .mkdir(this.dir, {
+        this.ready = new Promise(async (resolve, reject) => {
+            await fs.promises.mkdir(this.dir, {
                 recursive: true,
-                mode: 0o700,
-            })
-            .then(async () => {
-                if (this.primaryFile) {
-                    const pipe = pipeline(
-                        await readableFromFile(this.primaryFile),
-                        unzip.Extract({ path: path.join(this.dir, "data") })
-                    );
-                    return new Promise((resolve, reject) => {
-                        pipe.on("close", () => resolve());
-                        pipe.on("error", (err) => reject(err));
-                    });
-                }
-                return;
+                mode: 0o777,
             });
+            if (this.primaryFile) {
+                const pipe = pipeline(
+                    await readableFromFile(this.primaryFile),
+                    unzip.Extract({
+                        path: path.join(this.dir, "data"),
+                    }),
+                    (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    }
+                );
+            } else {
+                resolve();
+            }
+        });
     }
     register(name: string, subpath: string): void {
         if (!path.isAbsolute(subpath)) {
@@ -82,6 +88,11 @@ export class FileAgent {
         await this.ready;
         const s = fs.createReadStream(await this.getPath(name));
         await waitForOpen(s);
+        return s;
+    }
+    async getFd(name: string): Promise<number> {
+        await this.ready;
+        const s = fs.openSync(await this.getPath(name), "r");
         return s;
     }
     async getPath(name: string): Promise<string> {

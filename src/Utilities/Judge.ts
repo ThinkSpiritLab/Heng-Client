@@ -16,6 +16,7 @@ import { jailMeterSpawn } from "../Spawn";
 import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 import { StdioType } from "src/Spawn/BasicSpawn";
 import { Throttle } from "./Throttle";
+import { Writable } from "node:stream";
 
 function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
     return getLanguage(excutable.environment.language)(
@@ -307,6 +308,9 @@ export abstract class JudgeAgent {
                 } else if (sysJudge === "WA") {
                     return JudgeResultKind.WrongAnswer;
                 } else {
+                    getLogger("generateResult").fatal(
+                        `Judger says:${sysJudge}`
+                    );
                     return JudgeResultKind.SystemError;
                 }
             })(),
@@ -522,7 +526,12 @@ export class SpecialJudgeAgent extends JudgeAgent {
             spjExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, stdStream] = await Promise.all([
+                const [
+                    inputStream,
+                    inputStream2,
+                    stdStream,
+                ] = await Promise.all([
+                    this.fileAgent.getStream(value.input),
                     this.fileAgent.getStream(value.input),
                     this.fileAgent.getStream(value.output),
                 ]);
@@ -539,9 +548,14 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     const compProcess = spjExecutableAgent.exec([
                         userProcess.stdout,
                         "pipe",
-                        inputStream,
+                        "pipe",
+                        // "pipe",
+                        // "pipe",
+                        inputStream2,
                         stdStream,
                     ]);
+                    // inputStream2.pipe(userProcess.stdio[2]as unknown as Writable)
+                    // stdStream.pipe(userProcess.stdio[3]as unknown as Writable)
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
                         compProcess.result,
@@ -716,6 +730,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                     }
                     const compProcess = interactorExecutableAgent.exec([
                         userProcess.stdout,
+                        "pipe",
                         "pipe",
                         inputStream,
                         stdStream,
