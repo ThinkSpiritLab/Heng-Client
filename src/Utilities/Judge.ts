@@ -264,13 +264,14 @@ export abstract class JudgeAgent {
 
     abstract getResult(): Promise<JudgeResult>;
 
-    async generateResult(
+    generateResult(
         userResult: MeterResult,
         userExec: Executable,
         sysResult: MeterResult,
         sysExec: Executable,
         sysJudge: string
-    ): Promise<JudgeCaseResult> {
+    ): JudgeCaseResult {
+        sysJudge = sysJudge.trim();
         return {
             kind: (() => {
                 if (userResult.signal === 25) {
@@ -345,14 +346,18 @@ export class NormalJudgeAgent extends JudgeAgent {
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        inputStream,
+                        // inputStream,
+                        "pipe",
                         "pipe",
                         "pipe",
                     ]);
+                    if (userProcess.stdin) {
+                        inputStream.pipe(userProcess.stdin);
+                    }
                     const compProcess = jailMeterSpawn(
                         this.cmp,
                         ["--std", stdPath],
-                        { stdio: [userProcess.stdout] },
+                        { stdio: [userProcess.stdout, "pipe", "pipe"] },
                         {
                             timelimit: this.judge.judge.user.limit.runtime
                                 .cpuTime,
@@ -360,6 +365,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                                 .memory,
                             filelimit: this.judge.judge.user.limit.runtime
                                 .output,
+                            mount: [{ path: stdPath, mode: "ro" }],
                         }
                     );
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
@@ -522,10 +528,14 @@ export class SpecialJudgeAgent extends JudgeAgent {
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        inputStream,
+                        "pipe",
                         "pipe",
                         "pipe",
                     ]);
+                    if (userProcess.stdin) {
+                        inputStream.pipe(userProcess.stdin);
+                    }
+
                     const compProcess = spjExecutableAgent.exec([
                         userProcess.stdout,
                         "pipe",
@@ -697,10 +707,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        inputStream,
+                        "pipe",
                         "pipe",
                         "pipe",
                     ]);
+                    if (userProcess.stdin) {
+                        inputStream.pipe(userProcess.stdin);
+                    }
                     const compProcess = interactorExecutableAgent.exec([
                         userProcess.stdout,
                         "pipe",
