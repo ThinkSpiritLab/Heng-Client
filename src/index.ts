@@ -55,8 +55,8 @@ async function main() {
         const resultPromise = judgeAgent.getResult();
         resultPromise
             .then((result) => {
-                logger.info(`Task:${JSON.stringify(task)}`);
-                logger.info(`Result:${JSON.stringify(result)}`);
+                // logger.info(`Task:${JSON.stringify(task)}`);
+                // logger.info(`Result:${JSON.stringify(result)}`);
                 controller.do("FinishJudges", { id: task.id, result });
             })
             .finally(() => judgeAgent.clean());
