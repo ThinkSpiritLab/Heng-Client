@@ -30,6 +30,7 @@
         "format": "prettier -c ./src/**/*.ts --write",
         "build": "tsc",
         "docker:build": "docker build .",
+        "docker:build:fresh": "docker build --no-cache .",
         "docker:run": "docker run --privileged --network=\"host\" -v $(pwd)/config.toml:/usr/src/app/config.toml heng-client",
         "dev": "ts-node-dev --respawn -- src/index.ts",
         "start": "node dist/index.js"
