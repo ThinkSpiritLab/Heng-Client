@@ -23,7 +23,7 @@ export function readStream(s: Readable): Promise<string> {
     });
 }
 
-export function waitForOpen(s: fs.WriteStream): Promise<null> {
+export function waitForOpen(s: fs.WriteStream | fs.ReadStream): Promise<null> {
     return new Promise<null>((resolve) => {
         s.on("open", () => resolve(null));
     });
@@ -80,7 +80,9 @@ export class FileAgent {
     }
     async getStream(name: string): Promise<Readable> {
         await this.ready;
-        return fs.createReadStream(await this.getPath(name));
+        const s = fs.createReadStream(await this.getPath(name));
+        await waitForOpen(s);
+        return s;
     }
     async getPath(name: string): Promise<string> {
         await this.ready;
