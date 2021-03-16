@@ -4,6 +4,7 @@ import { Controller } from "./controller";
 import { cpus } from "os";
 import { getConfig } from "./Config";
 import { getJudgerFactory } from "./Utilities/Judge";
+import { Throttle } from "./Utilities/Throttle";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
 }
@@ -28,7 +29,10 @@ async function main() {
         throw e;
     }
     const config = getConfig().self;
-    const judgerFactory = await getJudgerFactory(getConfig().judger);
+    const judgerFactory = await getJudgerFactory(
+        getConfig().judger,
+        new Throttle(config.judgeCapability)
+    );
     const controller = new Controller(getConfig().controller);
     controller.on("Report", () => {
         return Promise.resolve({
