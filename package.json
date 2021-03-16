@@ -29,6 +29,7 @@
         "ci-format": "prettier -c ./src/**/*.ts",
         "format": "prettier -c ./src/**/*.ts --write",
         "build": "tsc",
+        "docker:build":"docker build .",
         "dev": "ts-node-dev --respawn -- src/index.ts",
         "start": "node dist/index.js"
     },

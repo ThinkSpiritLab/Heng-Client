@@ -208,7 +208,7 @@ export function getConfig(): Config {
         config = plainToClass(Config, rawConfig);
         // logger.fatal(JSON.stringify(rawConfig));
         // logger.fatal(JSON.stringify(config));
-        if (!tryValidate(config)) {
+        if (!tryValidate((config as any) as Record<string, unknown>)) {
             config = undefined;
             throw "Failed to get Config,Please check configToml";
         }
