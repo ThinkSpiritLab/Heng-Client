@@ -14,12 +14,12 @@ import path from "path";
 
 export function javaExtraArg(
     jailOption: JailSpawnOption,
-    args: { [key: string]: string | number | boolean }
+    args: { [key: string]: string | number | boolean } | undefined
 ) {
     const javaOption: string[] = [];
     if (jailOption.memorylimit !== undefined) {
         javaOption.push(
-            args.stackSize ? `-Xss${args.stackSize}k` : "-Xss256k",
+            args?.stackSize ? `-Xss${args.stackSize}k` : "-Xss256k",
             `-Xms${Math.ceil(jailOption.memorylimit / 4)}m`,
             `-Xmx${jailOption.memorylimit}m`
         );
@@ -87,7 +87,7 @@ export const JAVA: Language = function (javaargs) {
                 })(loggedSpawn(spawn))
             )(java, javaOption, options);
         },
-        `${javaargs.className ?? "Main"}.java`,
-        `${javaargs.className ?? "Main"}.class`
+        `${javaargs?.className ?? "Main"}.java`,
+        `${javaargs?.className ?? "Main"}.class`
     );
 };

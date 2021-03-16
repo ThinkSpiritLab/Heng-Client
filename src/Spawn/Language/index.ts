@@ -71,9 +71,13 @@ export class ConfiguredLanguage {
     ) {}
 }
 
-export type Language = (args: {
-    [key: string]: string | boolean | number;
-}) => ConfiguredLanguage;
+export type Language = (
+    args:
+        | {
+              [key: string]: string | boolean | number;
+          }
+        | undefined
+) => ConfiguredLanguage;
 
 const logger = getLogger("LanguageService");
 

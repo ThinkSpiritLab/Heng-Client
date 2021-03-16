@@ -12,17 +12,17 @@ export const CPP: Language = function (args) {
                 src,
                 "-o",
                 output,
-                args.version !== undefined
+                args?.version !== undefined
                     ? `--std=${args.version}`
                     : "--std=c++17",
             ];
-            if (args.o2 !== false) {
+            if (args?.o2 !== false) {
                 compilerOptions.push("-O2");
             }
-            if (args.static) {
+            if (args?.static) {
                 compilerOptions.push("-static");
             }
-            if (args.lm) {
+            if (args?.lm) {
                 compilerOptions.push("-lm");
             }
             return [cpp, compilerOptions];
