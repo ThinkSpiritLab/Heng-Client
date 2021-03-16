@@ -16,7 +16,6 @@ import { jailMeterSpawn } from "../Spawn";
 import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 import { StdioType } from "src/Spawn/BasicSpawn";
 import { Throttle } from "./Throttle";
-import { Writable } from "node:stream";
 
 function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
     return getLanguage(excutable.environment.language)(
@@ -531,26 +530,22 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     inputStream2,
                     stdStream,
                 ] = await Promise.all([
-                    this.fileAgent.getStream(value.input),
-                    this.fileAgent.getStream(value.input),
-                    this.fileAgent.getStream(value.output),
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        "pipe",
+                        // "pipe",
+                        inputStream,
                         "pipe",
                         "pipe",
                     ]);
-                    if (userProcess.stdin) {
-                        inputStream.pipe(userProcess.stdin);
-                    }
 
                     const compProcess = spjExecutableAgent.exec([
                         userProcess.stdout,
                         "pipe",
                         "pipe",
-                        // "pipe",
-                        // "pipe",
                         inputStream2,
                         stdStream,
                     ]);
@@ -716,18 +711,16 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
                 const [inputStream, stdStream] = await Promise.all([
-                    this.fileAgent.getStream(value.input),
-                    this.fileAgent.getStream(value.output),
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        "pipe",
+                        inputStream,
                         "pipe",
                         "pipe",
                     ]);
-                    if (userProcess.stdin) {
-                        inputStream.pipe(userProcess.stdin);
-                    }
+
                     const compProcess = interactorExecutableAgent.exec([
                         userProcess.stdout,
                         "pipe",
@@ -772,26 +765,6 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         }
     }
 }
-
-// export class SpecialJudgeAgent extends JudgeAgent {
-//     constructor(public judge: CreateJudgeArgs) {
-//         super(judge);
-//         if (judge.judge.type !== JudgeType.Special) {
-//             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
-//         }
-//         this.excutables.push(judge.judge.spj);
-//     }
-// }
-
-// export class InteractiveJudgeAgent extends JudgeAgent {
-//     constructor(public judge: CreateJudgeArgs) {
-//         super(judge);
-//         if (judge.judge.type !== JudgeType.Interactive) {
-//             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
-//         }
-//         this.excutables.push(judge.judge.interactor);
-//     }
-// }
 
 export class JudgeFactory {
     constructor(
