@@ -1,0 +1,82 @@
+{
+    "id": "1",
+    "dynamicFiles": [
+        {
+            "type": "remote",
+            "name": "in",
+            "file": {
+                "type": "direct",
+                "content": "3"
+            }
+        },
+        {
+            "type": "remote",
+            "name": "out",
+            "file": {
+                "type": "direct",
+                "content": "10"
+            }
+        }
+    ],
+    "judge": {
+        "type": "special",
+        "user": {
+            "source": {
+                "type": "direct",
+                "content": "#include <iostream>\n int main() {std::cout<<\"1 6\"<<std::endl; return 0;}"
+            },
+            "environment": {
+                "language": "cxx",
+                "system": "Windows",
+                "arch": "x64",
+                "options": {}
+            },
+            "limit": {
+                "runtime": {
+                    "memory": 10240000000,
+                    "cpuTime": 10000000000,
+                    "output": 1024
+                },
+                "compiler": {
+                    "memory": 10240000000,
+                    "cpuTime": 10240000000,
+                    "output": 1024,
+                    "message": 1024
+                }
+            }
+        },
+        "spj": {
+            "source": {
+                "type": "direct",
+                "content": "#include <bits/stdc++.h>\n\nusing namespace std;\n\nint main() {\n  FILE *f = fdopen(3, \"r\");\n  FILE *d = fdopen(4, \"r\");\n\n  int a, b;\n\n  fscanf(f, \"%d\", &a);\n  fscanf(d, \"%d\", &b);\n\n  int x, y;\n  scanf(\"%d%d\", &x, &y);\n  if (x + y + a == b)\n    std::cout << \"AC\";\n  else\n    std::cout << \"WA\";\n  return 0;\n}"
+            },
+            "environment": {
+                "language": "cxx",
+                "system": "Windows",
+                "arch": "x64",
+                "options": {}
+            },
+            "limit": {
+                "runtime": {
+                    "memory": 10240000000,
+                    "cpuTime": 10000000000,
+                    "output": 1024
+                },
+                "compiler": {
+                    "memory": 10240000000,
+                    "cpuTime": 10240000000,
+                    "output": 1024,
+                    "message": 1024
+                }
+            }
+        }
+    },
+    "test": {
+        "cases": [{ "input": "in", "output": "out" }],
+        "policy": "all"
+    },
+    "callbackUrls": {
+        "update": "http://localhost:8000/v1/judges/testurl",
+        "finish": "http://localhost:8000/v1/judges/testurl"
+    }
+}
