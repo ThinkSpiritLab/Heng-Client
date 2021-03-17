@@ -83,7 +83,7 @@ const logger = getLogger("LanguageService");
 
 const languageMap = new Map<string, Language>();
 
-export function registerLanguage(name: string, language: Language) {
+export function registerLanguage(name: string, language: Language):void {
     name = name.toLowerCase();
     if (!languageMap.has(name)) {
         languageMap.set(name, language);

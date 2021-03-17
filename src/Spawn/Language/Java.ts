@@ -15,7 +15,7 @@ import path from "path";
 export function javaExtraArg(
     jailOption: JailSpawnOption,
     args: { [key: string]: string | number | boolean } | undefined
-) {
+): string[] {
     const javaOption: string[] = [];
     if (jailOption.memorylimit !== undefined) {
         javaOption.push(

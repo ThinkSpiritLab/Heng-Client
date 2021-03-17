@@ -12,7 +12,11 @@ export function loggedSpawn(
         args: string[],
         options: BasicSpawnOption
     ) => BasicChildProcess
-) {
+): (
+    command: string,
+    args: string[],
+    options: BasicSpawnOption
+) => BasicChildProcess {
     return function (
         command: string,
         args: string[],

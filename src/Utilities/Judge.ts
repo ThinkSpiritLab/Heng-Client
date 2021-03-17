@@ -144,7 +144,7 @@ export abstract class JudgeAgent {
             judge.data ?? null
         );
         if (judge.dynamicFiles !== undefined) {
-            judge.dynamicFiles.forEach((file, index) => {
+            judge.dynamicFiles.forEach((file) => {
                 if (file.type === "remote") {
                     this.fileAgent.add(file.name, file.file);
                 }
@@ -174,7 +174,7 @@ export abstract class JudgeAgent {
     }> => ({});
     async compileUsr(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         const userExecutableAgent = new ExecutableAgent(
             this.judge.judge.user,
             this.fileAgent,
@@ -317,7 +317,7 @@ export abstract class JudgeAgent {
             memory: userResult.memory,
         };
     }
-    async clean() {
+    async clean(): Promise<void> {
         await this.fileAgent.clean();
     }
     // abstract getState(): JudgeStatus;
@@ -422,7 +422,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
     }
     async compileSpj(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         if (this.judge.judge.type != JudgeType.Special) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
         }
@@ -602,7 +602,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     }
     async compileInteractor(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         if (this.judge.judge.type != JudgeType.Interactive) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
@@ -776,33 +776,33 @@ export class JudgeFactory {
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
         switch (judge.judge.type) {
-            case JudgeType.Normal: {
-                return new NormalJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle,
-                    this.cmp
-                );
-            }
-            case JudgeType.Special: {
-                return new SpecialJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle
-                );
-            }
-            case JudgeType.Interactive: {
-                return new InteractiveJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle
-                );
-            }
-            default:
-                throw "Unkown JudgeType";
+        case JudgeType.Normal: {
+            return new NormalJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle,
+                this.cmp
+            );
+        }
+        case JudgeType.Special: {
+            return new SpecialJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle
+            );
+        }
+        case JudgeType.Interactive: {
+            return new InteractiveJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle
+            );
+        }
+        default:
+            throw "Unkown JudgeType";
         }
     }
 }
@@ -915,11 +915,4 @@ export async function getJudgerFactory(
         judgerConfig.cmp,
         throttle
     );
-}
-function async(): (
-    value: import("heng-protocol").TestCase,
-    index: number,
-    array: import("heng-protocol").TestCase[]
-) => void {
-    throw new Error("Function not implemented.");
 }

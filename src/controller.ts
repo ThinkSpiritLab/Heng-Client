@@ -47,12 +47,15 @@ export class Controller {
     ws!: WebSocket;
     connectingSettings: ConnectionSettings = { statusReportInterval: 1000 };
     statusReportTimer?: NodeJS.Timer;
-    judgerMethods: Map<JudgerMethod | "Report", (args: any) => Promise<unknown|void>>;
+    judgerMethods: Map<
+        JudgerMethod | "Report",
+        (args: unknown) => Promise<unknown | void>
+    >;
     messageCallbackMap: Map<
         number,
         {
-            resolve: (arg0: any) => void;
-            reject: (arg0: any) => void;
+            resolve: (arg0: unknown) => void;
+            reject: (arg0: unknown) => void;
             timer: NodeJS.Timeout;
         }
     >;
@@ -82,7 +85,7 @@ export class Controller {
             return this.connectingSettings;
         });
     }
-    startReport(interval: number) {
+    startReport(interval: number): void {
         if (this.statusReportTimer !== undefined) {
             this.stopReport();
         }
@@ -101,7 +104,7 @@ export class Controller {
             }
         }, interval);
     }
-    stopReport() {
+    stopReport(): void {
         if (this.statusReportTimer !== undefined) {
             clearInterval(this.statusReportTimer);
             this.statusReportTimer = undefined;
@@ -205,7 +208,10 @@ export class Controller {
             | ((args: void) => Promise<StatusReport>)
     ): Controller {
         this.logger.info(`Method ${method} Registered`);
-        this.judgerMethods.set(method, cb);
+        this.judgerMethods.set(
+            method,
+            cb as (args: unknown) => Promise<unknown>
+        );
         return this;
     }
 

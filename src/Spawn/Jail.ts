@@ -21,7 +21,19 @@ export type JailedChildProcess = BasicChildProcess;
 
 // const logger = getLogger("JailSpawn");
 
-export function useJail(jailOption: JailSpawnOption) {
+export function useJail(
+    jailOption: JailSpawnOption
+): (
+    spawnFunction: (
+        command: string,
+        args: string[],
+        options: BasicSpawnOption
+    ) => BasicChildProcess
+) => (
+    command: string,
+    args: string[],
+    options: BasicSpawnOption
+) => JailedChildProcess {
     const jailConfig = getConfig().nsjail;
     return function (
         spawnFunction: (
@@ -45,15 +57,15 @@ export function useJail(jailOption: JailSpawnOption) {
             if (jailOption.mount) {
                 for (const mountPoint of jailOption.mount) {
                     switch (mountPoint.mode) {
-                        case "ro":
-                            jailArgs.push("-R", path.resolve(mountPoint.path));
-                            break;
-                        case "rw":
-                            jailArgs.push("-B", path.resolve(mountPoint.path));
-                            break;
-                        default:
-                            throw `Unkown mount type ${mountPoint.mode}`;
-                            break;
+                    case "ro":
+                        jailArgs.push("-R", path.resolve(mountPoint.path));
+                        break;
+                    case "rw":
+                        jailArgs.push("-B", path.resolve(mountPoint.path));
+                        break;
+                    default:
+                        throw `Unkown mount type ${mountPoint.mode}`;
+                        break;
                     }
                 }
             }

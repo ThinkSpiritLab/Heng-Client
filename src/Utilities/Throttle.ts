@@ -2,9 +2,7 @@ export class Throttle {
     private used = 0;
     private queue: (() => void)[] = [];
     constructor(readonly capablity: number) {}
-    async withThrottle<T>(
-        fn: () => Promise<T>
-    ): Promise<T> {
+    async withThrottle<T>(fn: () => Promise<T>): Promise<T> {
         if (this.used >= this.capablity) {
             await this.block();
         }
@@ -17,10 +15,10 @@ export class Throttle {
             this.next();
         }
     }
-    block() {
+    block(): Promise<void> {
         return new Promise<void>((resolve) => this.queue.push(() => resolve()));
     }
-    next() {
+    next(): void {
         if (this.queue.length > 0) {
             const f = this.queue.shift();
             if (f !== undefined) f();

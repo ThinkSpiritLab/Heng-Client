@@ -29,7 +29,19 @@ export interface MeteredChildProcess extends BasicChildProcess {
 
 const logger = getLogger("MeterSpawn");
 
-export function useMeter(meterOption: MeterSpawnOption) {
+export function useMeter(
+    meterOption: MeterSpawnOption
+): (
+    spawnFunction: (
+        command: string,
+        args: string[],
+        options: BasicSpawnOption
+    ) => BasicChildProcess
+) => (
+    command: string,
+    args: string[],
+    options: BasicSpawnOption
+) => MeteredChildProcess {
     const meterConfig = getConfig().hc;
     return function (
         spawnFunction: (
@@ -115,6 +127,6 @@ export function meterSpawn(
     args: string[],
     option: BasicSpawnOption,
     meterOption: MeterSpawnOption
-) {
+): MeteredChildProcess {
     return useMeter(meterOption)(spawn)(command, args, option);
 }
