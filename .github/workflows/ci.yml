@@ -25,7 +25,7 @@ jobs:
           ${{ runner.os }}-node-
 
     - run: npm install
-    - run: npm run check:lint
+    - run: npm run ci-eslint
 
   format:
     name: Format
@@ -50,4 +50,4 @@ jobs:
           ${{ runner.os }}-node-
     
     - run: npm install
-    - run: npm run check:format
+    - run: npm run ci-format
