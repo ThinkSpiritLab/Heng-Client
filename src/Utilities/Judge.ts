@@ -174,7 +174,7 @@ export abstract class JudgeAgent {
     }> => ({});
     async compileUsr(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         const userExecutableAgent = new ExecutableAgent(
             this.judge.judge.user,
             this.fileAgent,
@@ -422,7 +422,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
     }
     async compileSpj(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         if (this.judge.judge.type != JudgeType.Special) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
         }
@@ -602,7 +602,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     }
     async compileInteractor(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
+        > {
         if (this.judge.judge.type != JudgeType.Interactive) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
@@ -776,33 +776,33 @@ export class JudgeFactory {
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
         switch (judge.judge.type) {
-            case JudgeType.Normal: {
-                return new NormalJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle,
-                    this.cmp
-                );
-            }
-            case JudgeType.Special: {
-                return new SpecialJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle
-                );
-            }
-            case JudgeType.Interactive: {
-                return new InteractiveJudgeAgent(
-                    judge,
-                    this.timeRatio,
-                    this.timeIntercept,
-                    this.throttle
-                );
-            }
-            default:
-                throw "Unkown JudgeType";
+        case JudgeType.Normal: {
+            return new NormalJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle,
+                this.cmp
+            );
+        }
+        case JudgeType.Special: {
+            return new SpecialJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle
+            );
+        }
+        case JudgeType.Interactive: {
+            return new InteractiveJudgeAgent(
+                judge,
+                this.timeRatio,
+                this.timeIntercept,
+                this.throttle
+            );
+        }
+        default:
+            throw "Unkown JudgeType";
         }
     }
 }

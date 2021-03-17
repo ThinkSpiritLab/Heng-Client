@@ -57,15 +57,15 @@ export function useJail(
             if (jailOption.mount) {
                 for (const mountPoint of jailOption.mount) {
                     switch (mountPoint.mode) {
-                        case "ro":
-                            jailArgs.push("-R", path.resolve(mountPoint.path));
-                            break;
-                        case "rw":
-                            jailArgs.push("-B", path.resolve(mountPoint.path));
-                            break;
-                        default:
-                            throw `Unkown mount type ${mountPoint.mode}`;
-                            break;
+                    case "ro":
+                        jailArgs.push("-R", path.resolve(mountPoint.path));
+                        break;
+                    case "rw":
+                        jailArgs.push("-B", path.resolve(mountPoint.path));
+                        break;
+                    default:
+                        throw `Unkown mount type ${mountPoint.mode}`;
+                        break;
                     }
                 }
             }
