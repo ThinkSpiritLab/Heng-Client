@@ -4,6 +4,7 @@ RUN dnf update --assumeyes && \
     # yum config-manager --set-enabled powertools && \
     # dnf install --assumeyes epel-release && \
     dnf module --assumeyes install nodejs:14 && \
+    npm install -g npm && \
     dnf install --enablerepo=powertools --assumeyes \
     autoconf \
     bison \
