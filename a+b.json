@@ -26,7 +26,7 @@
             },
             "environment": {
                 "language": "cxx",
-                "system": "Windows",
+                "system": "linux",
                 "arch": "x64",
                 "options": {}
             },
