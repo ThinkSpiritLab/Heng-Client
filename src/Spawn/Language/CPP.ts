@@ -29,6 +29,6 @@ export const CPP: Language = function (args) {
         }),
         null,
         "src.cpp",
-        "src.o"
+        "src"
     );
 };

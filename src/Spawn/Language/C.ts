@@ -29,6 +29,6 @@ export const C: Language = function (args) {
         }),
         null,
         "src.c",
-        "src.o"
+        "src"
     );
 };
