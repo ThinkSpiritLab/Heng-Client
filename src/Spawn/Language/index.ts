@@ -32,10 +32,6 @@ export function generateCompileGenerator(
     };
 }
 
-export const notCompile: CompileGenerator = generateCompileGenerator(
-    (src, output) => ["dd", [`if=${src}`, `of=${output}`]]
-);
-
 export type BasicExcuteGenerator = (
     command: string,
     args: string[]
