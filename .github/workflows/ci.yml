@@ -1,0 +1,53 @@
+on: [push, pull_request]
+
+name: CI
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '14'
+    # see https://github.com/actions/cache/blob/main/examples.md#node---npm
+    - name: Get npm cache directory
+      id: npm-cache-dir
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+    - uses: actions/cache@v2
+      id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
+      with:
+        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm install
+    - run: npm run ci-eslint
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '14'
+
+    # see https://github.com/actions/cache/blob/main/examples.md#node---npm
+    - name: Get npm cache directory
+      id: npm-cache-dir
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+    - uses: actions/cache@v2
+      id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
+      with:
+        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    
+    - run: npm install
+    - run: npm run ci-format

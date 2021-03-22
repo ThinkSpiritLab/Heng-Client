@@ -11,7 +11,7 @@ module.exports = {
         "prettier",
     ],
     rules: {
-        indent: ["error", 4],
+        indent: ["off", 4, { SwitchCase: 1 }],
         "linebreak-style": ["error", "unix"],
         quotes: ["error", "double"],
         semi: ["error", "always"],
