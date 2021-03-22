@@ -12,6 +12,24 @@ export type File = {
     url?: string;
 };
 
+export async function chownR(
+    dirpath: string,
+    uid: number,
+    gid: number
+): Promise<void> {
+    let curdir = await fs.promises.opendir(dirpath);
+    let subItem: fs.Dirent | null;
+    while ((subItem = await curdir.read()) !== null) {
+        if (subItem.isDirectory()) {
+            await chownR(path.join(dirpath, subItem.name), uid, gid);
+        } else if (subItem.isFile()) {
+            await fs.promises.chown(path.join(dirpath, subItem.name), uid, gid);
+        }
+    }
+    await fs.promises.chown(dirpath, uid, gid);
+    await curdir.close();
+}
+
 export function readStream(s: Readable): Promise<string> {
     const data: string[] = [];
     s.on("data", (chunk) => {
@@ -43,13 +61,18 @@ export class FileAgent {
     readonly dir: string;
     readonly ready: Promise<void>;
     private nameToFile = new Map<string, [File | null, string, boolean]>();
-    constructor(readonly prefix: string, readonly primaryFile: File | null) {
+    constructor(
+        readonly prefix: string,
+        readonly primaryFile: File | null,
+        readonly uid: number,
+        readonly gid: number
+    ) {
         this.dir = path.join(os.tmpdir(), prefix);
         this.ready = new Promise((resolve, reject) => {
             fs.promises
                 .mkdir(this.dir, {
                     recursive: true,
-                    mode: 0o777,
+                    mode: 0o700,
                 })
                 .then(async () => {
                     if (this.primaryFile) {
@@ -69,6 +92,9 @@ export class FileAgent {
                     } else {
                         resolve();
                     }
+                })
+                .then(async () => {
+                    await chownR(this.dir, uid, gid);
                 });
         });
     }
@@ -111,7 +137,7 @@ export class FileAgent {
                         mode: 0o700,
                     });
                     const readable = await readableFromFile(file);
-                    return new Promise((resolve, reject) => {
+                    return new Promise<string>((resolve, reject) => {
                         pipeline(
                             readable,
                             fs.createWriteStream(subpath),
@@ -128,6 +154,9 @@ export class FileAgent {
                         //     resolve(subpath);
                         // });
                         // pipe.on("error", (err) => reject(err));
+                    }).then(async (path) => {
+                        await fs.promises.chown(path, this.uid, this.gid);
+                        return path;
                     });
                 } else {
                     throw "File not found nor writen";

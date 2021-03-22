@@ -11,9 +11,9 @@ export interface JailMountingPoint {
 
 export interface JailSpawnOption {
     mount?: JailMountingPoint[];
-    timelimit?: number; //s
-    filelimit?: number; //MB
-    memorylimit?: number; //MB
+    timelimit?: number; //ms
+    filelimit?: number; //Byte
+    memorylimit?: number; //Byte
     pidlimit?: number;
 }
 
@@ -70,10 +70,16 @@ export function useJail(
                 }
             }
             if (jailOption.timelimit) {
-                jailArgs.push("-t", jailOption.timelimit.toString());
+                jailArgs.push(
+                    "-t",
+                    Math.ceil(jailOption.timelimit / 1000).toString()
+                );
             }
             if (jailOption.memorylimit) {
-                jailArgs.push("--rlimit_as", jailOption.memorylimit.toString());
+                jailArgs.push(
+                    "--rlimit_as",
+                    Math.ceil(jailOption.memorylimit / 1024 / 1024).toString()
+                );
             }
             // if (jailOption.pidlimit) {
             //     jailArgs.push(
@@ -92,7 +98,7 @@ export function useJail(
             if (jailOption.filelimit) {
                 jailArgs.push(
                     "--rlimit_fsize",
-                    jailOption.filelimit.toString()
+                    Math.ceil(jailOption.filelimit / 1024 / 1024).toString()
                 );
             }
             if (options.stdio) {

@@ -52,14 +52,14 @@ async function main() {
     });
     controller.on("CreateJudge", (task) => {
         const judgeAgent = judgerFactory.getJudgerAgent(task);
-        const resultPromise = judgeAgent.getResult();
+        const resultPromise = judgeAgent.getResultNoException();
         resultPromise
             .then((result) => {
                 // logger.info(`Task:${JSON.stringify(task)}`);
                 // logger.info(`Result:${JSON.stringify(result)}`);
                 controller.do("FinishJudges", { id: task.id, result });
             })
-            .finally(() => judgeAgent.clean());
+            // .finally(() => judgeAgent.clean());
         return Promise.resolve(null);
     });
     const token = await controller.getToken(

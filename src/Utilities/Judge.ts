@@ -30,7 +30,9 @@ export class ExecutableAgent {
         readonly excutable: Executable,
         private fileAgent: FileAgent,
         readonly name: string,
-        readonly cwdPrefix: string
+        readonly cwdPrefix: string,
+        private uid: number,
+        private gid: number
     ) {
         this.configuredLanguage = languageFromExcutable(excutable);
         fileAgent.add(
@@ -74,6 +76,8 @@ export class ExecutableAgent {
                 {
                     cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
                     stdio: ["pipe", compileLogFileStream, compileLogFileStream],
+                    uid: this.uid,
+                    gid: this.gid,
                 },
                 {
                     timelimit: this.excutable.limit.compiler.cpuTime,
@@ -117,6 +121,8 @@ export class ExecutableAgent {
                 {
                     cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
                     stdio,
+                    uid: this.uid,
+                    gid: this.gid,
                 },
                 {
                     timelimit: this.excutable.limit.runtime.cpuTime,
@@ -132,16 +138,21 @@ export class ExecutableAgent {
 export abstract class JudgeAgent {
     protected excutables: Executable[] = [];
     protected fileAgent: FileAgent;
+    protected logger = getLogger("JudgeAgent");
     constructor(
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        readonly throttle: Throttle
+        readonly throttle: Throttle,
+        protected uid: number,
+        protected gid: number
     ) {
         this.excutables.push(judge.judge.user);
         this.fileAgent = new FileAgent(
             path.join("Heng-Client", judge.id),
-            judge.data ?? null
+            judge.data ?? null,
+            this.uid,
+            this.gid
         );
         if (judge.dynamicFiles !== undefined) {
             judge.dynamicFiles.forEach((file) => {
@@ -179,7 +190,9 @@ export abstract class JudgeAgent {
             this.judge.judge.user,
             this.fileAgent,
             "usr",
-            "usr"
+            "usr",
+            this.uid,
+            this.gid
         );
         const compileResult = await this.throttle.withThrottle(() =>
             userExecutableAgent.compile()
@@ -264,6 +277,24 @@ export abstract class JudgeAgent {
 
     abstract getResult(): Promise<JudgeResult>;
 
+    async getResultNoException(): Promise<JudgeResult> {
+        try {
+            return await this.getResult();
+        } catch (e) {
+            this.logger.fatal(e);
+            return {
+                cases: [
+                    {
+                        kind: JudgeResultKind.SystemError,
+                        time: 0,
+                        memory: 0,
+                        extraMessage: e.toString(),
+                    },
+                ],
+            };
+        }
+    }
+
     generateResult(
         userResult: MeterResult,
         userExec: Executable,
@@ -329,9 +360,11 @@ export class NormalJudgeAgent extends JudgeAgent {
         public timeRatio: number,
         public timeIntercept: number,
         throttle: Throttle,
+        uid: number,
+        gid: number,
         private cmp: string
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
         if (judge.judge.type !== JudgeType.Normal) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
         }
@@ -392,8 +425,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                 cases: await Promise.all(result ?? []),
                 extra: await this.getExtra(),
             };
-        }
-        {
+        } else {
             return {
                 cases: [
                     {
@@ -413,9 +445,11 @@ export class SpecialJudgeAgent extends JudgeAgent {
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        throttle: Throttle
+        throttle: Throttle,
+        uid: number,
+        gid: number
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
         if (judge.judge.type !== JudgeType.Special) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`;
         }
@@ -430,7 +464,9 @@ export class SpecialJudgeAgent extends JudgeAgent {
             this.judge.judge.spj,
             this.fileAgent,
             "spj",
-            "spj"
+            "spj",
+            this.uid,
+            this.gid
         );
         const compileResult = await this.throttle.withThrottle(
             async () => await userExecutableAgent.compile()
@@ -572,8 +608,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
                 cases: await Promise.all(result ?? []),
                 extra: await this.getExtra(),
             };
-        }
-        {
+        } else {
             return {
                 cases: [
                     {
@@ -593,9 +628,11 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        throttle: Throttle
+        throttle: Throttle,
+        uid: number,
+        gid: number
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
         if (judge.judge.type !== JudgeType.Interactive) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
@@ -610,7 +647,9 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             this.judge.judge.interactor,
             this.fileAgent,
             "spj",
-            "spj"
+            "spj",
+            this.uid,
+            this.gid
         );
         const compileResult = await this.throttle.withThrottle(() =>
             interactorExecutableAgent.compile()
@@ -750,8 +789,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                 cases: await Promise.all(result ?? []),
                 extra: await this.getExtra(),
             };
-        }
-        {
+        } else {
             return {
                 cases: [
                     {
@@ -771,7 +809,9 @@ export class JudgeFactory {
         readonly timeRatio: number,
         readonly timeIntercept: number,
         readonly cmp: string,
-        readonly throttle: Throttle
+        readonly throttle: Throttle,
+        readonly uid: number,
+        readonly gid: number
     ) {}
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
@@ -782,6 +822,8 @@ export class JudgeFactory {
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
+                    this.uid,
+                    this.gid,
                     this.cmp
                 );
             }
@@ -790,7 +832,9 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle
+                    this.throttle,
+                    this.uid,
+                    this.gid
                 );
             }
             case JudgeType.Interactive: {
@@ -798,7 +842,9 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle
+                    this.throttle,
+                    this.uid,
+                    this.gid
                 );
             }
             default:
@@ -820,7 +866,9 @@ export async function getJudgerFactory(
                 logger.info(`self test ${index} loaded`);
                 const fileAgent = new FileAgent(
                     `${process.pid}selfTest${index}`,
-                    null
+                    null,
+                    process.getuid(),
+                    process.getgid()
                 );
                 try {
                     await fileAgent.ready;
@@ -849,7 +897,7 @@ export async function getJudgerFactory(
                             ),
                             { cwd: fileAgent.dir },
                             {
-                                timelimit: 10,
+                                timelimit: 10000,
                                 mount: [{ path: fileAgent.dir, mode: "rw" }],
                             }
                         );
@@ -900,7 +948,7 @@ export async function getJudgerFactory(
                     logger.info(
                         `Test case ${index} completed in ${testResult.time.real}`
                     );
-                    return [testcase.timeExpected * 1e9, testResult.time.real];
+                    return [testcase.timeExpected, testResult.time.real];
                 } finally {
                     await fileAgent.clean();
                 }
@@ -913,6 +961,8 @@ export async function getJudgerFactory(
         timeRatio,
         timeIntercept,
         judgerConfig.cmp,
-        throttle
+        throttle,
+        judgerConfig.uid,
+        judgerConfig.gid
     );
 }

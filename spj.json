@@ -32,15 +32,15 @@
             },
             "limit": {
                 "runtime": {
-                    "memory": 10240000000,
-                    "cpuTime": 10000000000,
-                    "output": 1024
+                    "memory": 1024000,
+                    "cpuTime": 1000,
+                    "output": 1024000
                 },
                 "compiler": {
-                    "memory": 10240000000,
-                    "cpuTime": 10240000000,
-                    "output": 1024,
-                    "message": 1024
+                    "memory": 102400000,
+                    "cpuTime":5000,
+                    "output": 102400000,
+                    "message": 102400000
                 }
             }
         },
@@ -55,17 +55,17 @@
                 "arch": "x64",
                 "options": {}
             },
-            "limit": {
+           "limit": {
                 "runtime": {
-                    "memory": 10240000000,
-                    "cpuTime": 10000000000,
-                    "output": 1024
+                    "memory": 1024000,
+                    "cpuTime": 1000,
+                    "output": 1024000
                 },
                 "compiler": {
-                    "memory": 10240000000,
-                    "cpuTime": 10240000000,
-                    "output": 1024,
-                    "message": 1024
+                    "memory": 102400000,
+                    "cpuTime":5000,
+                    "output": 102400000,
+                    "message": 102400000
                 }
             }
         }

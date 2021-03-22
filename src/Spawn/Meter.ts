@@ -6,8 +6,8 @@ import { getConfig } from "../Config";
 import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
 
 interface MeterSpawnOption {
-    timelimit?: number; //second
-    memorylimit?: number; //MB
+    timelimit?: number; //ms
+    memorylimit?: number; //byte
     pidlimit?: number;
 }
 
@@ -16,9 +16,9 @@ export interface MeterResult {
     returnCode: number;
     signal: number;
     time: {
-        real: number; //nanoseconds
-        sys: number; //nanoseconds
-        usr: number; //nanoseconds
+        real: number; //ms
+        sys: number; //ms
+        usr: number; //ms
     };
 }
 

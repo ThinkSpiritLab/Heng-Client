@@ -20,15 +20,17 @@ javac = "/usr/bin/javac"
 [judger]
 timeRatioTolerance = 5
 cmp = '/usr/bin/ojcmp'
+uid = 1000
+gid = 1000
 [[judger.testcases]]
 src = "./selfTest/src.cpp"
 language = "cpp"
-timeExpected = 1
+timeExpected = 1000
 [[judger.testcases]]
 src = "./selfTest/Main.java"
 language = "java"
-timeExpected = 1
+timeExpected = 1000
 [[judger.testcases]]
 src = "./selfTest/src.py"
 language = "py3"
-timeExpected = 2
+timeExpected = 2000
