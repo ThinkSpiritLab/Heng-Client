@@ -216,8 +216,7 @@ export abstract class JudgeAgent {
                     {
                         cases:
                             this.judge.test?.cases.map(() => ({
-                                kind:
-                                    JudgeResultKind.CompileMemoryLimitExceeded,
+                                kind: JudgeResultKind.CompileMemoryLimitExceeded,
                                 time: 0,
                                 memory: 0,
                             })) ?? [],
@@ -392,15 +391,15 @@ export class NormalJudgeAgent extends JudgeAgent {
                     }
                     const compProcess = jailMeterSpawn(
                         this.cmp,
-                        ["--std", stdPath],
+                        ["normal", "--std", stdPath],
                         { stdio: [userProcess.stdout, "pipe", "pipe"] },
                         {
-                            timelimit: this.judge.judge.user.limit.runtime
-                                .cpuTime,
-                            memorylimit: this.judge.judge.user.limit.runtime
-                                .memory,
-                            filelimit: this.judge.judge.user.limit.runtime
-                                .output,
+                            timelimit:
+                                this.judge.judge.user.limit.runtime.cpuTime,
+                            memorylimit:
+                                this.judge.judge.user.limit.runtime.memory,
+                            filelimit:
+                                this.judge.judge.user.limit.runtime.output,
                             mount: [{ path: stdPath, mode: "ro" }],
                         }
                     );
@@ -561,15 +560,12 @@ export class SpecialJudgeAgent extends JudgeAgent {
             spjExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [
-                    inputStream,
-                    inputStream2,
-                    stdStream,
-                ] = await Promise.all([
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.output),
-                ]);
+                const [inputStream, inputStream2, stdStream] =
+                    await Promise.all([
+                        this.fileAgent.getFd(value.input),
+                        this.fileAgent.getFd(value.input),
+                        this.fileAgent.getFd(value.output),
+                    ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
                         // "pipe",
@@ -736,10 +732,8 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     }
     async getResult(): Promise<JudgeResult> {
         const [compileResult, userExecutableAgent] = await this.compileUsr();
-        const [
-            spjCompileResult,
-            interactorExecutableAgent,
-        ] = await this.compileInteractor();
+        const [spjCompileResult, interactorExecutableAgent] =
+            await this.compileInteractor();
         if (compileResult !== undefined) {
             return compileResult;
         } else if (spjCompileResult !== undefined) {
@@ -886,21 +880,24 @@ export async function getJudgerFactory(
                     logger.info(`copyed src for testcase ${index}`);
                     if (configuredLanguage.compileGenerator !== null) {
                         logger.info(`self test ${index} compiling`);
-                        const compileProcess = configuredLanguage.compileGenerator(
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.sourceFileName
-                            ),
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.compiledFileName
-                            ),
-                            { cwd: fileAgent.dir },
-                            {
-                                timelimit: 10000,
-                                mount: [{ path: fileAgent.dir, mode: "rw" }],
-                            }
-                        );
+                        const compileProcess =
+                            configuredLanguage.compileGenerator(
+                                path.resolve(
+                                    fileAgent.dir,
+                                    configuredLanguage.sourceFileName
+                                ),
+                                path.resolve(
+                                    fileAgent.dir,
+                                    configuredLanguage.compiledFileName
+                                ),
+                                { cwd: fileAgent.dir },
+                                {
+                                    timelimit: 10000,
+                                    mount: [
+                                        { path: fileAgent.dir, mode: "rw" },
+                                    ],
+                                }
+                            );
                         const compileResult = await compileProcess.result;
                         if (
                             compileResult.returnCode !== 0 ||
