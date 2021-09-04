@@ -391,7 +391,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                     }
                     const compProcess = jailMeterSpawn(
                         this.cmp,
-                        ["normal", "--std", stdPath],
+                        ["normal", "--user-fd", "0", "--std", stdPath],
                         { stdio: [userProcess.stdout, "pipe", "pipe"] },
                         {
                             timelimit:
@@ -861,6 +861,7 @@ export async function getJudgerFactory(
                 const fileAgent = new FileAgent(
                     `${process.pid}selfTest${index}`,
                     null,
+                    // TODO root?
                     process.getuid(),
                     process.getgid()
                 );
@@ -931,6 +932,7 @@ export async function getJudgerFactory(
                             mount: [{ path: curExcutablePath, mode: "ro" }],
                         }
                     );
+                    // TODO understand it
                     if (testProc.stdout) {
                         const testOutput = await readStream(testProc.stdout);
                         logger.info(`TestProc ${index} says ${testOutput}`);

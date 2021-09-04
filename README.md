@@ -56,3 +56,32 @@
 要添加评测类型，先实现其对应的 `JudgeAgent` 然后在 `JudgeFactory` 中添加对应的 `case` 。
 
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
+
+
+Language：传入语言相关自定义参数，产出 CompileGenerator ExcuteGenerator sourceFileName(not path) compiledFileName(not path)，即 ConfiguredLanguage。
+
+CompileGenerator：传入源文件 path，目标文件 path，相关限制，产出一个子进程，子进程运行结束后得到结果。
+
+CompileGenerator：传入运行文件路径，运行参数，相关限制，产出一个子进程，子进程运行结束后得到结果。
+
+BasicCompileGenerator：传入源文件 path，目标文件 path，产出运行路径和参数
+
+BasicExcuteGenerator：运行文件路径，运行参数，产出运行路径和参数
+
+BasicGenerator：负责生成/转换command arg
+
+BasicGeneratorToGenerator(BasicGenerator){
+    return function(source|command, output|arg, limit){
+        const [command, args] = BasicGenerator(source|command, output|arg);
+        return ChildProcess(command, args, limit);
+    }
+}
+
+(source|command, output|arg)-->BasicGenerator-->(command, args)+limit-->ChildProcess-->result
+
+or
+
+(only for Excute)
+
+(command, arg)+limit-->ChildProcess-->result
+

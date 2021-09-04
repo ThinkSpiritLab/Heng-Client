@@ -214,11 +214,11 @@ export class Controller {
             | ((args: ControlArgs) => Promise<ConnectionSettings>)
             | ((args: void) => Promise<StatusReport>)
     ): Controller {
-        this.logger.info(`Method ${method} Registered`);
         this.judgerMethods.set(
             method,
             cb as (args: unknown) => Promise<unknown>
         );
+        this.logger.info(`Method ${method} Registered`);
         return this;
     }
 

@@ -46,7 +46,7 @@
     "class-validator": "^0.12.2",
     "fs-extra": "^8.1.0",
     "heng-protocol": "github:ThinkSpiritLab/Heng-Protocol",
-    "heng-sign-js": "^0.0.14",
+    "heng-sign-js": "^0.0.15",
     "lodash": "^4.17.20",
     "log4js": "^6.3.0",
     "queue-typescript": "^1.0.1",
