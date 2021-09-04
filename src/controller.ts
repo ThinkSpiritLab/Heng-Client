@@ -184,8 +184,8 @@ export class Controller {
             params: {},
             url: `${this.host}/v1/judger/token`,
             method: "post",
-            ak: "",
-            sk: "",
+            ak: this.AccessKey,
+            sk: this.SecrectKey,
         });
         try {
             const res = (await this.exec(req)).data;
