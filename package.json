@@ -1,56 +1,57 @@
 {
-    "name": "heng-client",
-    "version": "0.0.1",
-    "contributors": [
-        {
-            "name": "ThinkSpiritDevelopers"
-        }
-    ],
-    "license": "MIT",
-    "main": "built/index.js",
-    "types": "built/index.d.ts",
-    "description": "Judge Client of Heng",
-    "repository": "https://github.com/ThinkSpiritLab/Heng-Client",
-    "devDependencies": {
-        "@types/lodash": "^4.14.168",
-        "@types/ws": "^7.4.0",
-        "@typescript-eslint/eslint-plugin": "^3.7.0",
-        "@typescript-eslint/parser": "^3.7.0",
-        "eslint": "^7.5.0",
-        "eslint-config-prettier": "^6.11.0",
-        "eslint-plugin-import": "^2.22.0",
-        "prettier": "^2.0.5",
-        "ts-node-dev": "^1.0.0",
-        "typescript": "^3.9.7"
-    },
-    "scripts": {
-        "ci-eslint": "eslint --ext .ts,.js ./src",
-        "lint": "eslint --ext .ts,.js ./src --fix",
-        "ci-format": "prettier -c ./src/**/*.ts",
-        "format": "prettier -c ./src/**/*.ts --write",
-        "build": "tsc",
-        "docker:build": "docker build .",
-        "docker:build:fresh": "docker build --no-cache .",
-        "docker:run": "docker run --privileged -v $(pwd)/config.toml:/usr/src/app/config.toml heng-client",
-        "docker:run:dev": "docker run --privileged --network=\"host\" -v $(pwd)/config.toml:/usr/src/app/config.toml heng-client",
-        "dev": "ts-node-dev --respawn -- src/index.ts",
-        "start": "node dist/index.js"
-    },
-    "dependencies": {
-        "@iarna/toml": "^2.2.5",
-        "@types/fs-extra": "^9.0.8",
-        "@types/node": "^14.14.5",
-        "@types/unzip-stream": "^0.3.0",
-        "axios": "^0.21.0",
-        "class-transformer": "^0.3.1",
-        "class-validator": "^0.12.2",
-        "fs-extra": "^8.1.0",
-        "heng-protocol": "github:ThinkSpiritLab/Heng-Protocol#c178c87",
-        "lodash": "^4.17.20",
-        "log4js": "^6.3.0",
-        "queue-typescript": "^1.0.1",
-        "reflect-metadata": "^0.1.13",
-        "unzip-stream": "^0.3.1",
-        "ws": "^7.4.1"
+  "name": "heng-client",
+  "version": "0.0.1",
+  "contributors": [
+    {
+      "name": "ThinkSpiritDevelopers"
     }
+  ],
+  "license": "MIT",
+  "main": "built/index.js",
+  "types": "built/index.d.ts",
+  "description": "Judge Client of Heng",
+  "repository": "https://github.com/ThinkSpiritLab/Heng-Client",
+  "devDependencies": {
+    "@types/lodash": "^4.14.168",
+    "@types/ws": "^7.4.0",
+    "@typescript-eslint/eslint-plugin": "^3.7.0",
+    "@typescript-eslint/parser": "^3.7.0",
+    "eslint": "^7.5.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-import": "^2.22.0",
+    "prettier": "^2.0.5",
+    "ts-node-dev": "^1.0.0",
+    "typescript": "^3.9.7"
+  },
+  "scripts": {
+    "ci-eslint": "eslint --ext .ts,.js ./src",
+    "lint": "eslint --ext .ts,.js ./src --fix",
+    "ci-format": "prettier -c ./src/**/*.ts",
+    "format": "prettier -c ./src/**/*.ts --write",
+    "build": "tsc",
+    "docker:build": "docker build .",
+    "docker:build:fresh": "docker build --no-cache .",
+    "docker:run": "docker run --privileged -v $(pwd)/config.toml:/usr/src/app/config.toml heng-client",
+    "docker:run:dev": "docker run --privileged --network=\"host\" -v $(pwd)/config.toml:/usr/src/app/config.toml heng-client",
+    "dev": "ts-node-dev --respawn -- src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "@types/fs-extra": "^9.0.8",
+    "@types/node": "^14.14.5",
+    "@types/unzip-stream": "^0.3.0",
+    "axios": "^0.21.0",
+    "class-transformer": "^0.3.1",
+    "class-validator": "^0.12.2",
+    "fs-extra": "^8.1.0",
+    "heng-protocol": "github:ThinkSpiritLab/Heng-Protocol#c178c87",
+    "heng-sign-js": "^0.0.14",
+    "lodash": "^4.17.20",
+    "log4js": "^6.3.0",
+    "queue-typescript": "^1.0.1",
+    "reflect-metadata": "^0.1.13",
+    "unzip-stream": "^0.3.1",
+    "ws": "^7.4.1"
+  }
 }

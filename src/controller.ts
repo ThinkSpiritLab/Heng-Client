@@ -1,7 +1,6 @@
 import { getLogger } from "log4js";
-import { createHmac, randomInt } from "crypto";
-import { orderBy, toUpper } from "lodash";
-import Axios, { AxiosResponse } from "axios";
+import { createHmac, randomInt, createHash } from "crypto";
+import Axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import {
     ControllerMethod,
     JudgerMethod,
@@ -22,6 +21,7 @@ import WebSocket from "ws";
 import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 import { ControllerConfig } from "./Config";
 import { StatusReport } from "heng-protocol";
+import { EncryptParam, Sign } from "heng-sign-js";
 class Param {
     key!: string;
     val!: string;
@@ -61,6 +61,19 @@ export class Controller {
     >;
     static MaxNonce = 0xffff;
     _nonce = randomInt(Controller.MaxNonce);
+    sign = new Sign((param: EncryptParam) => {
+        if (param.algorithm === "SHA256") {
+            return createHash("sha256").update(param.data).digest("hex");
+        } else if (param.algorithm === "HmacSHA256") {
+            if (!param.key) {
+                throw new Error("no key provided");
+            }
+            return createHmac("sha256", param.key)
+                .update(param.data)
+                .digest("hex");
+        }
+        return "";
+    }, true);
     get nonce(): number {
         return this._nonce++;
     }
@@ -110,56 +123,49 @@ export class Controller {
             this.statusReportTimer = undefined;
         }
     }
-    sign(req: Req): void {
-        let params: Param[] = [];
-        let headers: Header[] = [];
-        for (const key in req.params) {
-            params.push({ key, val: req.params[key].toString() });
-        }
-        if (req.headers === undefined) {
-            req.headers = {};
-        }
-        req.headers["x-heng-nonce"] = this.nonce.toString();
-        req.headers["x-heng-timestamp"] = Date.now().toString();
-        req.headers["x-heng-accesskey"] = this.AccessKey;
-        for (const key in req.headers) {
-            if (key !== "x-heng-signature") {
-                headers.push({ key, val: req.headers[key].toString() });
-            }
-        }
-        if (req.body !== undefined) {
-            params.push({
-                key: "body",
-                val:
-                    typeof req.body === "string"
-                        ? req.body
-                        : JSON.stringify(req.body),
-            });
-        }
-        params = orderBy(params, "key");
-        headers = orderBy(headers, "key");
-        const reqStr = `${toUpper(req.method)}:${headers
-            .map((h) => h.toString())
-            .join("&")}:${req.path}?${params
-            .map((p) => p.toString())
-            .join("&")}`;
-        const signature = createHmac("sha256", this.SecrectKey)
-            .update(reqStr)
-            .digest("hex");
-        if (!req.headers) {
-            req.headers = {};
-        }
-        req.headers["x-heng-signature"] = signature;
-    }
-    async exec(req: Req): Promise<AxiosResponse<unknown>> {
-        return (await Axios.request({
-            url: `/v1${req.path}`,
-            method: req.method,
-            baseURL: this.host,
-            data: req.body,
-            params: req.params,
-            headers: req.headers,
-        })) as AxiosResponse<unknown>;
+    // sign(req: Req): void {
+    //     let params: Param[] = [];
+    //     let headers: Header[] = [];
+    //     for (const key in req.params) {
+    //         params.push({ key, val: req.params[key].toString() });
+    //     }
+    //     if (req.headers === undefined) {
+    //         req.headers = {};
+    //     }
+    //     req.headers["x-heng-nonce"] = this.nonce.toString();
+    //     req.headers["x-heng-timestamp"] = Date.now().toString();
+    //     req.headers["x-heng-accesskey"] = this.AccessKey;
+    //     for (const key in req.headers) {
+    //         if (key !== "x-heng-signature") {
+    //             headers.push({ key, val: req.headers[key].toString() });
+    //         }
+    //     }
+    //     if (req.body !== undefined) {
+    //         params.push({
+    //             key: "body",
+    //             val:
+    //                 typeof req.body === "string"
+    //                     ? req.body
+    //                     : JSON.stringify(req.body),
+    //         });
+    //     }
+    //     params = orderBy(params, "key");
+    //     headers = orderBy(headers, "key");
+    //     const reqStr = `${toUpper(req.method)}:${headers
+    //         .map((h) => h.toString())
+    //         .join("&")}:${req.path}?${params
+    //         .map((p) => p.toString())
+    //         .join("&")}`;
+    //     const signature = createHmac("sha256", this.SecrectKey)
+    //         .update(reqStr)
+    //         .digest("hex");
+    //     if (!req.headers) {
+    //         req.headers = {};
+    //     }
+    //     req.headers["x-heng-signature"] = signature;
+    // }
+    async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
+        return (await Axios.request(req)) as AxiosResponse<unknown>;
     }
 
     async getToken(
@@ -168,18 +174,19 @@ export class Controller {
         name?: string,
         software?: string
     ): Promise<AcquireTokenOutput> {
-        const req = {
-            body: {
+        const req = this.sign.sign({
+            data: {
                 maxTaskCount,
                 coreCount,
                 name,
                 software,
             },
             params: {},
-            path: "/judger/token",
+            url: `${this.host}/v1/judger/token`,
             method: "post",
-        } as Req;
-        this.sign(req);
+            ak: "",
+            sk: "",
+        });
         try {
             const res = (await this.exec(req)).data;
             return res as AcquireTokenOutput;
@@ -280,7 +287,7 @@ export class Controller {
     async connectWs(token: string): Promise<Controller> {
         return new Promise((resolve) => {
             this.ws = new WebSocket(
-                `${this.host}v1/judger/websocket?token=${token}`
+                `${this.host}/v1/judger/websocket?token=${token}`
             );
             this.ws.on("open", () => {
                 this.logger.info("Ws Opened");

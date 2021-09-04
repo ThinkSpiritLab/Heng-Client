@@ -4,7 +4,7 @@ import * as path from "path";
 import { pipeline, Readable } from "stream";
 import * as unzip from "unzip-stream";
 import Axios from "axios";
-import { PlatformPath } from "node:path";
+import { PlatformPath } from "path";
 
 export type File = {
     hashsum?: string;
