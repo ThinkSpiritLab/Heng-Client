@@ -110,7 +110,7 @@ export function useMeter(
                     resultStream.on("data", (chunk) => (resultStr += chunk));
                     resultStream.on("end", () => {
                         try {
-                            logger.info(`Result : ${resultStr}`);
+                            logger.info(`Command : ${command} Result : ${resultStr}`);
                             resolve(JSON.parse(resultStr));
                         } catch (e) {
                             reject(e);
