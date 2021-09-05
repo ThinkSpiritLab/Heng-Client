@@ -11,10 +11,10 @@ export interface JailMountingPoint {
 
 export interface JailSpawnOption {
     mount?: JailMountingPoint[];
-    timelimit?: number; //ms
-    filelimit?: number; //Byte
-    memorylimit?: number; //Byte
-    pidlimit?: number;
+    timelimit?: number; //ms default600s
+    filelimit?: number; //Byte default1MB
+    memorylimit?: number; //Byte default512MB
+    pidlimit: number; // default0->max
 }
 
 export type JailedChildProcess = BasicChildProcess;

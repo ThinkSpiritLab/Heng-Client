@@ -32,6 +32,9 @@ export function generateCompileGenerator(
     };
 }
 
+/**
+ * return value BasicSpawnOption is not used.
+ */
 export type BasicExcuteGenerator = (
     command: string,
     args: string[]
@@ -79,7 +82,7 @@ const logger = getLogger("LanguageService");
 
 const languageMap = new Map<string, Language>();
 
-export function registerLanguage(name: string, language: Language):void {
+export function registerLanguage(name: string, language: Language): void {
     name = name.toLowerCase();
     if (!languageMap.has(name)) {
         languageMap.set(name, language);
@@ -112,4 +115,6 @@ registerLanguage("python", PYTHON);
 registerLanguage("python3", PYTHON);
 import { JAVA } from "./Java";
 registerLanguage("java", JAVA);
-export { CPP, C, PYTHON, JAVA };
+import { CMP } from "./CMP";
+registerLanguage("cmp", CMP);
+export { CPP, C, PYTHON, JAVA, CMP };

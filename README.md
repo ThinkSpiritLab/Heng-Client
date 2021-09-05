@@ -68,7 +68,7 @@ BasicCompileGenerator：传入源文件 path，目标文件 path，产出运行�
 
 BasicExcuteGenerator：运行文件路径，运行参数，产出运行路径和参数
 
-BasicGenerator：负责生成/转换command arg
+BasicGenerator：负责生成 / 转换 command arg
 
 BasicGeneratorToGenerator(BasicGenerator){
     return function(source|command, output|arg, limit){
@@ -98,3 +98,35 @@ getResult 流程：compileUsr，对每个case，usrExecutableAgent.exec(case)
 SpecialJudgeAgent：包含方法 compileSpj。
 
 getResult 流程：compileUsr compileSpj，
+
+
+limit 变换：
+
+useJailAndMeter 中，
+
+```ts
+const meterOption = {
+    timelimit: jailOption.timelimit,
+    memorylimit: jailOption.memorylimit,
+    pidlimit: jailOption.pidlimit,
+};
+```
+
+useJailAndMeter 中，jailOption.timelimit *= 2; jailOption.memorylimit *= 2; jailOption.pidlimit += 3;
+
+Java中：meterOption=jailOption; jailOption.timelimit * 2, jailOption.pidlimit + 2
+
+目前除了 Java 使用的都是 useJailAndMeter。
+
+
+export interface JailSpawnOption {
+    mount?: JailMountingPoint[];
+    timelimit?: number; //ms ?600s
+    filelimit?: number; //Byte ?1MB
+    memorylimit?: number; // Byte ?512MB
+    pidlimit?: number; // ?disabled
+}
+
+外界程序可能从哪里运行程序？excuteGenerator compileGenerator (use)jailMeterSpawn
+
+todo：ojcmp pack，result fix

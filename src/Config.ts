@@ -98,7 +98,7 @@ export class JudgeFactoryTestCase {
     @IsInt()
     @Max(40000)
     @Min(1)
-    timeExpected!: number;//ms
+    timeExpected!: number; //ms
 }
 export class JudgeFactoryConfig {
     @IsNotEmpty()
@@ -116,6 +116,9 @@ export class JudgeFactoryConfig {
     @IsString()
     @IsNotEmpty()
     cmp!: string;
+    @IsInt()
+    @IsPositive()
+    defaultPidLimit!: number;
     @IsInt()
     @Min(1000)
     uid!: number;

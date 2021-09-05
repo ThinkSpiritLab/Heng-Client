@@ -54,7 +54,7 @@ export const JAVA: Language = function (javaargs) {
                     pidlimit:
                         jailOption.pidlimit !== undefined
                             ? jailOption.pidlimit + 2
-                            : undefined,
+                            : getConfig().judger.defaultPidLimit,
                     filelimit: jailOption.filelimit,
                 })(loggedSpawn(spawn))
             )(javac, javaOption, options);
@@ -82,7 +82,7 @@ export const JAVA: Language = function (javaargs) {
                     pidlimit:
                         jailOption.pidlimit !== undefined
                             ? jailOption.pidlimit + 2
-                            : undefined,
+                            : getConfig().judger.defaultPidLimit,
                     filelimit: jailOption.filelimit,
                 })(loggedSpawn(spawn))
             )(java, javaOption, options);

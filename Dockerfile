@@ -29,7 +29,8 @@ RUN dnf update --assumeyes && \
     && dnf clean all \
     && rm -rf /var/cache/yum \
     && rm -rf /var/cache/dnf
-    RUN wget -O /usr/bin/ojcmp https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp/releases/download/v0.4.0/ojcmp-v0.4.0-x86_64-unknown-linux-gnu
+RUN wget -O /usr/bin/ojcmp https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp/releases/download/v0.4.0/ojcmp-v0.4.0-x86_64-unknown-linux-gnu \
+    && chmod 755 /usr/bin/ojcmp
     #WORKDIR /ojcmp
     #run git clone https://github.com/ThinkSpiritLab/ojcmp.git /ojcmp && \
     #curl https://sh.rustup.rs -sSf | bash -s -- -y && \

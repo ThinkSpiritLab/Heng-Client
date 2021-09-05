@@ -12,7 +12,7 @@ export const PYTHON: Language = function () {
         generateExcuterGenerator((command: string, args: string[]) => [
             py,
             [command, ...args],
-            {},
+            {}, // not used, ignore it
         ]),
         "src.py",
         "src.py"

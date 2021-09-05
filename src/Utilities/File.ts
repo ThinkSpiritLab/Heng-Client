@@ -17,7 +17,7 @@ export async function chownR(
     uid: number,
     gid: number
 ): Promise<void> {
-    let curdir = await fs.promises.opendir(dirpath);
+    const curdir = await fs.promises.opendir(dirpath);
     let subItem: fs.Dirent | null;
     while ((subItem = await curdir.read()) !== null) {
         if (subItem.isDirectory()) {
@@ -145,15 +145,15 @@ export class FileAgent {
                                 if (err) {
                                     reject(err);
                                 } else {
+                                    // this.nameToFile.set(name, [
+                                    //     null,
+                                    //     subpath,
+                                    //     true,
+                                    // ]);
                                     resolve(subpath);
                                 }
                             }
                         );
-                        // pipe.on("close", () => {
-                        //     this.nameToFile.set(name, [null, subpath, true]);
-                        //     resolve(subpath);
-                        // });
-                        // pipe.on("error", (err) => reject(err));
                     }).then(async (path) => {
                         await fs.promises.chown(path, this.uid, this.gid);
                         return path;

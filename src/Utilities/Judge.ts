@@ -9,7 +9,7 @@ import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
 import * as fs from "fs";
 import { getLogger } from "log4js";
-import { JudgeFactoryConfig } from "../Config";
+import { getConfig, JudgeFactoryConfig } from "../Config";
 import { ConfiguredLanguage, getLanguage } from "../Spawn/Language";
 import { FileAgent, readStream, waitForOpen } from "./File";
 import { jailMeterSpawn } from "../Spawn";
@@ -82,6 +82,7 @@ export class ExecutableAgent {
                 {
                     timelimit: this.excutable.limit.compiler.cpuTime,
                     memorylimit: this.excutable.limit.compiler.memory,
+                    pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: Math.max(
                         this.excutable.limit.compiler.output,
                         this.excutable.limit.compiler.message
@@ -104,7 +105,7 @@ export class ExecutableAgent {
         }
     }
 
-    exec(stdio: StdioType): MeteredChildProcess {
+    exec(stdio: StdioType, args: string[] = []): MeteredChildProcess {
         if (this.needCompile()) {
             throw "Excutable not compiled";
         } else {
@@ -117,7 +118,7 @@ export class ExecutableAgent {
                 this.configuredLanguage.excuteGenerator ?? jailMeterSpawn;
             return excuter(
                 excutablePath,
-                [],
+                args,
                 {
                     cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
                     stdio,
@@ -127,6 +128,7 @@ export class ExecutableAgent {
                 {
                     timelimit: this.excutable.limit.runtime.cpuTime,
                     memorylimit: this.excutable.limit.runtime.memory,
+                    pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: this.excutable.limit.runtime.output,
                     mount: [{ path: excutablePath, mode: "ro" }],
                 }
@@ -163,6 +165,17 @@ export abstract class JudgeAgent {
             });
         }
     }
+
+    // async getBasicCmp(): Promise<ExecutableAgent> {
+    //     return new ExecutableAgent(
+    //         {},
+    //         this.fileAgent,
+    //         "",
+    //         "cmp",
+    //         this.uid,
+    //         this.gid
+    //     );
+    // }
 
     getExtra = async (): Promise<{
         user?:
@@ -217,7 +230,8 @@ export abstract class JudgeAgent {
                     {
                         cases:
                             this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.CompileMemoryLimitExceeded,
+                                kind:
+                                    JudgeResultKind.CompileMemoryLimitExceeded,
                                 time: 0,
                                 memory: 0,
                             })) ?? [],
@@ -395,12 +409,13 @@ export class NormalJudgeAgent extends JudgeAgent {
                         ["normal", "--user-fd", "0", "--std", stdPath],
                         { stdio: [userProcess.stdout, "pipe", "pipe"] },
                         {
-                            timelimit:
-                                this.judge.judge.user.limit.runtime.cpuTime,
-                            memorylimit:
-                                this.judge.judge.user.limit.runtime.memory,
-                            filelimit:
-                                this.judge.judge.user.limit.runtime.output,
+                            timelimit: this.judge.judge.user.limit.runtime
+                                .cpuTime,
+                            memorylimit: this.judge.judge.user.limit.runtime
+                                .memory,
+                            pidlimit: getConfig().judger.defaultPidLimit,
+                            filelimit: this.judge.judge.user.limit.runtime
+                                .output,
                             mount: [{ path: stdPath, mode: "ro" }],
                         }
                     );
@@ -561,12 +576,15 @@ export class SpecialJudgeAgent extends JudgeAgent {
             spjExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, inputStream2, stdStream] =
-                    await Promise.all([
-                        this.fileAgent.getFd(value.input),
-                        this.fileAgent.getFd(value.input),
-                        this.fileAgent.getFd(value.output),
-                    ]);
+                const [
+                    inputStream,
+                    inputStream2,
+                    stdStream,
+                ] = await Promise.all([
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.output),
+                ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
                         // "pipe",
@@ -733,8 +751,10 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     }
     async getResult(): Promise<JudgeResult> {
         const [compileResult, userExecutableAgent] = await this.compileUsr();
-        const [spjCompileResult, interactorExecutableAgent] =
-            await this.compileInteractor();
+        const [
+            spjCompileResult,
+            interactorExecutableAgent,
+        ] = await this.compileInteractor();
         if (compileResult !== undefined) {
             return compileResult;
         } else if (spjCompileResult !== undefined) {
@@ -882,24 +902,24 @@ export async function getJudgerFactory(
                     logger.info(`copyed src for testcase ${index}`);
                     if (configuredLanguage.compileGenerator !== null) {
                         logger.info(`self test ${index} compiling`);
-                        const compileProcess =
-                            configuredLanguage.compileGenerator(
-                                path.resolve(
-                                    fileAgent.dir,
-                                    configuredLanguage.sourceFileName
-                                ),
-                                path.resolve(
-                                    fileAgent.dir,
-                                    configuredLanguage.compiledFileName
-                                ),
-                                { cwd: fileAgent.dir },
-                                {
-                                    timelimit: 10000,
-                                    mount: [
-                                        { path: fileAgent.dir, mode: "rw" },
-                                    ],
-                                }
-                            );
+                        const compileProcess = configuredLanguage.compileGenerator(
+                            path.resolve(
+                                fileAgent.dir,
+                                configuredLanguage.sourceFileName
+                            ),
+                            path.resolve(
+                                fileAgent.dir,
+                                configuredLanguage.compiledFileName
+                            ),
+                            { cwd: fileAgent.dir },
+                            {
+                                timelimit: 10000,
+                                memorylimit: 512 * 1024 * 1024,
+                                pidlimit: getConfig().judger.defaultPidLimit,
+                                filelimit: 1024 * 1024 * 1024,
+                                mount: [{ path: fileAgent.dir, mode: "rw" }],
+                            }
+                        );
                         const compileResult = await compileProcess.result;
                         if (
                             compileResult.returnCode !== 0 ||
@@ -930,6 +950,9 @@ export async function getJudgerFactory(
                                 judgerConfig.timeRatioTolerance *
                                 2 *
                                 testcase.timeExpected,
+                            memorylimit: 512 * 1024 * 1024,
+                            pidlimit: getConfig().judger.defaultPidLimit,
+                            filelimit: 1024 * 1024 * 1024,
                             mount: [{ path: curExcutablePath, mode: "ro" }],
                         }
                     );
@@ -950,12 +973,12 @@ export async function getJudgerFactory(
                     );
                     return [testcase.timeExpected, testResult.time.real];
                 } finally {
-                    await fileAgent.clean();
+                    // await fileAgent.clean();
                 }
             })
         )
     ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
-    const timeRatio = result[1] / result[0];
+    const timeRatio = result[0] / result[1];
     logger.info(`timeRatio is ${timeRatio}`);
     return new JudgeFactory(
         timeRatio,
