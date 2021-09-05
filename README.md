@@ -85,3 +85,16 @@ or
 
 (command, arg)+limit-->ChildProcess-->result
 
+ExecutableAgent：传入 Executable（包含代码、限制）解析出 Language-->ConfiguredLanguage，提供 complie 和 exec 方法，执行后返回将运行结果（time，memory，signal，returnCode）。exec 方法仅传入 stdio。
+
+JudgeAgent(Base)：包含方法 compileUsr。包含其他方法，如：getResult，generateResult。
+
+compileUsr：传入 Executable，新建一个 ExecutableAgent 并 compile，返回[result, ExecutableAgent]
+
+NormalJudgeAgent：
+
+getResult 流程：compileUsr，对每个case，usrExecutableAgent.exec(case)
+
+SpecialJudgeAgent：包含方法 compileSpj。
+
+getResult 流程：compileUsr compileSpj，

@@ -38,12 +38,12 @@ RUN dnf update --assumeyes && \
     #cp target/release/ojcmp /usr/bin && \
     #RM -rf -- /ojcmp
 WORKDIR /hc
-RUN git clone https://github.com/ThinkSpiritLab/Heng-Core.git /hc && \
+RUN git clone https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git /hc && \
     make && \
     make install && \
     rm -rf -- /hc
 WORKDIR /nsjail
-RUN git clone https://github.com/google/nsjail.git /nsjail && \
+RUN git clone https://github.com.cnpmjs.org/google/nsjail.git /nsjail && \
     make && mv /nsjail/nsjail /usr/bin && rm -rf -- /nsjail
 WORKDIR /usr/src/app
 COPY package*.json ./
