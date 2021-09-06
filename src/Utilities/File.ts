@@ -17,7 +17,6 @@ export async function chownR(
     uid: number,
     gid: number
 ): Promise<void> {
-    console.log(`in chown ${path} to ${uid}`);
     const curdir = await fs.promises.opendir(dirpath);
     let subItem: fs.Dirent | null;
     while ((subItem = await curdir.read()) !== null) {
@@ -27,7 +26,6 @@ export async function chownR(
             await fs.promises.chown(path.join(dirpath, subItem.name), uid, gid);
         }
     }
-    console.log(`out chown ${path} to ${uid}`);
     await fs.promises.chown(dirpath, uid, gid);
     await curdir.close();
 }
@@ -70,7 +68,7 @@ export class FileAgent {
         readonly gid: number
     ) {
         this.dir = path.join(os.tmpdir(), prefix);
-        this.ready = new Promise((resolve, reject) => {
+        this.ready = new Promise<void>((resolve, reject) => {
             fs.promises
                 .mkdir(this.dir, {
                     recursive: true,
@@ -94,10 +92,9 @@ export class FileAgent {
                     } else {
                         resolve();
                     }
-                })
-                .then(async () => {
-                    await chownR(this.dir, uid, gid);
                 });
+        }).then(async () => {
+            await chownR(this.dir, uid, gid);
         });
     }
     register(name: string, subpath: string): void {
@@ -138,7 +135,6 @@ export class FileAgent {
                         recursive: true,
                         mode: 0o700,
                     });
-                    console.log(`get ${name}, mkdir ${path.dirname(subpath)}`);
                     const readable = await readableFromFile(file);
                     return new Promise<string>((resolve, reject) => {
                         pipeline(
@@ -154,7 +150,6 @@ export class FileAgent {
                         );
                     }).then(async (path) => {
                         await fs.promises.chown(path, this.uid, this.gid);
-                        console.log(`chown ${path} to ${this.uid}`);
                         this.nameToFile.set(name, [null, subpath, true]);
                         return path;
                     });
