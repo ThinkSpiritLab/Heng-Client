@@ -152,6 +152,7 @@ export class FileAgent {
                         );
                     }).then(async (path) => {
                         await fs.promises.chown(path, this.uid, this.gid);
+                        console.log(`chown ${path} to ${this.uid}`);
                         this.nameToFile.set(name, [null, subpath, true]);
                         return path;
                     });
