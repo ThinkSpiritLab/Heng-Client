@@ -58,7 +58,7 @@
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
 
 
-Language：传入语言相关自定义参数，产出 CompileGenerator ExcuteGenerator sourceFileName(not path) compiledFileName(not path)，即 ConfiguredLanguage。
+Language：传入语言相关自定义参数，产出 CompileGenerator ExcuteGenerator sourceFileName(not path)（影响编译前源代码的存档地点（若不编译，不会产生此文件），传入 path 会导致错误） compiledFileName(not path)（影响编译后可执行文件路径，**nsjail文件挂载**，传入 path 就真的是 path 了（假如已经被挂载）），即 ConfiguredLanguage。
 
 CompileGenerator：传入源文件 path，目标文件 path，相关限制，产出一个子进程，子进程运行结束后得到结果。
 
@@ -86,6 +86,8 @@ or
 (command, arg)+limit-->ChildProcess-->result
 
 ExecutableAgent：传入 Executable（包含代码、限制）解析出 Language-->ConfiguredLanguage，提供 complie 和 exec 方法，执行后返回将运行结果（time，memory，signal，returnCode）。exec 方法仅传入 stdio。
+
+ExecutableAgent：传入的 name 和 cwdPrefix：name影响编译产物在哪个文件夹，为空就是当前任务主目录，cwdPrefix 影响 cwd，为空也是当前任务主目录。
 
 JudgeAgent(Base)：包含方法 compileUsr。包含其他方法，如：getResult，generateResult。
 
@@ -129,4 +131,16 @@ export interface JailSpawnOption {
 
 外界程序可能从哪里运行程序？excuteGenerator compileGenerator (use)jailMeterSpawn
 
-todo：ojcmp pack，result fix
+todo：
+ojcmp pack ok
+
+result fix ok
+
+empty meter message: remove nsjail time limit / load average to high
+
+remove multi compile error ok
+
+nsjail launch fail: load average to high
+
+judgePolicy
+

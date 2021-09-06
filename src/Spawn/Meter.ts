@@ -57,13 +57,16 @@ export function useMeter(
         ): MeteredChildProcess {
             const hcargs: string[] = [];
             if (meterOption.timelimit) {
-                hcargs.push("-t", meterOption.timelimit.toString());
+                hcargs.push("-t", Math.ceil(meterOption.timelimit).toString());
             }
             if (meterOption.memorylimit) {
-                hcargs.push("-m", meterOption.memorylimit.toString());
+                hcargs.push(
+                    "-m",
+                    Math.ceil(meterOption.memorylimit).toString()
+                );
             }
             if (meterOption.pidlimit) {
-                hcargs.push("-p", meterOption.pidlimit.toString());
+                hcargs.push("-p", Math.ceil(meterOption.pidlimit).toString());
             }
             if (options.cwd) {
                 hcargs.push("-c", path.resolve(options.cwd));

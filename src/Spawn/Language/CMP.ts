@@ -10,7 +10,7 @@ export const CMP: Language = function () {
             ["normal", "--user-fd", "0", "--std", ...args],
             {},
         ]),
-        cmp,
-        cmp
+        "",
+        ""
     );
 };

@@ -20,8 +20,8 @@ export function javaExtraArg(
     if (jailOption.memorylimit !== undefined) {
         javaOption.push(
             args?.stackSize ? `-Xss${args.stackSize}k` : "-Xss256k",
-            `-Xms${Math.ceil(jailOption.memorylimit / 4)}m`,
-            `-Xmx${jailOption.memorylimit}m`
+            `-Xms${Math.ceil(jailOption.memorylimit / 1024 / 1024 / 4)}m`,
+            `-Xmx${Math.ceil(jailOption.memorylimit / 1024 / 1024)}m`
         );
     }
     return javaOption;
@@ -41,7 +41,7 @@ export const JAVA: Language = function (javaargs) {
                 throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
             }
             const javaOption: string[] = [];
-            javaOption.push(...javaExtraArg(jailOption, javaargs));
+            // javaOption.push(...javaExtraArg(jailOption, javaargs));
             javaOption.push("-sourcepath", options.cwd ?? path.dirname(src));
             javaOption.push(src);
             return useMeter(jailOption)(

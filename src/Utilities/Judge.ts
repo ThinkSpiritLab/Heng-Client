@@ -4,6 +4,7 @@ import {
     JudgeResult,
     JudgeResultKind,
     JudgeType,
+    Limit,
 } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
@@ -80,7 +81,9 @@ export class ExecutableAgent {
                     gid: this.gid,
                 },
                 {
-                    timelimit: this.excutable.limit.compiler.cpuTime,
+                    timelimit:
+                        this.excutable.limit.compiler.cpuTime +
+                        getConfig().judger.tleTimeOutMs,
                     memorylimit: this.excutable.limit.compiler.memory,
                     pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: Math.max(
@@ -126,7 +129,9 @@ export class ExecutableAgent {
                     gid: this.gid,
                 },
                 {
-                    timelimit: this.excutable.limit.runtime.cpuTime,
+                    timelimit:
+                        this.excutable.limit.runtime.cpuTime +
+                        getConfig().judger.tleTimeOutMs,
                     memorylimit: this.excutable.limit.runtime.memory,
                     pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: this.excutable.limit.runtime.output,
@@ -166,16 +171,29 @@ export abstract class JudgeAgent {
         }
     }
 
-    // async getBasicCmp(): Promise<ExecutableAgent> {
-    //     return new ExecutableAgent(
-    //         {},
-    //         this.fileAgent,
-    //         "",
-    //         "cmp",
-    //         this.uid,
-    //         this.gid
-    //     );
-    // }
+    getBasicCmp(usrLimit: Limit): ExecutableAgent {
+        return new ExecutableAgent(
+            {
+                source: {
+                    hashsum: "",
+                    type: "direct",
+                    content: "",
+                },
+                environment: {
+                    language: "cmp", // fixed
+                    system: "Linux",
+                    arch: "x64",
+                    options: {},
+                },
+                limit: usrLimit,
+            },
+            this.fileAgent,
+            "cmp",
+            "",
+            this.uid,
+            this.gid
+        );
+    }
 
     getExtra = async (): Promise<{
         user?:
@@ -228,13 +246,14 @@ export abstract class JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind:
                                     JudgeResultKind.CompileMemoryLimitExceeded,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -246,12 +265,13 @@ export abstract class JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.CompileTimeLimitExceeded,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -260,12 +280,13 @@ export abstract class JudgeAgent {
             if (compileResult.signal === 25) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.CompileFileLimitExceeded,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -274,12 +295,13 @@ export abstract class JudgeAgent {
             if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.CompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -326,7 +348,7 @@ export abstract class JudgeAgent {
                     userResult.time.real > userExec.limit.runtime.cpuTime * 1.5
                 ) {
                     return JudgeResultKind.TimeLimitExceeded;
-                } else if (userResult.memory > userExec.limit.runtime.memory) {
+                } else if (userResult.memory >= userExec.limit.runtime.memory) {
                     return JudgeResultKind.MemoryLimitExceeded;
                 } else if (
                     userResult.signal !== -1 ||
@@ -340,14 +362,16 @@ export abstract class JudgeAgent {
                     sysResult.time.real > sysExec.limit.runtime.cpuTime * 1.5
                 ) {
                     return JudgeResultKind.SystemTimeLimitExceeded;
-                } else if (sysResult.memory > sysExec.limit.runtime.memory) {
+                } else if (sysResult.memory >= sysExec.limit.runtime.memory) {
                     return JudgeResultKind.SystemMemoryLimitExceeded;
                 } else if (
                     sysResult.signal !== -1 ||
-                    sysResult.returnCode !== 0
+                    // Adapt to ojcmp v0.4.0
+                    ![0, 1, 2].includes(sysResult.returnCode)
                 ) {
                     return JudgeResultKind.SystemRuntimeError;
-                } else if (sysJudge === "AC") {
+                } else if (sysJudge === "AC" || sysJudge === "PE") {
+                    // May add ResultType PE
                     return JudgeResultKind.Accepted;
                 } else if (sysJudge === "WA") {
                     return JudgeResultKind.WrongAnswer;
@@ -358,7 +382,9 @@ export abstract class JudgeAgent {
                     return JudgeResultKind.SystemError;
                 }
             })(),
-            time: userResult.time.usr * this.timeRatio + this.timeIntercept,
+            time: Math.ceil(
+                userResult.time.usr * this.timeRatio + this.timeIntercept
+            ),
             memory: userResult.memory,
         };
     }
@@ -386,6 +412,9 @@ export class NormalJudgeAgent extends JudgeAgent {
 
     async getResult(): Promise<JudgeResult> {
         const [compileResult, userExecutableAgent] = await this.compileUsr();
+        const cmpExecutableAgent = this.getBasicCmp(
+            this.judge.judge.user.limit
+        );
         if (compileResult !== undefined) {
             return compileResult;
         } else if (userExecutableAgent !== undefined) {
@@ -404,20 +433,24 @@ export class NormalJudgeAgent extends JudgeAgent {
                     if (userProcess.stdin) {
                         inputStream.pipe(userProcess.stdin);
                     }
-                    const compProcess = jailMeterSpawn(
-                        this.cmp,
-                        ["normal", "--user-fd", "0", "--std", stdPath],
-                        { stdio: [userProcess.stdout, "pipe", "pipe"] },
-                        {
-                            timelimit: this.judge.judge.user.limit.runtime
-                                .cpuTime,
-                            memorylimit: this.judge.judge.user.limit.runtime
-                                .memory,
-                            pidlimit: getConfig().judger.defaultPidLimit,
-                            filelimit: this.judge.judge.user.limit.runtime
-                                .output,
-                            mount: [{ path: stdPath, mode: "ro" }],
-                        }
+                    // const compProcess = jailMeterSpawn(
+                    //     this.cmp,
+                    //     ["normal", "--user-fd", "0", "--std", stdPath],
+                    //     { stdio: [userProcess.stdout, "pipe", "pipe"] },
+                    //     {
+                    //         timelimit: this.judge.judge.user.limit.runtime
+                    //             .cpuTime,
+                    //         memorylimit: this.judge.judge.user.limit.runtime
+                    //             .memory,
+                    //         pidlimit: getConfig().judger.defaultPidLimit,
+                    //         filelimit: this.judge.judge.user.limit.runtime
+                    //             .output,
+                    //         mount: [{ path: stdPath, mode: "ro" }],
+                    //     }
+                    // );
+                    const compProcess = cmpExecutableAgent.exec(
+                        [userProcess.stdout, "pipe", "pipe"],
+                        [stdPath]
                     );
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
@@ -505,12 +538,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -522,12 +556,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -536,12 +571,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
             if (compileResult.signal === 25) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -550,12 +586,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
             if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -690,12 +727,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -707,12 +745,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             ) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -721,12 +760,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             if (compileResult.signal === 25) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -735,12 +775,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
                 return [
                     {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
+                        cases: [
+                            {
                                 kind: JudgeResultKind.SystemCompileError,
                                 time: 0,
                                 memory: 0,
-                            })) ?? [],
+                            },
+                        ],
                         extra: await this.getExtra(),
                     },
                     undefined,
@@ -830,6 +871,13 @@ export class JudgeFactory {
     ) {}
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
+        // why so ugly? just reduce further bugs
+        judge.judge.user.limit.compiler.cpuTime = Math.ceil(
+            judge.judge.user.limit.compiler.cpuTime / this.timeRatio
+        );
+        judge.judge.user.limit.runtime.cpuTime = Math.ceil(
+            judge.judge.user.limit.runtime.cpuTime / this.timeRatio
+        );
         switch (judge.judge.type) {
             case JudgeType.Normal: {
                 return new NormalJudgeAgent(
@@ -843,6 +891,12 @@ export class JudgeFactory {
                 );
             }
             case JudgeType.Special: {
+                judge.judge.spj.limit.compiler.cpuTime = Math.ceil(
+                    judge.judge.spj.limit.compiler.cpuTime / this.timeRatio
+                );
+                judge.judge.spj.limit.runtime.cpuTime = Math.ceil(
+                    judge.judge.spj.limit.runtime.cpuTime / this.timeRatio
+                );
                 return new SpecialJudgeAgent(
                     judge,
                     this.timeRatio,
@@ -853,6 +907,14 @@ export class JudgeFactory {
                 );
             }
             case JudgeType.Interactive: {
+                judge.judge.interactor.limit.compiler.cpuTime = Math.ceil(
+                    judge.judge.interactor.limit.compiler.cpuTime /
+                        this.timeRatio
+                );
+                judge.judge.interactor.limit.runtime.cpuTime = Math.ceil(
+                    judge.judge.interactor.limit.runtime.cpuTime /
+                        this.timeRatio
+                );
                 return new InteractiveJudgeAgent(
                     judge,
                     this.timeRatio,
@@ -875,113 +937,141 @@ export async function getJudgerFactory(
     const logger = getLogger("JudgeFactoryFactory");
     logger.info("self test loaded");
     const timeIntercept = 0;
-    const result = (
-        await Promise.all(
-            judgerConfig.testcases.map(async (testcase, index) => {
-                logger.info(`self test ${index} loaded`);
-                const fileAgent = new FileAgent(
-                    `${process.pid}selfTest${index}`,
-                    null,
-                    // TODO root?
-                    process.getuid(),
-                    process.getgid()
-                );
-                try {
-                    await fileAgent.ready;
-                    const language = getLanguage(testcase.language);
-                    const configuredLanguage = language({});
-                    let curExcutablePath = path.resolve(
-                        fileAgent.dir,
-                        configuredLanguage.sourceFileName
-                    );
-                    logger.info(`copying src for testcase ${index}`);
-                    await fs.promises.copyFile(
-                        path.resolve(testcase.src),
-                        curExcutablePath
-                    );
-                    logger.info(`copyed src for testcase ${index}`);
-                    if (configuredLanguage.compileGenerator !== null) {
-                        logger.info(`self test ${index} compiling`);
-                        const compileProcess = configuredLanguage.compileGenerator(
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.sourceFileName
-                            ),
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.compiledFileName
-                            ),
-                            { cwd: fileAgent.dir },
-                            {
-                                timelimit: 10000,
-                                memorylimit: 512 * 1024 * 1024,
-                                pidlimit: getConfig().judger.defaultPidLimit,
-                                filelimit: 1024 * 1024 * 1024,
-                                mount: [{ path: fileAgent.dir, mode: "rw" }],
-                            }
-                        );
-                        const compileResult = await compileProcess.result;
-                        if (
-                            compileResult.returnCode !== 0 ||
-                            compileResult.signal !== -1
-                        ) {
-                            throw `Compile for testcase ${index} Failed`;
-                        }
-                        logger.info(`self test ${index} compiled`);
-                        curExcutablePath = path.resolve(
-                            fileAgent.dir,
-                            configuredLanguage.compiledFileName
-                        );
-                    }
-                    const testProc = (
-                        configuredLanguage.excuteGenerator ?? jailMeterSpawn
-                    )(
-                        curExcutablePath,
-                        testcase.args ?? [],
-                        {
-                            cwd: fileAgent.dir,
-                            stdio:
-                                testcase.input !== undefined
-                                    ? [fs.createReadStream(testcase.input)]
-                                    : undefined,
-                        },
-                        {
-                            timelimit:
-                                judgerConfig.timeRatioTolerance *
-                                2 *
-                                testcase.timeExpected,
-                            memorylimit: 512 * 1024 * 1024,
-                            pidlimit: getConfig().judger.defaultPidLimit,
-                            filelimit: 1024 * 1024 * 1024,
-                            mount: [{ path: curExcutablePath, mode: "ro" }],
-                        }
-                    );
-                    // TODO understand it
-                    if (testProc.stdout) {
-                        const testOutput = await readStream(testProc.stdout);
-                        logger.info(`TestProc ${index} says ${testOutput}`);
-                    }
-                    const testResult = await testProc.result;
-                    if (
-                        testResult.returnCode !== 0 ||
-                        testResult.signal !== -1
-                    ) {
-                        throw `TestProc for testcase ${index} Failed`;
-                    }
-                    logger.info(
-                        `Test case ${index} completed in ${testResult.time.real}`
-                    );
-                    return [testcase.timeExpected, testResult.time.real];
-                } finally {
-                    // await fileAgent.clean();
-                }
-            })
-        )
-    ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
-    const timeRatio = result[0] / result[1];
-    logger.info(`timeRatio is ${timeRatio}`);
+    // const judgerFactory = new JudgeFactory(
+    //     1,
+    //     0,
+    //     judgerConfig.cmp,
+    //     throttle,
+    //     judgerConfig.uid,
+    //     judgerConfig.gid
+    // );
+
+    // let costTime = 0,
+    //     expectedTime = 0;
+
+    // await Promise.all(
+    //     Tests.map(async (test) => {
+    //         const judgeAgent = judgerFactory.getJudgerAgent(test.task);
+    //         const result = await judgeAgent.getResultNoException();
+    //         result.cases.forEach((c, idx) => {
+    //             if (test.expectedResultKind[idx] !== c.kind) {
+    //                 throw ``
+    //             }
+    //             if (test.countPolicy.countTime) {
+    //                 costTime += c.time;
+    //                 expectedTime+=test.
+    //             }
+    //         })
+    //     })
+    // );
+
+    // const result = (
+    //     await Promise.all(
+    //         judgerConfig.testcases.map(async (testcase, index) => {
+    //             logger.info(`self test ${index} loaded`);
+    //             const fileAgent = new FileAgent(
+    //                 `${process.pid}selfTest${index}`,
+    //                 null,
+    //                 // TODO root?
+    //                 process.getuid(),
+    //                 process.getgid()
+    //             );
+    //             try {
+    //                 await fileAgent.ready;
+    //                 const language = getLanguage(testcase.language);
+    //                 const configuredLanguage = language({});
+    //                 let curExcutablePath = path.resolve(
+    //                     fileAgent.dir,
+    //                     configuredLanguage.sourceFileName
+    //                 );
+    //                 logger.info(`copying src for testcase ${index}`);
+    //                 await fs.promises.copyFile(
+    //                     path.resolve(testcase.src),
+    //                     curExcutablePath
+    //                 );
+    //                 logger.info(`copyed src for testcase ${index}`);
+    //                 if (configuredLanguage.compileGenerator !== null) {
+    //                     logger.info(`self test ${index} compiling`);
+    //                     const compileProcess = configuredLanguage.compileGenerator(
+    //                         path.resolve(
+    //                             fileAgent.dir,
+    //                             configuredLanguage.sourceFileName
+    //                         ),
+    //                         path.resolve(
+    //                             fileAgent.dir,
+    //                             configuredLanguage.compiledFileName
+    //                         ),
+    //                         { cwd: fileAgent.dir },
+    //                         {
+    //                             timelimit: 10000,
+    //                             memorylimit: 512 * 1024 * 1024,
+    //                             pidlimit: getConfig().judger.defaultPidLimit,
+    //                             filelimit: 1024 * 1024 * 1024,
+    //                             mount: [{ path: fileAgent.dir, mode: "rw" }],
+    //                         }
+    //                     );
+    //                     const compileResult = await compileProcess.result;
+    //                     if (
+    //                         compileResult.returnCode !== 0 ||
+    //                         compileResult.signal !== -1
+    //                     ) {
+    //                         throw `Compile for testcase ${index} Failed`;
+    //                     }
+    //                     logger.info(`self test ${index} compiled`);
+    //                     curExcutablePath = path.resolve(
+    //                         fileAgent.dir,
+    //                         configuredLanguage.compiledFileName
+    //                     );
+    //                 }
+    //                 const testProc = (
+    //                     configuredLanguage.excuteGenerator ?? jailMeterSpawn
+    //                 )(
+    //                     curExcutablePath,
+    //                     testcase.args ?? [],
+    //                     {
+    //                         cwd: fileAgent.dir,
+    //                         stdio:
+    //                             testcase.input !== undefined
+    //                                 ? [fs.createReadStream(testcase.input)]
+    //                                 : undefined,
+    //                     },
+    //                     {
+    //                         timelimit:
+    //                             judgerConfig.timeRatioTolerance *
+    //                             2 *
+    //                             testcase.timeExpected,
+    //                         memorylimit: 512 * 1024 * 1024,
+    //                         pidlimit: getConfig().judger.defaultPidLimit,
+    //                         filelimit: 1024 * 1024 * 1024,
+    //                         mount: [{ path: curExcutablePath, mode: "ro" }],
+    //                     }
+    //                 );
+    //                 // TODO understand it
+    //                 if (testProc.stdout) {
+    //                     const testOutput = await readStream(testProc.stdout);
+    //                     logger.info(`TestProc ${index} says ${testOutput}`);
+    //                 }
+    //                 const testResult = await testProc.result;
+    //                 if (
+    //                     testResult.returnCode !== 0 ||
+    //                     testResult.signal !== -1
+    //                 ) {
+    //                     throw `TestProc for testcase ${index} Failed`;
+    //                 }
+    //                 logger.info(
+    //                     `Test case ${index} completed in ${testResult.time.real}`
+    //                 );
+    //                 return [testcase.timeExpected, testResult.time.real];
+    //             } finally {
+    //                 await fileAgent.clean();
+    //             }
+    //         })
+    //     )
+    // ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
+    // logger.info(`timeRatio is ${timeRatio}`);
+    // const timeRatio = expectedTime / costTime;
     return new JudgeFactory(
-        timeRatio,
+        1,
         timeIntercept,
         judgerConfig.cmp,
         throttle,

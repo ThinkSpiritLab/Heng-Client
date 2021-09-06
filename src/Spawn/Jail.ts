@@ -84,7 +84,7 @@ export function useJail(
             // if (jailOption.pidlimit) {
             //     jailArgs.push(
             //         "--cgroup_pids_max",
-            //         jailOption.pidlimit.toString()
+            //         Math.ceil(jailOption.pidlimit).toString()
             //     );
             // }
             if (options.cwd) {

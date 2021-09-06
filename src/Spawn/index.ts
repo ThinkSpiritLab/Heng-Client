@@ -55,9 +55,15 @@ function useJailAndMeter(jailOption: JailSpawnOption) {
             if (jailOption.pidlimit) {
                 jailOption.pidlimit += 3;
             }
-            return useMeter(meterOption)(
+            const subProcess = useMeter(meterOption)(
                 useJail(jailOption)(loggedSpawn(spawnFunction))
             )(command, args, options);
+            subProcess.on("error", (e) => {
+                console.log(e);
+                // TODO require fix
+                throw e;
+            });
+            return subProcess;
         };
     };
 }

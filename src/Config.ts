@@ -113,12 +113,18 @@ export class JudgeFactoryConfig {
     @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
+    @IsInt()
+    @IsPositive()
+    tleTimeOutMs!: number;
     @IsString()
     @IsNotEmpty()
     cmp!: string;
     @IsInt()
     @IsPositive()
     defaultPidLimit!: number;
+    @IsInt()
+    @IsPositive()
+    selfTestRound!: number;
     @IsInt()
     @Min(1000)
     uid!: number;

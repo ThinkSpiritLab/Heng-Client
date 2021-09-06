@@ -14,7 +14,7 @@ export const C: Language = function (args) {
                 output,
                 args?.version !== undefined
                     ? `--std=${args.version}`
-                    : "--std=C99",
+                    : "--std=c99",
             ];
             if (args?.o2 !== false) {
                 compilerOptions.push("-O2");

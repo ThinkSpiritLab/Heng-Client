@@ -145,11 +145,11 @@ export class FileAgent {
                                 if (err) {
                                     reject(err);
                                 } else {
-                                    // this.nameToFile.set(name, [
-                                    //     null,
-                                    //     subpath,
-                                    //     true,
-                                    // ]);
+                                    this.nameToFile.set(name, [
+                                        null,
+                                        subpath,
+                                        true,
+                                    ]);
                                     resolve(subpath);
                                 }
                             }
