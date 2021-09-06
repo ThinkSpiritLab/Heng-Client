@@ -136,6 +136,7 @@ export class FileAgent {
                         recursive: true,
                         mode: 0o700,
                     });
+                    console.log(`get ${name}, mkdir ${path.dirname(subpath)}`);
                     const readable = await readableFromFile(file);
                     return new Promise<string>((resolve, reject) => {
                         pipeline(
@@ -145,17 +146,13 @@ export class FileAgent {
                                 if (err) {
                                     reject(err);
                                 } else {
-                                    this.nameToFile.set(name, [
-                                        null,
-                                        subpath,
-                                        true,
-                                    ]);
                                     resolve(subpath);
                                 }
                             }
                         );
                     }).then(async (path) => {
                         await fs.promises.chown(path, this.uid, this.gid);
+                        this.nameToFile.set(name, [null, subpath, true]);
                         return path;
                     });
                 } else {
