@@ -17,6 +17,7 @@ export async function chownR(
     uid: number,
     gid: number
 ): Promise<void> {
+    console.log(`in chown ${path} to ${uid}`);
     const curdir = await fs.promises.opendir(dirpath);
     let subItem: fs.Dirent | null;
     while ((subItem = await curdir.read()) !== null) {
@@ -26,6 +27,7 @@ export async function chownR(
             await fs.promises.chown(path.join(dirpath, subItem.name), uid, gid);
         }
     }
+    console.log(`out chown ${path} to ${uid}`);
     await fs.promises.chown(dirpath, uid, gid);
     await curdir.close();
 }
