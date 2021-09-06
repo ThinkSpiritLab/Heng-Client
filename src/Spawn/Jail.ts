@@ -69,18 +69,18 @@ export function useJail(
                     }
                 }
             }
-            if (jailOption.timelimit) {
-                jailArgs.push(
-                    "-t",
-                    Math.ceil(jailOption.timelimit / 1000).toString()
-                );
-            }
-            if (jailOption.memorylimit) {
-                jailArgs.push(
-                    "--rlimit_as",
-                    Math.ceil(jailOption.memorylimit / 1024 / 1024).toString()
-                );
-            }
+            // if (jailOption.timelimit) {
+            //     jailArgs.push(
+            //         "-t",
+            //         Math.ceil(jailOption.timelimit / 1000).toString()
+            //     );
+            // }
+            // if (jailOption.memorylimit) {
+            //     jailArgs.push(
+            //         "--rlimit_as",
+            //         Math.ceil(jailOption.memorylimit / 1024 / 1024).toString()
+            //     );
+            // }
             // if (jailOption.pidlimit) {
             //     jailArgs.push(
             //         "--cgroup_pids_max",
