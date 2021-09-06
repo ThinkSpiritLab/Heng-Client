@@ -60,7 +60,10 @@ export function readableFromFile(file: File): Promise<Readable> {
 export class FileAgent {
     readonly dir: string;
     readonly ready: Promise<void>;
-    private nameToFile = new Map<string, [File | null, string, boolean]>();
+    private nameToFile = new Map<
+        string,
+        [File | null, string, boolean | Promise<boolean>]
+    >();
     constructor(
         readonly prefix: string,
         readonly primaryFile: File | null,
@@ -127,35 +130,59 @@ export class FileAgent {
         const record = this.nameToFile.get(name);
         if (record !== undefined) {
             const [file, subpath, writed] = record;
-            if (writed) {
+            let ret = false;
+            if (typeof writed !== "boolean") {
+                try {
+                    ret = await writed;
+                } catch (error) {
+                    ret = false;
+                }
+            } else {
+                ret = writed;
+            }
+            if (ret) {
                 return subpath;
             } else {
-                if (file) {
-                    await fs.promises.mkdir(path.dirname(subpath), {
-                        recursive: true,
-                        mode: 0o700,
-                    });
-                    const readable = await readableFromFile(file);
-                    return new Promise<string>((resolve, reject) => {
-                        pipeline(
-                            readable,
-                            fs.createWriteStream(subpath),
-                            (err) => {
-                                if (err) {
-                                    reject(err);
-                                } else {
-                                    resolve(subpath);
-                                }
-                            }
+                const promise = Promise.resolve().then(async () => {
+                    if (file) {
+                        await fs.promises.mkdir(path.dirname(subpath), {
+                            recursive: true,
+                            mode: 0o700,
+                        });
+                        await fs.promises.chown(
+                            path.dirname(subpath),
+                            this.uid,
+                            this.gid
                         );
-                    }).then(async (path) => {
-                        await fs.promises.chown(path, this.uid, this.gid);
-                        this.nameToFile.set(name, [null, subpath, true]);
-                        return path;
-                    });
-                } else {
-                    throw "File not found nor writen";
-                }
+                        const readable = await readableFromFile(file);
+                        return new Promise<boolean>((resolve, reject) => {
+                            pipeline(
+                                readable,
+                                fs.createWriteStream(subpath),
+                                (err) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve(true);
+                                    }
+                                }
+                            );
+                        }).then(async (sus) => {
+                            await fs.promises.chown(
+                                subpath,
+                                this.uid,
+                                this.gid
+                            );
+                            return sus;
+                        });
+                    } else {
+                        throw "File not found nor writen";
+                    }
+                });
+                // this step maybe? too late / slow, then double promise
+                this.nameToFile.set(name, [file, subpath, promise]);
+                await promise;
+                return subpath;
             }
         } else {
             return path.join(this.dir, "data", name);
