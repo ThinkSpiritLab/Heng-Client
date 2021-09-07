@@ -158,7 +158,6 @@ export abstract class JudgeAgent {
         this.fileAgent = new FileAgent(
             path.join("Heng-Client", judge.id),
             judge.data ?? null,
-            // TODO why usr
             this.uid,
             this.gid
         );
@@ -180,7 +179,7 @@ export abstract class JudgeAgent {
                     content: "",
                 },
                 environment: {
-                    language: "cmp", // fixed
+                    language: "cmp", // const
                     system: "Linux",
                     arch: "x64",
                     options: {},
