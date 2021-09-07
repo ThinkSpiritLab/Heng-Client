@@ -80,6 +80,7 @@ export function useMeter(
                 hcargs.push("-g", options.gid.toString());
                 options.gid = undefined;
             }
+            hcargs.push("-cpu", "1");
             hcargs.push("--bin", command);
             let meterFd: number;
             if (options.stdio && options.stdio.length >= 3) {
