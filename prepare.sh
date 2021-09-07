@@ -21,7 +21,8 @@ dnf update --assumeyes && \
     wget \
     java-1.8.0-openjdk \
     java-1.8.0-openjdk-devel \
-    python3
+    python3 \
+    screen
 npm install -g cnpm --registry=https://registry.npm.taobao.org
 cd ~
 nohup wget -O /usr/bin/ojcmp https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp/releases/download/v0.4.0/ojcmp-v0.4.0-x86_64-unknown-linux-gnu \

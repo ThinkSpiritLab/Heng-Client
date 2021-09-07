@@ -41,7 +41,6 @@ export const JAVA: Language = function (javaargs) {
                 throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
             }
             const javaOption: string[] = [];
-            // javaOption.push(...javaExtraArg(jailOption, javaargs));
             javaOption.push("-sourcepath", options.cwd ?? path.dirname(src));
             javaOption.push(src);
             return useMeter(jailOption)(
