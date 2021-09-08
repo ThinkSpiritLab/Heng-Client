@@ -19,7 +19,10 @@ java = "/usr/bin/java"
 javac = "/usr/bin/javac"
 [judger]
 timeRatioTolerance = 5
+tleTimeOutMs = 200
 cmp = '/usr/bin/ojcmp'
+defaultPidLimit = 64
+selfTestRound = 10
 uid = 1000
 gid = 1000
 [[judger.testcases]]

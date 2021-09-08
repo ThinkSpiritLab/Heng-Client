@@ -17,6 +17,7 @@ import { jailMeterSpawn } from "../Spawn";
 import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 import { StdioType } from "src/Spawn/BasicSpawn";
 import { Throttle } from "./Throttle";
+import { Tests } from "../SelfTest";
 
 function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
     return getLanguage(excutable.environment.language)(
@@ -247,8 +248,7 @@ export abstract class JudgeAgent {
                     {
                         cases: [
                             {
-                                kind:
-                                    JudgeResultKind.CompileMemoryLimitExceeded,
+                                kind: JudgeResultKind.CompileMemoryLimitExceeded,
                                 time: 0,
                                 memory: 0,
                             },
@@ -612,15 +612,12 @@ export class SpecialJudgeAgent extends JudgeAgent {
             spjExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [
-                    inputStream,
-                    inputStream2,
-                    stdStream,
-                ] = await Promise.all([
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.output),
-                ]);
+                const [inputStream, inputStream2, stdStream] =
+                    await Promise.all([
+                        this.fileAgent.getFd(value.input),
+                        this.fileAgent.getFd(value.input),
+                        this.fileAgent.getFd(value.output),
+                    ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
                         // "pipe",
@@ -791,10 +788,8 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     }
     async getResult(): Promise<JudgeResult> {
         const [compileResult, userExecutableAgent] = await this.compileUsr();
-        const [
-            spjCompileResult,
-            interactorExecutableAgent,
-        ] = await this.compileInteractor();
+        const [spjCompileResult, interactorExecutableAgent] =
+            await this.compileInteractor();
         if (compileResult !== undefined) {
             return compileResult;
         } else if (spjCompileResult !== undefined) {
@@ -936,145 +931,102 @@ export async function getJudgerFactory(
     const logger = getLogger("JudgeFactoryFactory");
     logger.info("self test loaded");
     const timeIntercept = 0;
-    // const judgerFactory = new JudgeFactory(
-    //     1,
-    //     0,
-    //     judgerConfig.cmp,
-    //     throttle,
-    //     judgerConfig.uid,
-    //     judgerConfig.gid
-    // );
-
-    // let costTime = 0,
-    //     expectedTime = 0;
-
-    // await Promise.all(
-    //     Tests.map(async (test) => {
-    //         const judgeAgent = judgerFactory.getJudgerAgent(test.task);
-    //         const result = await judgeAgent.getResultNoException();
-    //         result.cases.forEach((c, idx) => {
-    //             if (test.expectedResultKind[idx] !== c.kind) {
-    //                 throw ``
-    //             }
-    //             if (test.countPolicy.countTime) {
-    //                 costTime += c.time;
-    //                 expectedTime+=test.
-    //             }
-    //         })
-    //     })
-    // );
-
-    // const result = (
-    //     await Promise.all(
-    //         judgerConfig.testcases.map(async (testcase, index) => {
-    //             logger.info(`self test ${index} loaded`);
-    //             const fileAgent = new FileAgent(
-    //                 `${process.pid}selfTest${index}`,
-    //                 null,
-    //                 // TODO root?
-    //                 process.getuid(),
-    //                 process.getgid()
-    //             );
-    //             try {
-    //                 await fileAgent.ready;
-    //                 const language = getLanguage(testcase.language);
-    //                 const configuredLanguage = language({});
-    //                 let curExcutablePath = path.resolve(
-    //                     fileAgent.dir,
-    //                     configuredLanguage.sourceFileName
-    //                 );
-    //                 logger.info(`copying src for testcase ${index}`);
-    //                 await fs.promises.copyFile(
-    //                     path.resolve(testcase.src),
-    //                     curExcutablePath
-    //                 );
-    //                 logger.info(`copyed src for testcase ${index}`);
-    //                 if (configuredLanguage.compileGenerator !== null) {
-    //                     logger.info(`self test ${index} compiling`);
-    //                     const compileProcess = configuredLanguage.compileGenerator(
-    //                         path.resolve(
-    //                             fileAgent.dir,
-    //                             configuredLanguage.sourceFileName
-    //                         ),
-    //                         path.resolve(
-    //                             fileAgent.dir,
-    //                             configuredLanguage.compiledFileName
-    //                         ),
-    //                         { cwd: fileAgent.dir },
-    //                         {
-    //                             timelimit: 10000,
-    //                             memorylimit: 512 * 1024 * 1024,
-    //                             pidlimit: getConfig().judger.defaultPidLimit,
-    //                             filelimit: 1024 * 1024 * 1024,
-    //                             mount: [{ path: fileAgent.dir, mode: "rw" }],
-    //                         }
-    //                     );
-    //                     const compileResult = await compileProcess.result;
-    //                     if (
-    //                         compileResult.returnCode !== 0 ||
-    //                         compileResult.signal !== -1
-    //                     ) {
-    //                         throw `Compile for testcase ${index} Failed`;
-    //                     }
-    //                     logger.info(`self test ${index} compiled`);
-    //                     curExcutablePath = path.resolve(
-    //                         fileAgent.dir,
-    //                         configuredLanguage.compiledFileName
-    //                     );
-    //                 }
-    //                 const testProc = (
-    //                     configuredLanguage.excuteGenerator ?? jailMeterSpawn
-    //                 )(
-    //                     curExcutablePath,
-    //                     testcase.args ?? [],
-    //                     {
-    //                         cwd: fileAgent.dir,
-    //                         stdio:
-    //                             testcase.input !== undefined
-    //                                 ? [fs.createReadStream(testcase.input)]
-    //                                 : undefined,
-    //                     },
-    //                     {
-    //                         timelimit:
-    //                             judgerConfig.timeRatioTolerance *
-    //                             2 *
-    //                             testcase.timeExpected,
-    //                         memorylimit: 512 * 1024 * 1024,
-    //                         pidlimit: getConfig().judger.defaultPidLimit,
-    //                         filelimit: 1024 * 1024 * 1024,
-    //                         mount: [{ path: curExcutablePath, mode: "ro" }],
-    //                     }
-    //                 );
-    //                 // TODO understand it
-    //                 if (testProc.stdout) {
-    //                     const testOutput = await readStream(testProc.stdout);
-    //                     logger.info(`TestProc ${index} says ${testOutput}`);
-    //                 }
-    //                 const testResult = await testProc.result;
-    //                 if (
-    //                     testResult.returnCode !== 0 ||
-    //                     testResult.signal !== -1
-    //                 ) {
-    //                     throw `TestProc for testcase ${index} Failed`;
-    //                 }
-    //                 logger.info(
-    //                     `Test case ${index} completed in ${testResult.time.real}`
-    //                 );
-    //                 return [testcase.timeExpected, testResult.time.real];
-    //             } finally {
-    //                 await fileAgent.clean();
-    //             }
-    //         })
-    //     )
-    // ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
-    // logger.info(`timeRatio is ${timeRatio}`);
-    // const timeRatio = expectedTime / costTime;
-    return new JudgeFactory(
+    let judgerFactory = new JudgeFactory(
         1,
+        0,
+        judgerConfig.cmp,
+        throttle,
+        judgerConfig.uid,
+        judgerConfig.gid
+    );
+
+    let costTime = 0,
+        expectedTime = 0;
+
+    logger.warn("start preheat");
+
+    // 预热
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
+        await Promise.all(
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
+                );
+                const result = await judgeAgent.getResultNoException();
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
+                    if (expectedResult.expectResultType !== c.kind) {
+                        throw `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                    }
+                });
+            })
+        );
+    }
+
+    logger.warn("start self test");
+
+    // 统计
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
+        await Promise.all(
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
+                );
+                const result = await judgeAgent.getResultNoException();
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
+                    if (expectedResult.expectResultType !== c.kind) {
+                        throw `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                    }
+                    if (expectedResult.count) {
+                        costTime += c.time;
+                        expectedTime += expectedResult.expectedTime;
+                    }
+                });
+            })
+        );
+    }
+
+    let timeRatio = 1;
+    if (expectedTime && costTime) {
+        timeRatio = expectedTime / costTime;
+    }
+    logger.warn(`timeRatio is ${timeRatio}`);
+    judgerFactory = new JudgeFactory(
+        timeRatio,
         timeIntercept,
         judgerConfig.cmp,
         throttle,
         judgerConfig.uid,
         judgerConfig.gid
     );
+
+    // 校验
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
+        await Promise.all(
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
+                );
+                const result = await judgeAgent.getResultNoException();
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
+                    if (expectedResult.expectResultType !== c.kind) {
+                        throw `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                    }
+                    if (expectedResult.count) {
+                        const diff = Math.abs(
+                            expectedResult.expectedTime - c.time
+                        );
+                        const percentage = diff / expectedResult.expectedTime;
+                        if (diff > 200 || percentage > 0.2) {
+                            throw `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`;
+                        }
+                    }
+                });
+            })
+        );
+    }
+    logger.warn(`timeRatio is ${timeRatio}`);
+    return judgerFactory;
 }
