@@ -1,9 +1,9 @@
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { getLogger } from "log4js";
 import path from "path";
 import { Readable } from "stream";
 import { getConfig } from "../Config";
-import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
+import { BasicSpawnOption } from "./BasicSpawn";
 
 interface MeterSpawnOption {
     timelimit?: number; //ms
@@ -22,7 +22,7 @@ export interface MeterResult {
     };
 }
 
-export interface MeteredChildProcess extends BasicChildProcess {
+export interface MeteredChildProcess extends ChildProcess {
     meterFd: number;
     result: Promise<MeterResult>;
 }
@@ -36,7 +36,7 @@ export function useMeter(
         command: string,
         args: string[],
         options: BasicSpawnOption
-    ) => BasicChildProcess
+    ) => ChildProcess
 ) => (
     command: string,
     args: string[],
@@ -48,7 +48,7 @@ export function useMeter(
             command: string,
             args: string[],
             options: BasicSpawnOption
-        ) => BasicChildProcess
+        ) => ChildProcess
     ) {
         return function (
             command: string,
@@ -98,11 +98,11 @@ export function useMeter(
             if (!meterConfig.path) {
                 throw "Meter not configed";
             }
-            const subProcess = (spawnFunction(
+            const subProcess = spawnFunction(
                 meterConfig.path,
                 hcargs,
                 options
-            ) as unknown) as MeteredChildProcess;
+            ) as unknown as MeteredChildProcess;
             Object.assign(subProcess, {
                 meterFd,
                 result: new Promise((resolve, reject) => {

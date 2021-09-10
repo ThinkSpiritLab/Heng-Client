@@ -58,7 +58,7 @@
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
 
 
-Language：传入语言相关自定义参数，产出 CompileGenerator ExcuteGenerator sourceFileName(not path)（影响编译前源代码的存档地点（若不编译，不会产生此文件），传入 path 会导致错误） compiledFileName(not path)（影响编译后可执行文件路径，**nsjail文件挂载**，传入 path 就真的是 path 了（假如已经被挂载）），即 ConfiguredLanguage。
+Language：传入语言相关自定义参数，产出 CompileGenerator ExcuteGenerator sourceFileName(not path)（影响编译前源代码的存档地点（若不调用ExecutableAgent.compile，不会产生此文件），传入 path 会导致错误） compiledFileName(not path)（影响编译后可执行文件路径，**nsjail文件挂载**，传入 path 就真的是 path 了（假如已经被挂载）），即 ConfiguredLanguage。
 
 CompileGenerator：传入源文件 path，目标文件 path，相关限制，产出一个子进程，子进程运行结束后得到结果。
 
@@ -129,7 +129,7 @@ export interface JailSpawnOption {
     pidlimit?: number; // ?disabled
 }
 
-外界程序可能从哪里运行程序？excuteGenerator compileGenerator (use)jailMeterSpawn
+外界程序可能从哪里运行？ ExecutableAgent 执行：excuteGenerator compileGenerator (use)jailMeterSpawn
 
 todo:
 
@@ -145,3 +145,10 @@ nsjail launch fail: load average to high
 
 judgePolicy
 
+
+
+new target:
+
+运行时自由挂载目录
+
+复用编译结果

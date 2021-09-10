@@ -1,8 +1,8 @@
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 // import { getLogger } from "log4js";
 import path from "path";
 import { getConfig } from "../Config";
-import { BasicSpawnOption, BasicChildProcess } from "./BasicSpawn";
+import { BasicSpawnOption } from "./BasicSpawn";
 
 export interface JailMountingPoint {
     path: string;
@@ -17,7 +17,7 @@ export interface JailSpawnOption {
     pidlimit: number; // default0->max
 }
 
-export type JailedChildProcess = BasicChildProcess;
+export type JailedChildProcess = ChildProcess;
 
 // const logger = getLogger("JailSpawn");
 
@@ -28,7 +28,7 @@ export function useJail(
         command: string,
         args: string[],
         options: BasicSpawnOption
-    ) => BasicChildProcess
+    ) => ChildProcess
 ) => (
     command: string,
     args: string[],
@@ -40,7 +40,7 @@ export function useJail(
             command: string,
             args: string[],
             options: BasicSpawnOption
-        ) => BasicChildProcess
+        ) => ChildProcess
     ) {
         return function (
             command: string,

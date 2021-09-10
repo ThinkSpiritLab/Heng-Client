@@ -1,6 +1,6 @@
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { getLogger } from "log4js";
-import { BasicChildProcess, BasicSpawnOption } from "./BasicSpawn";
+import { BasicSpawnOption } from "./BasicSpawn";
 import { JailSpawnOption, useJail } from "./Jail";
 import { MeteredChildProcess, useMeter } from "./Meter";
 
@@ -11,12 +11,12 @@ export function loggedSpawn(
         command: string,
         args: string[],
         options: BasicSpawnOption
-    ) => BasicChildProcess
+    ) => ChildProcess
 ): (
     command: string,
     args: string[],
     options: BasicSpawnOption
-) => BasicChildProcess {
+) => ChildProcess {
     return function (
         command: string,
         args: string[],
@@ -34,7 +34,7 @@ function useJailAndMeter(jailOption: JailSpawnOption) {
             command: string,
             args: string[],
             options: BasicSpawnOption
-        ) => BasicChildProcess
+        ) => ChildProcess
     ) {
         return function (
             command: string,

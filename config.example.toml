@@ -20,6 +20,7 @@ javac = "/usr/bin/javac"
 [judger]
 timeRatioTolerance = 5
 tleTimeOutMs = 200
+mleMemOutByte = 4194304
 cmp = '/usr/bin/ojcmp'
 defaultPidLimit = 64
 selfTestRound = 10

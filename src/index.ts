@@ -59,7 +59,7 @@ async function main() {
                 // logger.info(`Result:${JSON.stringify(result)}`);
                 controller.do("FinishJudges", { id: task.id, result });
             })
-            .finally(() => judgeAgent.clean());
+            // .finally(() => judgeAgent.clean());
         return Promise.resolve(null);
     });
     const token = await controller.getToken(

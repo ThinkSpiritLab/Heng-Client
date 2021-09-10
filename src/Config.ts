@@ -29,6 +29,9 @@ export class LanguageConfig {
     cpp!: string;
     @IsString()
     @IsNotEmpty()
+    testlib!: string;
+    @IsString()
+    @IsNotEmpty()
     python!: string;
     @IsString()
     @IsNotEmpty()
@@ -113,6 +116,10 @@ export class JudgeFactoryConfig {
     @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
+    @IsNumber()
+    @IsNotEmpty()
+    @IsPositive()
+    mleMemOutByte!: number;
     @IsInt()
     @IsPositive()
     tleTimeOutMs!: number;
