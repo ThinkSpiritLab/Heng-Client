@@ -58,7 +58,7 @@ async function main() {
                 // logger.info(`Task:${JSON.stringify(task)}`);
                 // logger.info(`Result:${JSON.stringify(result)}`);
                 controller.do("FinishJudges", { id: task.id, result });
-            })
+            });
             // .finally(() => judgeAgent.clean());
         return Promise.resolve(null);
     });

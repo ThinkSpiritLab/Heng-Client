@@ -18,6 +18,7 @@ import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 import { StdioType } from "src/Spawn/BasicSpawn";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
+import { Readable } from "stream";
 
 function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
     return getLanguage(excutable.environment.language)(
@@ -51,7 +52,7 @@ export class ExecutableAgent {
         ); //not compiled
     }
 
-    async compile(): Promise<MeterResult | void> {
+    async compile(includeTestlib = false): Promise<MeterResult | void> {
         const srcpath = await this.fileAgent.getPath(`${this.name}:src`);
         if (
             this.needCompile() &&
@@ -68,6 +69,16 @@ export class ExecutableAgent {
             const compileLogFileStream = fs.createWriteStream(compileLogPath);
             await waitForOpen(compileLogFileStream);
             this.fileAgent.register(`${this.name}:compile-log`, compileLogPath);
+            if (includeTestlib) {
+                await fs.promises.copyFile(
+                    path.resolve(getConfig().language.testlib),
+                    path.resolve(
+                        this.fileAgent.dir,
+                        this.cwdPrefix,
+                        "testlib.h"
+                    )
+                );
+            }
             const compileProcess = this.configuredLanguage.compileGenerator(
                 srcpath,
                 path.resolve(
@@ -85,7 +96,9 @@ export class ExecutableAgent {
                     timelimit:
                         this.excutable.limit.compiler.cpuTime +
                         getConfig().judger.tleTimeOutMs,
-                    memorylimit: this.excutable.limit.compiler.memory,
+                    memorylimit:
+                        this.excutable.limit.compiler.memory +
+                        getConfig().judger.mleMemOutByte,
                     pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: Math.max(
                         this.excutable.limit.compiler.output,
@@ -133,7 +146,9 @@ export class ExecutableAgent {
                     timelimit:
                         this.excutable.limit.runtime.cpuTime +
                         getConfig().judger.tleTimeOutMs,
-                    memorylimit: this.excutable.limit.runtime.memory,
+                    memorylimit:
+                        this.excutable.limit.runtime.memory +
+                        getConfig().judger.mleMemOutByte,
                     pidlimit: getConfig().judger.defaultPidLimit,
                     filelimit: this.excutable.limit.runtime.output,
                     mount: [{ path: excutablePath, mode: "ro" }],
@@ -189,7 +204,7 @@ export abstract class JudgeAgent {
             },
             this.fileAgent,
             "cmp",
-            "",
+            "/",
             this.uid,
             this.gid
         );
@@ -323,7 +338,7 @@ export abstract class JudgeAgent {
                         kind: JudgeResultKind.SystemError,
                         time: 0,
                         memory: 0,
-                        extraMessage: e.toString(),
+                        extraMessage: String(e),
                     },
                 ],
             };
@@ -347,7 +362,7 @@ export abstract class JudgeAgent {
                     userResult.time.real > userExec.limit.runtime.cpuTime * 1.5
                 ) {
                     return JudgeResultKind.TimeLimitExceeded;
-                } else if (userResult.memory >= userExec.limit.runtime.memory) {
+                } else if (userResult.memory > userExec.limit.runtime.memory) {
                     return JudgeResultKind.MemoryLimitExceeded;
                 } else if (
                     userResult.signal !== -1 ||
@@ -361,7 +376,7 @@ export abstract class JudgeAgent {
                     sysResult.time.real > sysExec.limit.runtime.cpuTime * 1.5
                 ) {
                     return JudgeResultKind.SystemTimeLimitExceeded;
-                } else if (sysResult.memory >= sysExec.limit.runtime.memory) {
+                } else if (sysResult.memory > sysExec.limit.runtime.memory) {
                     return JudgeResultKind.SystemMemoryLimitExceeded;
                 } else if (
                     sysResult.signal !== -1 ||
@@ -418,20 +433,20 @@ export class NormalJudgeAgent extends JudgeAgent {
             return compileResult;
         } else if (userExecutableAgent !== undefined) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, stdPath] = await Promise.all([
-                    this.fileAgent.getStream(value.input),
-                    this.fileAgent.getPath(value.output),
+                const [inputFd, stdFd] = await Promise.all([
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        // inputStream,
-                        "pipe",
+                        inputFd,
+                        // "pipe",
                         "pipe",
                         "pipe",
                     ]);
-                    if (userProcess.stdin) {
-                        inputStream.pipe(userProcess.stdin);
-                    }
+                    // if (userProcess.stdin) {
+                    //     inputStream.pipe(userProcess.stdin);
+                    // }
                     // const compProcess = jailMeterSpawn(
                     //     this.cmp,
                     //     ["normal", "--user-fd", "0", "--std", stdPath],
@@ -447,10 +462,12 @@ export class NormalJudgeAgent extends JudgeAgent {
                     //         mount: [{ path: stdPath, mode: "ro" }],
                     //     }
                     // );
-                    const compProcess = cmpExecutableAgent.exec(
-                        [userProcess.stdout, "pipe", "pipe"],
-                        [stdPath]
-                    );
+                    const compProcess = cmpExecutableAgent.exec([
+                        userProcess.stdout,
+                        "pipe",
+                        "pipe",
+                        stdFd,
+                    ]);
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
                         compProcess.result,
@@ -516,7 +533,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
             this.gid
         );
         const compileResult = await this.throttle.withThrottle(
-            async () => await userExecutableAgent.compile()
+            async () => await userExecutableAgent.compile(true)
         );
         if (compileResult !== undefined) {
             const oldExtra = this.getExtra;
@@ -612,16 +629,15 @@ export class SpecialJudgeAgent extends JudgeAgent {
             spjExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, inputStream2, stdStream] =
-                    await Promise.all([
-                        this.fileAgent.getFd(value.input),
-                        this.fileAgent.getFd(value.input),
-                        this.fileAgent.getFd(value.output),
-                    ]);
+                const [inputFd, inputFd2, stdFd] = await Promise.all([
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.input),
+                    this.fileAgent.getFd(value.output),
+                ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
                         // "pipe",
-                        inputStream,
+                        inputFd,
                         "pipe",
                         "pipe",
                     ]);
@@ -630,8 +646,8 @@ export class SpecialJudgeAgent extends JudgeAgent {
                         userProcess.stdout,
                         "pipe",
                         "pipe",
-                        inputStream2,
-                        stdStream,
+                        inputFd2,
+                        stdFd,
                     ]);
                     // inputStream2.pipe(userProcess.stdio[2]as unknown as Writable)
                     // stdStream.pipe(userProcess.stdio[3]as unknown as Writable)
@@ -642,6 +658,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
                             ? readStream(compProcess.stdout)
                             : "",
                     ]);
+                    console.log(cmpOut);
                     return this.generateResult(
                         userResult,
                         this.judge.judge.user,
@@ -700,7 +717,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             this.gid
         );
         const compileResult = await this.throttle.withThrottle(() =>
-            interactorExecutableAgent.compile()
+            interactorExecutableAgent.compile(true)
         );
         if (compileResult !== undefined) {
             const oldExtra = this.getExtra;
@@ -799,30 +816,30 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             interactorExecutableAgent !== undefined
         ) {
             const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, stdStream] = await Promise.all([
+                const [inputFd, stdFd] = await Promise.all([
                     this.fileAgent.getFd(value.input),
                     this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
                     const userProcess = userExecutableAgent.exec([
-                        inputStream,
+                        "pipe",
                         "pipe",
                         "pipe",
                     ]);
 
                     const compProcess = interactorExecutableAgent.exec([
                         userProcess.stdout,
-                        "pipe",
-                        "pipe",
-                        inputStream,
-                        stdStream,
                         userProcess.stdin,
+                        "pipe",
+                        inputFd,
+                        stdFd,
+                        "pipe",
                     ]);
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
                         compProcess.result,
-                        compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
+                        compProcess.stdio[5]
+                            ? readStream(compProcess.stdio[5] as Readable)
                             : "",
                     ]);
                     return this.generateResult(
@@ -1019,7 +1036,7 @@ export async function getJudgerFactory(
                             expectedResult.expectedTime - c.time
                         );
                         const percentage = diff / expectedResult.expectedTime;
-                        if (diff > 200 || percentage > 0.2) {
+                        if (diff > 200 || percentage > 0.15) {
                             throw `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`;
                         }
                     }
