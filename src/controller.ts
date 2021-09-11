@@ -320,7 +320,7 @@ export class Controller {
                                 seq: message.seq,
                                 time: new Date().toISOString(),
                                 body: {
-                                    error: { code: 500, message: e.toString() },
+                                    error: { code: 500, message: String(e) },
                                 },
                             };
                             this.ws.send(JSON.stringify(res));

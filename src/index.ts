@@ -6,7 +6,7 @@ import fs from "fs";
 import { getConfig } from "./Config";
 import { getJudgerFactory } from "./Utilities/Judge";
 import { Throttle } from "./Utilities/Throttle";
-import { exit, getgid, getuid } from "process";
+import { getgid, getuid } from "process";
 import path from "path";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));

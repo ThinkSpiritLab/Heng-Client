@@ -7,7 +7,6 @@ import {
     IsOptional,
     IsPositive,
     IsString,
-    Max,
     Min,
     ValidateNested,
     validateSync,

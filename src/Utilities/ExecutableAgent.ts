@@ -100,8 +100,8 @@ export class ExecutableAgent {
     }
 
     /**
-     * You'd better not set args, stdio, cwd
-     * cwd is low priority
+     * You'd better not set args, stdio, cwd.
+     * cwd is low priority.
      * @param args
      * @param stdio
      * @param cwd
@@ -216,9 +216,9 @@ export class ExecutableAgent {
     }
 
     /**
-     * You'd better set stdio
-     * You'd better not set cwd, args
-     * cwd is low priority
+     * You'd better set stdio.
+     * You'd better not set cwd, args.
+     * cwd is low priority.
      * @param args
      * @param stdio
      * @param cwd
