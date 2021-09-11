@@ -11,203 +11,61 @@ import path from "path";
 import * as fs from "fs";
 import { getLogger } from "log4js";
 import { getConfig, JudgeFactoryConfig } from "../Config";
-import { ConfiguredLanguage, getLanguage } from "../Spawn/Language";
-import { FileAgent, readStream, waitForOpen } from "./File";
-import { jailMeterSpawn } from "../Spawn";
-import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
-import { StdioType } from "src/Spawn/BasicSpawn";
+import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
 import { Readable } from "stream";
-
-function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
-    return getLanguage(excutable.environment.language)(
-        excutable.environment.options
-    );
-}
-
-export class ExecutableAgent {
-    compiled = false;
-    configuredLanguage: ConfiguredLanguage;
-    constructor(
-        readonly excutable: Executable,
-        private fileAgent: FileAgent,
-        readonly name: string,
-        readonly cwdPrefix: string,
-        private uid: number,
-        private gid: number
-    ) {
-        this.configuredLanguage = languageFromExcutable(excutable);
-        fileAgent.add(
-            `${name}:src`,
-            excutable.source,
-            path.join(cwdPrefix, this.configuredLanguage.sourceFileName)
-        );
-    }
-
-    needCompile(): boolean {
-        return (
-            this.configuredLanguage.compileGenerator !== null && //compile is needed
-            !this.compiled
-        ); //not compiled
-    }
-
-    async compile(includeTestlib = false): Promise<MeterResult | void> {
-        const srcpath = await this.fileAgent.getPath(`${this.name}:src`);
-        if (
-            this.needCompile() &&
-            this.configuredLanguage.compileGenerator !== null
-        ) {
-            const compileLogPath = path.resolve(
-                this.fileAgent.dir,
-                this.cwdPrefix,
-                "compile.log"
-            );
-            await fs.promises.mkdir(path.dirname(compileLogPath), {
-                recursive: true,
-            });
-            const compileLogFileStream = fs.createWriteStream(compileLogPath);
-            await waitForOpen(compileLogFileStream);
-            this.fileAgent.register(`${this.name}:compile-log`, compileLogPath);
-            if (includeTestlib) {
-                await fs.promises.copyFile(
-                    path.resolve(getConfig().language.testlib),
-                    path.resolve(
-                        this.fileAgent.dir,
-                        this.cwdPrefix,
-                        "testlib.h"
-                    )
-                );
-            }
-            const compileProcess = this.configuredLanguage.compileGenerator(
-                srcpath,
-                path.resolve(
-                    this.fileAgent.dir,
-                    this.cwdPrefix,
-                    this.configuredLanguage.compiledFileName
-                ),
-                {
-                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
-                    stdio: ["pipe", compileLogFileStream, compileLogFileStream],
-                    uid: this.uid,
-                    gid: this.gid,
-                },
-                {
-                    timelimit:
-                        this.excutable.limit.compiler.cpuTime +
-                        getConfig().judger.tleTimeOutMs,
-                    memorylimit:
-                        this.excutable.limit.compiler.memory +
-                        getConfig().judger.mleMemOutByte,
-                    pidlimit: getConfig().judger.defaultPidLimit,
-                    filelimit: Math.max(
-                        this.excutable.limit.compiler.output,
-                        this.excutable.limit.compiler.message
-                    ),
-                    mount: [
-                        {
-                            path: path.resolve(
-                                this.fileAgent.dir,
-                                this.cwdPrefix
-                            ),
-                            mode: "rw",
-                        },
-                    ],
-                }
-            );
-            this.compiled = true;
-            return await compileProcess.result;
-        } else {
-            return;
-        }
-    }
-
-    exec(stdio: StdioType, args: string[] = []): MeteredChildProcess {
-        if (this.needCompile()) {
-            throw "Excutable not compiled";
-        } else {
-            const excutablePath = path.resolve(
-                this.fileAgent.dir,
-                this.cwdPrefix,
-                this.configuredLanguage.compiledFileName
-            );
-            const excuter =
-                this.configuredLanguage.excuteGenerator ?? jailMeterSpawn;
-            return excuter(
-                excutablePath,
-                args,
-                {
-                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
-                    stdio,
-                    uid: this.uid,
-                    gid: this.gid,
-                },
-                {
-                    timelimit:
-                        this.excutable.limit.runtime.cpuTime +
-                        getConfig().judger.tleTimeOutMs,
-                    memorylimit:
-                        this.excutable.limit.runtime.memory +
-                        getConfig().judger.mleMemOutByte,
-                    pidlimit: getConfig().judger.defaultPidLimit,
-                    filelimit: this.excutable.limit.runtime.output,
-                    mount: [{ path: excutablePath, mode: "ro" }],
-                }
-            );
-        }
-    }
-}
+import { JailResult } from "../Spawn/Jail";
+import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
+import { ExecType } from "../Spawn/LanguageV2/decl";
 
 export abstract class JudgeAgent {
-    protected excutables: Executable[] = [];
     protected fileAgent: FileAgent;
     protected logger = getLogger("JudgeAgent");
+    private Initialized = false;
+
     constructor(
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        readonly throttle: Throttle,
-        protected uid: number,
-        protected gid: number
+        readonly throttle: Throttle
     ) {
-        this.excutables.push(judge.judge.user);
         this.fileAgent = new FileAgent(
-            path.join("Heng-Client", judge.id),
-            judge.data ?? null,
-            this.uid,
-            this.gid
+            path.join(getConfig().judger.tmpdirBase, "workspace", judge.id),
+            judge.data ?? null
         );
-        if (judge.dynamicFiles !== undefined) {
-            judge.dynamicFiles.forEach((file) => {
+    }
+
+    async init(): Promise<void> {
+        await this.fileAgent.init();
+        if (this.judge.dynamicFiles !== undefined) {
+            this.judge.dynamicFiles.forEach((file) => {
                 if (file.type === "remote") {
                     this.fileAgent.add(file.name, file.file);
                 }
             });
         }
+        this.Initialized = true;
     }
 
-    getBasicCmp(usrLimit: Limit): ExecutableAgent {
-        return new ExecutableAgent(
-            {
-                source: {
-                    hashsum: "",
-                    type: "direct",
-                    content: "",
-                },
-                environment: {
-                    language: "cmp", // const
-                    system: "Linux",
-                    arch: "x64",
-                    options: {},
-                },
-                limit: usrLimit,
-            },
-            this.fileAgent,
-            "cmp",
-            "/",
-            this.uid,
-            this.gid
-        );
+    generateCompileResult(
+        compileResult: JailResult,
+        limit: Limit,
+        transformer: {
+            mle: JudgeResultKind;
+            tle: JudgeResultKind;
+            ole: JudgeResultKind;
+            re: JudgeResultKind;
+            ce: JudgeResultKind;
+        }
+    ) {
+
+    }
+
+    checkInit(): void {
+        if (!this.Initialized) {
+            throw new Error("Don't forget to call init");
+        }
     }
 
     getExtra = async (): Promise<{
@@ -233,14 +91,12 @@ export abstract class JudgeAgent {
     async compileUsr(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
     > {
+        this.checkInit();
         const userExecutableAgent = new ExecutableAgent(
-            this.judge.judge.user,
-            this.fileAgent,
-            "usr",
-            "usr",
-            this.uid,
-            this.gid
+            ExecType.Usr,
+            this.judge.judge.user
         );
+        await userExecutableAgent.init();
         const compileResult = await this.throttle.withThrottle(() =>
             userExecutableAgent.compile()
         );
@@ -250,7 +106,9 @@ export abstract class JudgeAgent {
                     compileTime: compileResult.time.usr,
                     compileMessage: fs
                         .readFileSync(
-                            await this.fileAgent.getPath("usr:compile-log")
+                            await userExecutableAgent.fileAgent.getPath(
+                                CompileLogName
+                            )
                         )
                         .toString(),
                 },
@@ -328,6 +186,7 @@ export abstract class JudgeAgent {
     abstract getResult(): Promise<JudgeResult>;
 
     async getResultNoException(): Promise<JudgeResult> {
+        this.checkInit();
         try {
             return await this.getResult();
         } catch (e) {
@@ -346,12 +205,13 @@ export abstract class JudgeAgent {
     }
 
     generateResult(
-        userResult: MeterResult,
+        userResult: JailResult,
         userExec: Executable,
-        sysResult: MeterResult,
+        sysResult: JailResult,
         sysExec: Executable,
         sysJudge: string
     ): JudgeCaseResult {
+        this.checkInit();
         sysJudge = sysJudge.trim();
         return {
             kind: (() => {
@@ -413,22 +273,40 @@ export class NormalJudgeAgent extends JudgeAgent {
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number,
-        private cmp: string
+        throttle: Throttle
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
+        super(judge, timeRatio, timeIntercept, throttle);
         if (judge.judge.type !== JudgeType.Normal) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
         }
     }
 
+    getBasicCmp(usrLimit: Limit): ExecutableAgent {
+        this.checkInit();
+        return new ExecutableAgent(ExecType.System, {
+            source: {
+                hashsum: "",
+                type: "direct",
+                content: "",
+            },
+            environment: {
+                language: "cmp",
+                system: "Linux",
+                arch: "x64",
+                options: {},
+            },
+            limit: usrLimit,
+        });
+    }
+
     async getResult(): Promise<JudgeResult> {
+        this.checkInit();
         const [compileResult, userExecutableAgent] = await this.compileUsr();
         const cmpExecutableAgent = this.getBasicCmp(
             this.judge.judge.user.limit
         );
+        await cmpExecutableAgent.init();
+        await cmpExecutableAgent.compile();
         if (compileResult !== undefined) {
             return compileResult;
         } else if (userExecutableAgent !== undefined) {
@@ -438,12 +316,15 @@ export class NormalJudgeAgent extends JudgeAgent {
                     this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        inputFd,
-                        // "pipe",
-                        "pipe",
-                        "pipe",
-                    ]);
+                    const userProcess = await userExecutableAgent.exec(
+                        undefined,
+                        [
+                            inputFd,
+                            // "pipe",
+                            "pipe",
+                            "pipe",
+                        ]
+                    );
                     // if (userProcess.stdin) {
                     //     inputStream.pipe(userProcess.stdin);
                     // }
@@ -462,12 +343,10 @@ export class NormalJudgeAgent extends JudgeAgent {
                     //         mount: [{ path: stdPath, mode: "ro" }],
                     //     }
                     // );
-                    const compProcess = cmpExecutableAgent.exec([
-                        userProcess.stdout,
-                        "pipe",
-                        "pipe",
-                        stdFd,
-                    ]);
+                    const compProcess = await cmpExecutableAgent.exec(
+                        undefined,
+                        [userProcess.stdout, "pipe", "pipe", stdFd]
+                    );
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
                         compProcess.result,
@@ -509,11 +388,9 @@ export class SpecialJudgeAgent extends JudgeAgent {
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number
+        throttle: Throttle
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
+        super(judge, timeRatio, timeIntercept, throttle);
         if (judge.judge.type !== JudgeType.Special) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`;
         }
@@ -521,19 +398,16 @@ export class SpecialJudgeAgent extends JudgeAgent {
     async compileSpj(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
     > {
+        this.checkInit();
         if (this.judge.judge.type != JudgeType.Special) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
         }
         const userExecutableAgent = new ExecutableAgent(
-            this.judge.judge.spj,
-            this.fileAgent,
-            "spj",
-            "spj",
-            this.uid,
-            this.gid
+            ExecType.Spj,
+            this.judge.judge.spj
         );
         const compileResult = await this.throttle.withThrottle(
-            async () => await userExecutableAgent.compile(true)
+            async () => await userExecutableAgent.compile()
         );
         if (compileResult !== undefined) {
             const oldExtra = this.getExtra;
@@ -618,6 +492,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
         return [undefined, userExecutableAgent];
     }
     async getResult(): Promise<JudgeResult> {
+        this.checkInit();
         const [compileResult, userExecutableAgent] = await this.compileUsr();
         const [spjCompileResult, spjExecutableAgent] = await this.compileSpj();
         if (compileResult !== undefined) {
@@ -635,20 +510,20 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        // "pipe",
-                        inputFd,
-                        "pipe",
-                        "pipe",
-                    ]);
+                    const userProcess = await userExecutableAgent.exec(
+                        undefined,
+                        [
+                            // "pipe",
+                            inputFd,
+                            "pipe",
+                            "pipe",
+                        ]
+                    );
 
-                    const compProcess = spjExecutableAgent.exec([
-                        userProcess.stdout,
-                        "pipe",
-                        "pipe",
-                        inputFd2,
-                        stdFd,
-                    ]);
+                    const compProcess = await spjExecutableAgent.exec(
+                        undefined,
+                        [userProcess.stdout, "pipe", "pipe", inputFd2, stdFd]
+                    );
                     // inputStream2.pipe(userProcess.stdio[2]as unknown as Writable)
                     // stdStream.pipe(userProcess.stdio[3]as unknown as Writable)
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
@@ -693,11 +568,9 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         public judge: CreateJudgeArgs,
         public timeRatio: number,
         public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number
+        throttle: Throttle
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
+        super(judge, timeRatio, timeIntercept, throttle);
         if (judge.judge.type !== JudgeType.Interactive) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
@@ -705,19 +578,16 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     async compileInteractor(): Promise<
         [JudgeResult, undefined] | [undefined, ExecutableAgent]
     > {
+        this.checkInit();
         if (this.judge.judge.type != JudgeType.Interactive) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
         const interactorExecutableAgent = new ExecutableAgent(
-            this.judge.judge.interactor,
-            this.fileAgent,
-            "spj",
-            "spj",
-            this.uid,
-            this.gid
+            ExecType.Interactor,
+            this.judge.judge.interactor
         );
         const compileResult = await this.throttle.withThrottle(() =>
-            interactorExecutableAgent.compile(true)
+            interactorExecutableAgent.compile()
         );
         if (compileResult !== undefined) {
             const oldExtra = this.getExtra;
@@ -804,6 +674,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         return [undefined, interactorExecutableAgent];
     }
     async getResult(): Promise<JudgeResult> {
+        this.checkInit();
         const [compileResult, userExecutableAgent] = await this.compileUsr();
         const [spjCompileResult, interactorExecutableAgent] =
             await this.compileInteractor();
@@ -821,20 +692,22 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                     this.fileAgent.getFd(value.output),
                 ]);
                 return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        "pipe",
-                        "pipe",
-                        "pipe",
-                    ]);
+                    const userProcess = await userExecutableAgent.exec(
+                        undefined,
+                        ["pipe", "pipe", "pipe"]
+                    );
 
-                    const compProcess = interactorExecutableAgent.exec([
-                        userProcess.stdout,
-                        userProcess.stdin,
-                        "pipe",
-                        inputFd,
-                        stdFd,
-                        "pipe",
-                    ]);
+                    const compProcess = await interactorExecutableAgent.exec(
+                        undefined,
+                        [
+                            userProcess.stdout,
+                            userProcess.stdin,
+                            "pipe",
+                            inputFd,
+                            stdFd,
+                            "pipe",
+                        ]
+                    );
                     const [userResult, cmpResult, cmpOut] = await Promise.all([
                         userProcess.result,
                         compProcess.result,
@@ -875,10 +748,7 @@ export class JudgeFactory {
     constructor(
         readonly timeRatio: number,
         readonly timeIntercept: number,
-        readonly cmp: string,
-        readonly throttle: Throttle,
-        readonly uid: number,
-        readonly gid: number
+        readonly throttle: Throttle
     ) {}
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
@@ -895,10 +765,7 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
-                    this.uid,
-                    this.gid,
-                    this.cmp
+                    this.throttle
                 );
             }
             case JudgeType.Special: {
@@ -912,9 +779,7 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
-                    this.uid,
-                    this.gid
+                    this.throttle
                 );
             }
             case JudgeType.Interactive: {
@@ -930,9 +795,7 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
-                    this.uid,
-                    this.gid
+                    this.throttle
                 );
             }
             default:
@@ -948,14 +811,7 @@ export async function getJudgerFactory(
     const logger = getLogger("JudgeFactoryFactory");
     logger.info("self test loaded");
     const timeIntercept = 0;
-    let judgerFactory = new JudgeFactory(
-        1,
-        0,
-        judgerConfig.cmp,
-        throttle,
-        judgerConfig.uid,
-        judgerConfig.gid
-    );
+    let judgerFactory = new JudgeFactory(1, 0, throttle);
 
     let costTime = 0,
         expectedTime = 0;
@@ -969,6 +825,7 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
+                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
@@ -989,6 +846,7 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
+                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
@@ -1009,14 +867,7 @@ export async function getJudgerFactory(
         timeRatio = expectedTime / costTime;
     }
     logger.warn(`timeRatio is ${timeRatio}`);
-    judgerFactory = new JudgeFactory(
-        timeRatio,
-        timeIntercept,
-        judgerConfig.cmp,
-        throttle,
-        judgerConfig.uid,
-        judgerConfig.gid
-    );
+    judgerFactory = new JudgeFactory(timeRatio, timeIntercept, throttle);
 
     // 校验
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
@@ -1025,6 +876,7 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
+                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];

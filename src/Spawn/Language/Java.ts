@@ -1,16 +1,10 @@
-// nsjail -C ../../Heng-Client/jailConfig.cfg  --cwd $(pwd) -B $(pwd) -- $(which  hc) -m 2  --bin $(which java) --args -Xss256k -Xms1m -Xmx1m Main
 import { getConfig } from "../../Config";
 import { ConfiguredLanguage, Language } from ".";
-import {
-    BasicSpawnOption,
-    JailSpawnOption,
-    loggedSpawn,
-    MeteredChildProcess,
-} from "..";
-import { useJail } from "../Jail";
+import { JailSpawnOption, loggedSpawn } from "..";
+import { JailedChildProcess, useJail } from "../Jail";
 import { spawn } from "child_process";
-import { useMeter } from "../Meter";
 import path from "path";
+import { BasicSpawnOption } from "../BasicSpawn";
 
 export function javaExtraArg(
     jailOption: JailSpawnOption,
@@ -36,34 +30,33 @@ export const JAVA: Language = function (javaargs) {
             output: string, //path
             options: BasicSpawnOption,
             jailOption: JailSpawnOption
-        ): MeteredChildProcess {
+        ): JailedChildProcess {
             if (jailOption.pidlimit !== undefined && jailOption.pidlimit < 32) {
                 throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
             }
             const javaOption: string[] = [];
             javaOption.push("-sourcepath", options.cwd ?? path.dirname(src));
             javaOption.push(src);
-            return useMeter(jailOption)(
-                useJail({
-                    mount: jailOption.mount,
-                    timelimit:
-                        jailOption.timelimit !== undefined
-                            ? jailOption.timelimit * 2
-                            : undefined,
-                    pidlimit:
-                        jailOption.pidlimit !== undefined
-                            ? jailOption.pidlimit + 2
-                            : getConfig().judger.defaultPidLimit,
-                    filelimit: jailOption.filelimit,
-                })(loggedSpawn(spawn))
-            )(javac, javaOption, options);
+            return useJail({
+                bindMount: jailOption.bindMount,
+                timelimit:
+                    jailOption.timelimit !== undefined
+                        ? jailOption.timelimit * 2
+                        : undefined,
+                pidlimit:
+                    jailOption.pidlimit !== undefined
+                        ? jailOption.pidlimit + 2
+                        : getConfig().judger.defaultPidLimit,
+                filelimit: jailOption.filelimit,
+                memorylimit: jailOption.memorylimit,
+            })(loggedSpawn(spawn))(javac, javaOption, options);
         },
         function (
             command: string,
             args: string[],
             options: BasicSpawnOption,
             jailOption: JailSpawnOption
-        ): MeteredChildProcess {
+        ): JailedChildProcess {
             if (jailOption.pidlimit !== undefined && jailOption.pidlimit < 32) {
                 throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
             }
@@ -71,20 +64,19 @@ export const JAVA: Language = function (javaargs) {
             javaOption.push(...javaExtraArg(jailOption, javaargs));
             javaOption.push("-classpath", options.cwd ?? path.dirname(command));
             javaOption.push(path.basename(command, path.extname(command)));
-            return useMeter(jailOption)(
-                useJail({
-                    mount: jailOption.mount,
-                    timelimit:
-                        jailOption.timelimit !== undefined
-                            ? jailOption.timelimit * 2
-                            : undefined,
-                    pidlimit:
-                        jailOption.pidlimit !== undefined
-                            ? jailOption.pidlimit + 2
-                            : getConfig().judger.defaultPidLimit,
-                    filelimit: jailOption.filelimit,
-                })(loggedSpawn(spawn))
-            )(java, javaOption, options);
+            return useJail({
+                bindMount: jailOption.bindMount,
+                timelimit:
+                    jailOption.timelimit !== undefined
+                        ? jailOption.timelimit * 2
+                        : undefined,
+                pidlimit:
+                    jailOption.pidlimit !== undefined
+                        ? jailOption.pidlimit + 2
+                        : getConfig().judger.defaultPidLimit,
+                filelimit: jailOption.filelimit,
+                memorylimit: jailOption.memorylimit,
+            })(loggedSpawn(spawn))(java, javaOption, options);
         },
         `${javaargs?.className ?? "Main"}.java`,
         `${javaargs?.className ?? "Main"}.class`

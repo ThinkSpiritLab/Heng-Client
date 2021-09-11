@@ -152,3 +152,9 @@ new target:
 运行时自由挂载目录
 
 复用编译结果
+
+
+新结构：
+
+
+exec 指定cwd language 指定 mount

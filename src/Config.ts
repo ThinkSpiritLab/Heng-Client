@@ -1,10 +1,6 @@
 import * as TOML from "@iarna/toml";
 import { Type, plainToClass } from "class-transformer";
 import {
-    ArrayMaxSize,
-    ArrayMinSize,
-    ArrayNotEmpty,
-    IsArray,
     IsInt,
     IsNotEmpty,
     IsNumber,
@@ -48,11 +44,6 @@ export class JailConfig {
     @IsNotEmpty()
     configFile!: string;
 }
-class MeterConfig {
-    @IsString()
-    @IsNotEmpty()
-    path!: string;
-}
 export class ControllerConfig {
     @IsString()
     @IsNotEmpty()
@@ -79,39 +70,10 @@ export class SelfConfig {
     @IsOptional()
     software?: string;
 }
-
-export class JudgeFactoryTestCase {
-    @IsString()
-    @IsNotEmpty()
-    src!: string;
-    // @IsString()
-    // @IsNotEmpty()
-    // cwd!: string;
-    @ValidateNested()
-    @IsString()
-    @IsOptional()
-    @Type(() => String)
-    args?: string[];
-    @IsString()
-    @IsNotEmpty()
-    language!: string;
-    @IsString()
-    @IsOptional()
-    input?: string;
-    @IsInt()
-    @Max(40000)
-    @Min(1)
-    timeExpected!: number; //ms
-}
 export class JudgeFactoryConfig {
+    @IsString()
     @IsNotEmpty()
-    @IsArray()
-    @ValidateNested()
-    @ArrayNotEmpty()
-    @ArrayMinSize(2)
-    @ArrayMaxSize(20)
-    @Type(() => JudgeFactoryTestCase)
-    testcases!: JudgeFactoryTestCase[];
+    tmpdirBase!: string;
     @IsNumber()
     @IsNotEmpty()
     @IsPositive()
@@ -156,10 +118,6 @@ export class Config {
     @IsNotEmpty()
     @Type(() => JailConfig)
     nsjail!: JailConfig;
-    @ValidateNested()
-    @IsNotEmpty()
-    @Type(() => MeterConfig)
-    hc!: MeterConfig;
     @ValidateNested()
     @IsNotEmpty()
     @Type(() => JudgeFactoryConfig)
@@ -230,7 +188,7 @@ export function getConfig(): Config {
         config = plainToClass(Config, rawConfig);
         // logger.fatal(JSON.stringify(rawConfig));
         // logger.fatal(JSON.stringify(config));
-        if (!tryValidate((config as unknown) as Record<string, unknown>)) {
+        if (!tryValidate(config as unknown as Record<string, unknown>)) {
             config = undefined;
             throw "Failed to get Config,Please check configToml";
         }

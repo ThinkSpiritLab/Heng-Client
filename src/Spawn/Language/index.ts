@@ -1,17 +1,12 @@
 import { getLogger } from "log4js";
-import {
-    BasicSpawnOption,
-    jailMeterSpawn,
-    JailSpawnOption,
-    MeteredChildProcess,
-} from "..";
+import { jailMeterSpawn, JailSpawnOption } from "..";
 
 export type CompileGenerator = (
     src: string, //path
     output: string, //path
     options: BasicSpawnOption,
     jailOption: JailSpawnOption
-) => MeteredChildProcess; //compiler argv env
+) => JailedChildProcess; //compiler argv env
 
 export type BasicCompileGenerator = (
     src: string, //path
@@ -26,7 +21,7 @@ export function generateCompileGenerator(
         output: string, //path
         options: BasicSpawnOption,
         jailOption: JailSpawnOption
-    ): MeteredChildProcess {
+    ): JailedChildProcess {
         const [compiler, argv] = basicCompileGenerator(src, output);
         return jailMeterSpawn(compiler, argv, options, jailOption);
     };
@@ -45,7 +40,7 @@ export type ExcuteGenerator = (
     args: string[],
     options: BasicSpawnOption,
     jailOption: JailSpawnOption
-) => MeteredChildProcess;
+) => JailedChildProcess;
 
 export function generateExcuterGenerator(
     basicExcuteGenerator: BasicExcuteGenerator
@@ -55,7 +50,7 @@ export function generateExcuterGenerator(
         args: string[],
         options: BasicSpawnOption,
         jailOption: JailSpawnOption
-    ): MeteredChildProcess {
+    ): JailedChildProcess {
         const [excuter, argv] = basicExcuteGenerator(command, args);
         return jailMeterSpawn(excuter, argv, options, jailOption);
     };
@@ -116,5 +111,7 @@ registerLanguage("python3", PYTHON);
 import { JAVA } from "./Java";
 registerLanguage("java", JAVA);
 import { CMP } from "./CMP";
+import { JailedChildProcess } from "../Jail";
+import { BasicSpawnOption } from "../BasicSpawn";
 registerLanguage("cmp", CMP);
 export { CPP, C, PYTHON, JAVA, CMP };

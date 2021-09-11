@@ -198,7 +198,8 @@ import { NormalTLE } from "./NormalTLE";
 import { SpjAC } from "./SpjAC";
 import { SpjWA } from "./SpjWA";
 import { SpjEPS } from "./SpjEPS";
+import { NormalJavaAC } from "./NormalJavaAC";
 
-// export const Tests = [NormalWA, NormalAC, NormalTLE, NormalTime1];
+// export const Tests = [NormalWA, NormalAC, NormalTLE, NormalTime1, NormalJavaAC];
 // export const Tests = [SpjAC, SpjWA, SpjEPS];
-export const Tests = [SpjEPS];
+export const Tests = [NormalAC];

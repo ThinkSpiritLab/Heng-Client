@@ -1,10 +1,13 @@
 import * as os from "os";
 import * as fs from "fs";
 import * as path from "path";
-import { pipeline, Readable } from "stream";
+import stream, { Readable } from "stream";
 import * as unzip from "unzip-stream";
 import Axios from "axios";
 import { PlatformPath } from "path";
+import util from "util";
+import { getConfig } from "../Config";
+const pipeline = util.promisify(stream.pipeline);
 
 export type File = {
     hashsum?: string;
@@ -15,13 +18,17 @@ export type File = {
 export async function chownR(
     dirpath: string,
     uid: number,
-    gid: number
+    gid: number,
+    depth: number
 ): Promise<void> {
+    if (depth >= 4) {
+        throw new Error("too deep folder");
+    }
     const curdir = await fs.promises.opendir(dirpath);
     let subItem: fs.Dirent | null;
     while ((subItem = await curdir.read()) !== null) {
         if (subItem.isDirectory()) {
-            await chownR(path.join(dirpath, subItem.name), uid, gid);
+            await chownR(path.join(dirpath, subItem.name), uid, gid, depth + 1);
         } else if (subItem.isFile()) {
             await fs.promises.chown(path.join(dirpath, subItem.name), uid, gid);
         }
@@ -47,8 +54,17 @@ export function waitForOpen(s: fs.WriteStream | fs.ReadStream): Promise<null> {
     });
 }
 
+// todo pending fix
 export function readableFromFile(file: File): Promise<Readable> {
     if (file.content !== undefined) {
+        // if (file.hashsum) {
+        //     if (
+        //         file.hashsum !==
+        //         crypto.createHash("sha256").update(file.content).digest("hex")
+        //     ) {
+        //         throw new Error("data broken");
+        //     }
+        // }
         return Promise.resolve(Readable.from(file.content));
     } else if (file.url) {
         return Axios.get(file.url);
@@ -59,54 +75,58 @@ export function readableFromFile(file: File): Promise<Readable> {
 
 export class FileAgent {
     readonly dir: string;
-    readonly ready: Promise<void>;
     private nameToFile = new Map<
         string,
         [File | null, string, boolean | Promise<boolean>]
     >();
-    constructor(
-        readonly prefix: string,
-        readonly primaryFile: File | null,
-        readonly uid: number,
-        readonly gid: number
-    ) {
+    private Initialized = false;
+    constructor(readonly prefix: string, readonly primaryFile: File | null) {
         this.dir = path.join(os.tmpdir(), prefix);
-        this.ready = new Promise<void>((resolve, reject) => {
-            fs.promises
-                .mkdir(this.dir, {
-                    recursive: true,
-                    mode: 0o700,
-                })
-                .then(async () => {
-                    if (this.primaryFile) {
-                        pipeline(
-                            await readableFromFile(this.primaryFile),
-                            unzip.Extract({
-                                path: path.join(this.dir, "data"),
-                            }),
-                            (err) => {
-                                if (err) {
-                                    reject(err);
-                                } else {
-                                    resolve();
-                                }
-                            }
-                        );
-                    } else {
-                        resolve();
-                    }
-                });
-        }).then(async () => {
-            await chownR(this.dir, uid, gid);
-        });
     }
+
+    /**
+     * must use init() after constructor
+     * mkdir and download primaryFile
+     */
+    async init(cachedDir = false): Promise<void> {
+        if (!cachedDir) {
+            await fs.promises.mkdir(this.dir, {
+                recursive: true,
+                mode: 0o700,
+            });
+            if (this.primaryFile) {
+                await pipeline(
+                    await readableFromFile(this.primaryFile),
+                    unzip.Extract({
+                        path: path.join(this.dir, "data"),
+                    })
+                );
+            }
+            await chownR(
+                this.dir,
+                getConfig().judger.uid,
+                getConfig().judger.gid,
+                1
+            );
+        }
+        this.Initialized = true;
+    }
+
+    checkInit(): void {
+        if (!this.Initialized) {
+            throw new Error("Don't forget to call init");
+        }
+    }
+
     register(name: string, subpath: string): void {
+        this.checkInit();
         if (!path.isAbsolute(subpath)) {
             subpath = path.join(this.dir, subpath);
         }
         this.nameToFile.set(name, [null, subpath, true]);
     }
     add(name: string, file: File, subpath?: string): PlatformPath {
+        this.checkInit();
         if (subpath === undefined) {
             subpath = name;
         }
@@ -115,18 +135,18 @@ export class FileAgent {
         return path;
     }
     async getStream(name: string): Promise<Readable> {
-        await this.ready;
+        this.checkInit();
         const s = fs.createReadStream(await this.getPath(name));
         await waitForOpen(s);
         return s;
     }
     async getFd(name: string): Promise<number> {
-        await this.ready;
+        this.checkInit();
         const s = fs.openSync(await this.getPath(name), "r");
         return s;
     }
     async getPath(name: string): Promise<string> {
-        await this.ready;
+        this.checkInit();
         const record = this.nameToFile.get(name);
         if (record !== undefined) {
             const [file, subpath, writed] = record;
@@ -151,32 +171,21 @@ export class FileAgent {
                         });
                         await fs.promises.chown(
                             path.dirname(subpath),
-                            this.uid,
-                            this.gid
+                            getConfig().judger.uid,
+                            getConfig().judger.gid
+                        ); // maybe not enough
+                        await pipeline(
+                            await readableFromFile(file),
+                            fs.createWriteStream(subpath)
                         );
-                        const readable = await readableFromFile(file);
-                        return new Promise<boolean>((resolve, reject) => {
-                            pipeline(
-                                readable,
-                                fs.createWriteStream(subpath),
-                                (err) => {
-                                    if (err) {
-                                        reject(err);
-                                    } else {
-                                        resolve(true);
-                                    }
-                                }
-                            );
-                        }).then(async (sus) => {
-                            await fs.promises.chown(
-                                subpath,
-                                this.uid,
-                                this.gid
-                            );
-                            return sus;
-                        });
+                        await fs.promises.chown(
+                            subpath,
+                            getConfig().judger.uid,
+                            getConfig().judger.gid
+                        );
+                        return true;
                     } else {
-                        throw "File not found nor writen";
+                        throw new Error("File not found nor writen");
                     }
                 });
                 // this step maybe? too late / slow, then double promise
@@ -184,8 +193,10 @@ export class FileAgent {
                 await promise;
                 return subpath;
             }
-        } else {
+        } else if (this.primaryFile !== null) {
             return path.join(this.dir, "data", name);
+        } else {
+            throw new Error("File not add or register");
         }
     }
     async clean(): Promise<void> {

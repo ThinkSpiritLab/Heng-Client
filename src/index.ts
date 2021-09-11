@@ -1,12 +1,24 @@
 import "reflect-metadata";
 import { configure, getLogger } from "log4js";
 import { Controller } from "./controller";
-import { cpus } from "os";
+import os from "os";
+import fs from "fs";
 import { getConfig } from "./Config";
 import { getJudgerFactory } from "./Utilities/Judge";
 import { Throttle } from "./Utilities/Throttle";
+import { exit, getgid, getuid } from "process";
+import path from "path";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
+}
+
+async function createDir(dir: string) {
+    await fs.promises.mkdir(dir + "/", { recursive: true, mode: 0o700 });
+    await fs.promises.chown(
+        dir,
+        getConfig().judger.uid,
+        getConfig().judger.gid
+    );
 }
 
 async function main() {
@@ -28,6 +40,25 @@ async function main() {
         await wait(2000);
         throw e;
     }
+    if (getuid() || getgid()) {
+        throw new Error("Please run with root");
+    }
+    await fs.promises.rmdir(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
+        { recursive: true }
+    );
+    await createDir(path.join(os.tmpdir(), getConfig().judger.tmpdirBase));
+    await createDir(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "bin")
+    );
+    await createDir(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace")
+    );
+    await fs.promises.mkdir("/sys/fs/cgroup/cpu/NSJAIL", { recursive: true });
+    await fs.promises.mkdir("/sys/fs/cgroup/memory/NSJAIL", {
+        recursive: true,
+    });
+    await fs.promises.mkdir("/sys/fs/cgroup/pids/NSJAIL", { recursive: true });
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(
         getConfig().judger,
@@ -53,18 +84,17 @@ async function main() {
     controller.on("CreateJudge", (task) => {
         const judgeAgent = judgerFactory.getJudgerAgent(task);
         const resultPromise = judgeAgent.getResultNoException();
-        resultPromise
-            .then((result) => {
-                // logger.info(`Task:${JSON.stringify(task)}`);
-                // logger.info(`Result:${JSON.stringify(result)}`);
-                controller.do("FinishJudges", { id: task.id, result });
-            });
-            // .finally(() => judgeAgent.clean());
+        resultPromise.then((result) => {
+            // logger.info(`Task:${JSON.stringify(task)}`);
+            // logger.info(`Result:${JSON.stringify(result)}`);
+            controller.do("FinishJudges", { id: task.id, result });
+        });
+        // .finally(() => judgeAgent.clean());
         return Promise.resolve(null);
     });
     const token = await controller.getToken(
         config.judgeCapability,
-        cpus().length,
+        os.cpus().length,
         config.name,
         config.version
     );
