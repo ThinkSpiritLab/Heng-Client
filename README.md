@@ -57,10 +57,71 @@
 
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
 
-
-
-judgePolicy
-
 url 缓存
 
 通知 language workspace
+
+```cpp
+int resultExitCode(TResult r) {
+    if (r == _ok)
+        return OK_EXIT_CODE;
+    if (r == _wa)
+        return WA_EXIT_CODE;
+    if (r == _pe)
+        return PE_EXIT_CODE;
+    if (r == _fail)
+        return FAIL_EXIT_CODE;
+    if (r == _dirt)
+        return DIRT_EXIT_CODE;
+    if (r == _points)
+        return POINTS_EXIT_CODE;
+    if (r == _unexpected_eof)
+#ifdef ENABLE_UNEXPECTED_EOF
+        return UNEXPECTED_EOF_EXIT_CODE;
+#else
+        return PE_EXIT_CODE;
+#endif
+    if (r >= _partially)
+        return PC_BASE_EXIT_CODE + (r - _partially);
+    return FAIL_EXIT_CODE;
+}
+
+
+    switch (result) {
+        case _ok:
+            errorName = "ok ";
+            quitscrS(LightGreen, errorName);
+            break;
+        case _wa:
+            errorName = "wrong answer ";
+            quitscrS(LightRed, errorName);
+            break;
+        case _pe:
+            errorName = "wrong output format ";
+            quitscrS(LightRed, errorName);
+            break;
+        case _fail:
+            errorName = "FAIL ";
+            quitscrS(LightRed, errorName);
+            break;
+        case _dirt:
+            errorName = "wrong output format ";
+            quitscrS(LightCyan, errorName);
+            result = _pe;
+            break;
+        case _points:
+            errorName = "points ";
+            quitscrS(LightYellow, errorName);
+            break;
+        case _unexpected_eof:
+            errorName = "unexpected eof ";
+            quitscrS(LightCyan, errorName);
+            break;
+        default:
+            if (result >= _partially) {
+                errorName = format("partially correct (%d) ", pctype);
+                isPartial = true;
+                quitscrS(LightYellow, errorName);
+            } else
+                quit(_fail, "What is the code ??? ");
+```

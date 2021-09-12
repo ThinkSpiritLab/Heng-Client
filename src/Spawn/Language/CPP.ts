@@ -1,6 +1,7 @@
 import path from "path";
 import { getConfig } from "../../Config";
-import { RunOption, Language, LanguageConfigureOption } from "./decl";
+import { JailBindMountOption } from "../Jail";
+import { RunOption, Language, LanguageConfigureOption, ExecType } from "./decl";
 
 export class CPP extends Language {
     private src = "src.cpp";
@@ -35,10 +36,24 @@ export class CPP extends Language {
         if (this.excutable.environment.options?.lm) {
             compilerOptions.push("-lm");
         }
+        const bindMount: JailBindMountOption[] = [];
+        if (
+            this.execType === ExecType.Spj ||
+            this.execType === ExecType.Interactor
+        ) {
+            bindMount.push({
+                source: getConfig().language.testlib,
+                dest: path.join(this.compileDir, "testlib.h"),
+                mode: "ro",
+            });
+        }
         return {
             skip: false,
             command: getConfig().language.cpp,
             args: compilerOptions,
+            jailSpawnOption: {
+                bindMount: bindMount,
+            },
         };
     }
 
@@ -47,6 +62,7 @@ export class CPP extends Language {
         return {
             skip: false,
             command: binPath,
+            spawnOption: {},
             jailSpawnOption: {
                 bindMount: [
                     {

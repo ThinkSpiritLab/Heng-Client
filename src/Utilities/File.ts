@@ -1,10 +1,9 @@
-import * as os from "os";
-import * as fs from "fs";
-import * as path from "path";
+import os from "os";
+import fs from "fs";
 import stream, { Readable } from "stream";
-import * as unzip from "unzip-stream";
+import unzip from "unzip-stream";
 import Axios from "axios";
-import { PlatformPath } from "path";
+import path, { PlatformPath } from "path";
 import util from "util";
 import { getConfig } from "../Config";
 const pipeline = util.promisify(stream.pipeline);
@@ -49,8 +48,9 @@ export function readStream(s: Readable): Promise<string> {
 }
 
 export function waitForOpen(s: fs.WriteStream | fs.ReadStream): Promise<null> {
-    return new Promise<null>((resolve) => {
+    return new Promise<null>((resolve, reject) => {
         s.on("open", () => resolve(null));
+        s.on("error", (err) => reject(err));
     });
 }
 

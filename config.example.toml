@@ -3,38 +3,24 @@ host = "http://localhost:8000"
 SecrectKey = "0xffffffff"
 AccessKey = "ox00000000"
 [self]
-judgeCapability = 1000
+judgeCapability = 4
 name = "TestJudger"
 version = "0.0.1"
-[hc]
-path = "/usr/local/bin/hc"
 [nsjail]
 path = "/usr/bin/nsjail"
 configFile = "./jailConfig.cfg"
 [language]
 c = "/usr/bin/gcc"
 cpp = "/usr/bin/g++"
+testlib = "/testlib.h"
 python = "/usr/bin/python3"
 java = "/usr/bin/java"
 javac = "/usr/bin/javac"
 [judger]
+tmpdirBase = 'Heng_Client'
 timeRatioTolerance = 5
-tleTimeOutMs = 200
-mleMemOutByte = 4194304
 cmp = '/usr/bin/ojcmp'
 defaultPidLimit = 64
-selfTestRound = 10
+selfTestRound = 5
 uid = 1000
 gid = 1000
-[[judger.testcases]]
-src = "./selfTest/src.cpp"
-language = "cpp"
-timeExpected = 1000
-[[judger.testcases]]
-src = "./selfTest/Main.java"
-language = "java"
-timeExpected = 1000
-[[judger.testcases]]
-src = "./selfTest/src.py"
-language = "py3"
-timeExpected = 2000

@@ -11,7 +11,7 @@ import {
     ValidateNested,
     validateSync,
 } from "class-validator";
-import * as fs from "fs";
+import fs from "fs";
 import { getLogger } from "log4js";
 const logger = getLogger("ConfigService");
 const configToml = fs.readFileSync("config.toml").toString();
@@ -77,13 +77,6 @@ export class JudgeFactoryConfig {
     @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
-    @IsNumber()
-    @IsNotEmpty()
-    @IsPositive()
-    mleMemOutByte!: number;
-    @IsInt()
-    @IsPositive()
-    tleTimeOutMs!: number;
     @IsString()
     @IsNotEmpty()
     cmp!: string;

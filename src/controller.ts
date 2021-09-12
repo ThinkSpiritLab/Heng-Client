@@ -22,6 +22,9 @@ import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 import { ControllerConfig } from "./Config";
 import { StatusReport } from "heng-protocol";
 import { EncryptParam, Sign } from "heng-sign-js";
+import { stat } from "./Utilities/Statistics";
+import moment from "moment";
+
 class Param {
     key!: string;
     val!: string;
@@ -103,18 +106,13 @@ export class Controller {
             this.stopReport();
         }
         this.statusReportTimer = setInterval(async () => {
-            const reportFunction = this.judgerMethods.get("Report");
-            if (reportFunction !== undefined) {
-                this.do("ReportStatus", {
-                    collectTime: new Date().toISOString(),
-                    nextReportTime: new Date(
-                        new Date().valueOf() + interval
-                    ).toISOString(),
-                    report: (await reportFunction(undefined)) as StatusReport,
-                });
-            } else {
-                this.logger.warn("找不到状态获取回调，无法报告状态。");
-            }
+            this.do("ReportStatus", {
+                collectTime: moment().format("YYYY-MM-DDTHH:mm:ssZ"),
+                nextReportTime: moment(Date.now() + interval).format(
+                    "YYYY-MM-DDTHH:mm:ssZ"
+                ),
+                report: stat.collect(),
+            });
         }, interval);
     }
     stopReport(): void {
@@ -123,47 +121,6 @@ export class Controller {
             this.statusReportTimer = undefined;
         }
     }
-    // sign(req: Req): void {
-    //     let params: Param[] = [];
-    //     let headers: Header[] = [];
-    //     for (const key in req.params) {
-    //         params.push({ key, val: req.params[key].toString() });
-    //     }
-    //     if (req.headers === undefined) {
-    //         req.headers = {};
-    //     }
-    //     req.headers["x-heng-nonce"] = this.nonce.toString();
-    //     req.headers["x-heng-timestamp"] = Date.now().toString();
-    //     req.headers["x-heng-accesskey"] = this.AccessKey;
-    //     for (const key in req.headers) {
-    //         if (key !== "x-heng-signature") {
-    //             headers.push({ key, val: req.headers[key].toString() });
-    //         }
-    //     }
-    //     if (req.body !== undefined) {
-    //         params.push({
-    //             key: "body",
-    //             val:
-    //                 typeof req.body === "string"
-    //                     ? req.body
-    //                     : JSON.stringify(req.body),
-    //         });
-    //     }
-    //     params = orderBy(params, "key");
-    //     headers = orderBy(headers, "key");
-    //     const reqStr = `${toUpper(req.method)}:${headers
-    //         .map((h) => h.toString())
-    //         .join("&")}:${req.path}?${params
-    //         .map((p) => p.toString())
-    //         .join("&")}`;
-    //     const signature = createHmac("sha256", this.SecrectKey)
-    //         .update(reqStr)
-    //         .digest("hex");
-    //     if (!req.headers) {
-    //         req.headers = {};
-    //     }
-    //     req.headers["x-heng-signature"] = signature;
-    // }
     async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
         return (await Axios.request(req)) as AxiosResponse<unknown>;
     }
@@ -205,9 +162,8 @@ export class Controller {
         method: "Control",
         cb: (args: ControlArgs) => Promise<ConnectionSettings>
     ): Controller;
-    on(method: "Report", cb: (args: void) => Promise<StatusReport>): Controller;
     on(
-        method: JudgerMethod | "Report",
+        method: JudgerMethod,
         cb:
             | ((args: CreateJudgeArgs) => Promise<null>)
             | ((args: ExitArgs) => Promise<null>)

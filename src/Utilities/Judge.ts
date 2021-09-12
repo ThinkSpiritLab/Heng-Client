@@ -3,13 +3,16 @@ import {
     JudgeCaseResult,
     JudgeResult,
     JudgeResultKind,
+    JudgeState,
     JudgeType,
+    TestCase,
+    TestPolicy,
 } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
-import * as fs from "fs";
+import fs from "fs";
 import { getLogger } from "log4js";
-import { getConfig, JudgeFactoryConfig } from "../Config";
+import { getConfig } from "../Config";
 import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
@@ -17,6 +20,9 @@ import { Readable } from "stream";
 import { JailResult } from "../Spawn/Jail";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
 import { ExecType } from "../Spawn/Language/decl";
+import { range } from "lodash";
+import { Controller } from "src/controller";
+import { stat } from "./Statistics";
 
 const UsrCompileResultTransformer = {
     mle: JudgeResultKind.CompileMemoryLimitExceeded,
@@ -35,7 +41,7 @@ export abstract class JudgeAgent {
     protected ExecutableAgents: ExecutableAgent[] = [];
     protected fileAgent: FileAgent;
     protected logger = getLogger("JudgeAgent");
-    private Initialized = false;
+    protected Initialized = false;
     protected extra: {
         user?: {
             compileMessage?: string;
@@ -52,10 +58,11 @@ export abstract class JudgeAgent {
     } = {};
 
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        readonly throttle: Throttle
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
         this.fileAgent = new FileAgent(
             path.join(getConfig().judger.tmpdirBase, "workspace", judge.id),
@@ -81,6 +88,34 @@ export abstract class JudgeAgent {
         }
     }
 
+    async updateStatus(judgeState: JudgeState): Promise<void> {
+        if (this.controller) {
+            await this.controller.do("UpdateJudges", {
+                id: this.judge.id,
+                state: judgeState,
+            });
+        }
+    }
+
+    async runJudge(
+        judgeFunction: (testCase: TestCase) => Promise<JudgeCaseResult>
+    ): Promise<JudgeCaseResult[]> {
+        const judgeCaseResults: JudgeCaseResult[] = [];
+        if (this.judge.test) {
+            for (const testCase of this.judge.test.cases) {
+                const caseResult = await judgeFunction(testCase);
+                judgeCaseResults.push(caseResult);
+                if (
+                    caseResult.kind !== JudgeResultKind.Accepted &&
+                    this.judge.test.policy !== TestPolicy.All
+                ) {
+                    break;
+                }
+            }
+        }
+        return judgeCaseResults;
+    }
+
     async compileAndFillExtra(
         execType: ExecType,
         executable: Executable,
@@ -95,12 +130,14 @@ export abstract class JudgeAgent {
         const executableAgent = new ExecutableAgent(execType, executable);
         this.ExecutableAgents.push(executableAgent);
         await executableAgent.init();
-        const compileResult = await this.throttle.withThrottle(() =>
-            executableAgent.compile()
-        );
+        const compileResult = await this.throttle.withThrottle(() => {
+            return executableAgent.compile();
+        });
         if (compileResult !== undefined) {
             const exteaInfo = {
-                compileTime: Math.ceil(compileResult.time.usr * this.timeRatio),
+                compileTime: Math.ceil(
+                    compileResult.time.usr * this.timeRatio + this.timeIntercept
+                ),
                 compileMessage: (
                     await fs.promises.readFile(
                         await executableAgent.fileAgent.getPath(CompileLogName)
@@ -115,18 +152,18 @@ export abstract class JudgeAgent {
                 this.extra.interactor = exteaInfo;
             }
             let compileJudgeType: JudgeResultKind | undefined = undefined;
-            if (
-                compileResult.memory >
-                this.judge.judge.user.limit.compiler.memory
-            ) {
-                compileJudgeType = transformer.mle;
+            if (compileResult.signal === 25) {
+                compileJudgeType = transformer.ole;
             } else if (
                 compileResult.time.usr >
                 this.judge.judge.user.limit.compiler.cpuTime
             ) {
                 compileJudgeType = transformer.tle;
-            } else if (compileResult.signal === 25) {
-                compileJudgeType = transformer.ole;
+            } else if (
+                compileResult.memory >
+                this.judge.judge.user.limit.compiler.memory
+            ) {
+                compileJudgeType = transformer.mle;
             } else if (
                 compileResult.signal !== -1 ||
                 compileResult.returnCode !== 0
@@ -177,17 +214,26 @@ export abstract class JudgeAgent {
         userExec: Executable,
         sysResult: JailResult,
         sysExec: Executable,
-        sysJudge: string
+        sysOut: string,
+        sysErr: string
     ): JudgeCaseResult {
         this.checkInit();
-        sysJudge = sysJudge.trim();
+        sysOut = sysOut.trim();
+        sysErr = sysErr.trim();
+        let sysJudge = "";
+        if (sysOut) {
+            sysJudge += sysOut;
+        }
+        if (sysErr) {
+            sysJudge += sysErr;
+        }
+        const sysSummary = sysJudge.slice(0, 4).toLocaleLowerCase();
         return {
             kind: (() => {
                 if (userResult.signal === 25) {
                     return JudgeResultKind.OutpuLimitExceeded;
                 } else if (
-                    userResult.time.usr > userExec.limit.runtime.cpuTime ||
-                    userResult.time.real > userExec.limit.runtime.cpuTime * 1.5
+                    userResult.time.usr > userExec.limit.runtime.cpuTime
                 ) {
                     return JudgeResultKind.TimeLimitExceeded;
                 } else if (userResult.memory > userExec.limit.runtime.memory) {
@@ -199,29 +245,24 @@ export abstract class JudgeAgent {
                     return JudgeResultKind.RuntimeError;
                 } else if (sysResult.signal === 25) {
                     return JudgeResultKind.SystemOutpuLimitExceeded;
-                } else if (
-                    sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
-                    sysResult.time.real > sysExec.limit.runtime.cpuTime * 1.5
-                ) {
+                } else if (sysResult.time.usr > sysExec.limit.runtime.cpuTime) {
                     return JudgeResultKind.SystemTimeLimitExceeded;
                 } else if (sysResult.memory > sysExec.limit.runtime.memory) {
                     return JudgeResultKind.SystemMemoryLimitExceeded;
                 } else if (
                     sysResult.signal !== -1 ||
-                    // Adapt to ojcmp v0.4.0
-                    ![0, 1, 2].includes(sysResult.returnCode)
+                    !range(9).includes(sysResult.returnCode)
                 ) {
                     return JudgeResultKind.SystemRuntimeError;
-                } else if (sysJudge === "AC" || sysJudge === "PE") {
+                } else if (
+                    (sysSummary.startsWith("ac") ||
+                        sysSummary.startsWith("ok")) &&
+                    sysResult.returnCode === 0
+                ) {
                     // May add ResultType PE
                     return JudgeResultKind.Accepted;
-                } else if (sysJudge === "WA") {
-                    return JudgeResultKind.WrongAnswer;
                 } else {
-                    getLogger("generateResult").fatal(
-                        `Judger says:${sysJudge}`
-                    );
-                    return JudgeResultKind.SystemError;
+                    return JudgeResultKind.WrongAnswer;
                 }
             })(),
             time: Math.ceil(
@@ -232,8 +273,8 @@ export abstract class JudgeAgent {
         };
     }
     async clean(): Promise<void> {
-        for (const agent of this.ExecutableAgents) {
-            await agent.clean();
+        for (const executableAgent of this.ExecutableAgents) {
+            await executableAgent.clean();
         }
         await this.fileAgent.clean();
     }
@@ -241,42 +282,24 @@ export abstract class JudgeAgent {
 
 export class NormalJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Normal) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
         }
     }
 
-    async getBasicCmp(): Promise<ExecutableAgent> {
-        this.checkInit();
-        const cmpExecutableAgent = new ExecutableAgent(ExecType.System, {
-            source: {
-                hashsum:
-                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                type: "direct",
-                content: "",
-            },
-            environment: {
-                language: "cmp",
-                system: "Linux",
-                arch: "x64",
-                options: {},
-            },
-            limit: this.judge.judge.user.limit,
-        });
-        this.ExecutableAgents.push(cmpExecutableAgent);
-        await cmpExecutableAgent.init();
-        await cmpExecutableAgent.compile();
-        return cmpExecutableAgent;
-    }
-
     async getResult(): Promise<JudgeResult> {
         this.checkInit();
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
         const [userExecutableAgent, judgeResult1] =
             await this.compileAndFillExtra(
                 ExecType.Usr,
@@ -309,10 +332,14 @@ export class NormalJudgeAgent extends JudgeAgent {
         if (judgeResult2 !== undefined) {
             return judgeResult2;
         }
-        const result = this.judge.test?.cases?.map?.(async (value) => {
+
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
             const [inputFd, stdFd] = await Promise.all([
-                this.fileAgent.getFd(value.input),
-                this.fileAgent.getFd(value.output),
+                this.fileAgent.getFd(testCase.input),
+                this.fileAgent.getFd(testCase.output),
             ]);
             return this.throttle.withThrottle(async () => {
                 const userProcess = await userExecutableAgent.exec(undefined, [
@@ -326,25 +353,30 @@ export class NormalJudgeAgent extends JudgeAgent {
                     "pipe",
                     stdFd,
                 ]);
-                const [userResult, cmpResult, cmpOut] = await Promise.all([
-                    userProcess.result,
-                    compProcess.result,
-                    compProcess.stdout !== null
-                        ? readStream(compProcess.stdout)
-                        : "",
-                ]);
+                const [userResult, cmpResult, cmpOut, cmpErr] =
+                    await Promise.all([
+                        userProcess.result,
+                        compProcess.result,
+                        compProcess.stdout !== null
+                            ? readStream(compProcess.stdout)
+                            : "",
+                        compProcess.stderr !== null
+                            ? readStream(compProcess.stderr)
+                            : "",
+                    ]);
                 return this.generateCaseResult(
                     userResult,
                     this.judge.judge.user,
                     cmpResult,
                     this.judge.judge.user,
-                    cmpOut
+                    cmpOut,
+                    cmpErr
                 );
             });
         });
 
         return {
-            cases: await Promise.all(result ?? []),
+            cases: caseResults,
             extra: this.extra,
         };
     }
@@ -352,12 +384,13 @@ export class NormalJudgeAgent extends JudgeAgent {
 
 export class SpecialJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Special) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`;
         }
@@ -368,6 +401,10 @@ export class SpecialJudgeAgent extends JudgeAgent {
         if (this.judge.judge.type !== JudgeType.Special) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
         }
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
         const [userExecutableAgent, judgeResult1] =
             await this.compileAndFillExtra(
                 ExecType.Usr,
@@ -387,11 +424,14 @@ export class SpecialJudgeAgent extends JudgeAgent {
             return judgeResult2;
         }
 
-        const result = this.judge.test?.cases?.map?.(async (value) => {
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
             const [inputFd, inputFd2, stdFd] = await Promise.all([
-                this.fileAgent.getFd(value.input),
-                this.fileAgent.getFd(value.input),
-                this.fileAgent.getFd(value.output),
+                this.fileAgent.getFd(testCase.input),
+                this.fileAgent.getFd(testCase.input),
+                this.fileAgent.getFd(testCase.output),
             ]);
             return this.throttle.withThrottle(async () => {
                 const userProcess = await userExecutableAgent.exec(undefined, [
@@ -408,28 +448,30 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     inputFd2,
                     stdFd,
                 ]);
-                // inputStream2.pipe(userProcess.stdio[2]as unknown as Writable)
-                // stdStream.pipe(userProcess.stdio[3]as unknown as Writable)
-                const [userResult, cmpResult, cmpOut] = await Promise.all([
-                    userProcess.result,
-                    compProcess.result,
-                    compProcess.stdout !== null
-                        ? readStream(compProcess.stdout)
-                        : "",
-                ]);
-                console.log(cmpOut);
+                const [userResult, cmpResult, cmpOut, cmpErr] =
+                    await Promise.all([
+                        userProcess.result,
+                        compProcess.result,
+                        compProcess.stdout !== null
+                            ? readStream(compProcess.stdout)
+                            : "",
+                        compProcess.stderr !== null
+                            ? readStream(compProcess.stderr)
+                            : "",
+                    ]);
                 return this.generateCaseResult(
                     userResult,
                     this.judge.judge.user,
                     cmpResult,
                     this.judge.judge.user,
-                    cmpOut
+                    cmpOut,
+                    cmpErr
                 );
             });
         });
 
         return {
-            cases: await Promise.all(result ?? []),
+            cases: caseResults,
             extra: this.extra,
         };
     }
@@ -437,12 +479,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
 
 export class InteractiveJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle);
+        super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Interactive) {
             throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
@@ -453,6 +496,10 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         if (this.judge.judge.type !== JudgeType.Interactive) {
             throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
         }
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
         const [userExecutableAgent, judgeResult1] =
             await this.compileAndFillExtra(
                 ExecType.Usr,
@@ -472,10 +519,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             return judgeResult2;
         }
 
-        const result = this.judge.test?.cases?.map?.(async (value) => {
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
             const [inputFd, stdFd] = await Promise.all([
-                this.fileAgent.getFd(value.input),
-                this.fileAgent.getFd(value.output),
+                this.fileAgent.getFd(testCase.input),
+                this.fileAgent.getFd(testCase.output),
             ]);
             return this.throttle.withThrottle(async () => {
                 const userProcess = await userExecutableAgent.exec(undefined, [
@@ -495,25 +545,30 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                         "pipe",
                     ]
                 );
-                const [userResult, cmpResult, cmpOut] = await Promise.all([
-                    userProcess.result,
-                    compProcess.result,
-                    compProcess.stdio[5]
-                        ? readStream(compProcess.stdio[5] as Readable)
-                        : "",
-                ]);
+                const [userResult, cmpResult, cmpOut, cmpErr] =
+                    await Promise.all([
+                        userProcess.result,
+                        compProcess.result,
+                        compProcess.stdio[5]
+                            ? readStream(compProcess.stdio[5] as Readable)
+                            : "",
+                        compProcess.stderr !== null
+                            ? readStream(compProcess.stderr)
+                            : "",
+                    ]);
                 return this.generateCaseResult(
                     userResult,
                     this.judge.judge.user,
                     cmpResult,
                     this.judge.judge.user,
-                    cmpOut
+                    cmpOut,
+                    cmpErr
                 );
             });
         });
 
         return {
-            cases: await Promise.all(result ?? []),
+            cases: caseResults,
             extra: this.extra,
         };
     }
@@ -523,11 +578,12 @@ export class JudgeFactory {
     constructor(
         readonly timeRatio: number,
         readonly timeIntercept: number,
-        readonly throttle: Throttle
+        readonly throttle: Throttle,
+        public controller?: Controller
     ) {}
 
     getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
-        // why so ugly? just reduce further bugs
+        // why so ugly? reduce further bugs
         judge.judge.user.limit.compiler.cpuTime = Math.ceil(
             judge.judge.user.limit.compiler.cpuTime / this.timeRatio
         );
@@ -540,7 +596,8 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle
+                    this.throttle,
+                    this.controller
                 );
             }
             case JudgeType.Special: {
@@ -554,7 +611,8 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle
+                    this.throttle,
+                    this.controller
                 );
             }
             case JudgeType.Interactive: {
@@ -570,7 +628,8 @@ export class JudgeFactory {
                     judge,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle
+                    this.throttle,
+                    this.controller
                 );
             }
             default:
@@ -580,7 +639,6 @@ export class JudgeFactory {
 }
 
 export async function getJudgerFactory(
-    judgerConfig: JudgeFactoryConfig,
     throttle: Throttle
 ): Promise<JudgeFactory> {
     const logger = getLogger("JudgeFactoryFactory");
@@ -603,6 +661,7 @@ export async function getJudgerFactory(
                 await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 await judgeAgent.clean();
+                console.log(result);
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
                     if (expectedResult.expectResultType !== c.kind) {
@@ -624,6 +683,7 @@ export async function getJudgerFactory(
                 );
                 await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
+                console.log(result);
                 await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
@@ -655,6 +715,7 @@ export async function getJudgerFactory(
                 );
                 await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
+                console.log(result);
                 await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];

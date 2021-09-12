@@ -32,13 +32,12 @@ using namespace std;
 #define eps 1e-6
 
 int main(int argc, char *argv[]) {
-    printf("init ok, argc is %d\\n", argc);
     registerTestlibCmd(argc, argv);
 
     double std = ans.readDouble();
     double usr = ouf.readDouble();
 
-    if (fabs(std - usr) > eps)
+    if (fabs(std - usr) > eps && fabs(std - usr) > std * eps)
         quitf(_wa, "expected %.10f, found %.10f", std, usr);
 
     quitf(_ok, "answer is %.10f", std);
@@ -52,16 +51,16 @@ export const SpjEPS = generateSpjSelfTest("SpjEPS", "cpp", usrCode, spjCode, [
         expectResultType: JudgeResultKind.Accepted,
         count: false,
     },
-    // {
-    //     input: input2,
-    //     output: output2,
-    //     expectResultType: JudgeResultKind.Accepted,
-    //     count: false,
-    // },
-    // {
-    //     input: input3,
-    //     output: output3,
-    //     expectResultType: JudgeResultKind.WrongAnswer,
-    //     count: false,
-    // },
+    {
+        input: input2,
+        output: output2,
+        expectResultType: JudgeResultKind.Accepted,
+        count: false,
+    },
+    {
+        input: input3,
+        output: output3,
+        expectResultType: JudgeResultKind.WrongAnswer,
+        count: false,
+    },
 ]);

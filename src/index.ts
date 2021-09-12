@@ -10,6 +10,7 @@ import { getgid, getuid } from "process";
 import path from "path";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
+import { stat } from "./Utilities/Statistics";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
 }
@@ -66,39 +67,29 @@ async function main() {
         recursive: true,
     });
     await fs.promises.mkdir("/sys/fs/cgroup/pids/NSJAIL", { recursive: true });
+
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(
-        getConfig().judger,
         new Throttle(config.judgeCapability)
     );
     const controller = new Controller(getConfig().controller);
-    controller.on("Report", () => {
-        return Promise.resolve({
-            hardware: { cpu: { percentage: 50 }, memory: { percentage: 50 } },
-            judge: {
-                pending: 0,
-                preparing: {
-                    downloading: 0,
-                    readingCache: 0,
-                    compiling: 0,
-                },
-                judging: 0,
-                finished: 0,
-                total: 0,
-            },
-        });
-    });
+    judgerFactory.controller = controller;
+
     controller.on("CreateJudge", (task) => {
         const judgeAgent = judgerFactory.getJudgerAgent(task);
-        const resultPromise = judgeAgent.getResultNoException();
-        resultPromise.then((result) => {
-            // logger.info(`Task:${JSON.stringify(task)}`);
-            // logger.info(`Result:${JSON.stringify(result)}`);
-            controller.do("FinishJudges", { id: task.id, result });
+        stat.tick(task.id);
+        judgeAgent.init().then(async () => {
+            const judgeResult = await judgeAgent.getResultNoException();
+            await judgeAgent.clean();
+            stat.tick(task.id);
+            await controller.do("FinishJudges", {
+                id: task.id,
+                result: judgeResult,
+            });
         });
-        // .finally(() => judgeAgent.clean());
         return Promise.resolve(null);
     });
+
     const token = await controller.getToken(
         config.judgeCapability,
         os.cpus().length,

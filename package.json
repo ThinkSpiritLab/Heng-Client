@@ -49,6 +49,7 @@
     "heng-sign-js": "^0.0.15",
     "lodash": "^4.17.20",
     "log4js": "^6.3.0",
+    "moment": "^2.29.1",
     "queue-typescript": "^1.0.1",
     "reflect-metadata": "^0.1.13",
     "unzip-stream": "^0.3.1",
