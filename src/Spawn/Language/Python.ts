@@ -1,21 +1,39 @@
+import path from "path";
 import { getConfig } from "../../Config";
-import {
-    ConfiguredLanguage,
-    generateExcuterGenerator,
-    Language,
-} from ".";
+import { RunOption, Language, LanguageConfigureOption } from "./decl";
 
-export const PYTHON: Language = function () {
-    const py = getConfig().language.python;
-    return new ConfiguredLanguage(
-        null,
-        generateExcuterGenerator((command: string, args: string[]) => [
-            py,
-            [command, ...args],
-            {}, // not used, ignore it
-        ]),
-        "src.py",
-        "src.py"
-    );
-};
+export class Python extends Language {
+    private src = "src.py";
 
+    constructor(option: LanguageConfigureOption) {
+        super(option);
+    }
+    get compileCacheable(): boolean {
+        return true;
+    }
+
+    get srcFileName(): string {
+        return this.src;
+    }
+
+    compileOptionGenerator(): RunOption {
+        return { skip: true };
+    }
+
+    execOptionGenerator(): RunOption {
+        const binPath = path.join(this.compileDir, this.src);
+        return {
+            skip: false,
+            command: getConfig().language.python,
+            args: [binPath],
+            jailSpawnOption: {
+                bindMount: [
+                    {
+                        source: binPath,
+                        mode: "ro",
+                    },
+                ],
+            },
+        };
+    }
+}

@@ -1,5 +1,5 @@
 import { JudgeResultKind } from "heng-protocol";
-import { generateSpjSelfTest } from ".";
+import { generateSpjSelfTest } from "../util";
 
 const input = `1 7
 `;

@@ -16,7 +16,7 @@ import { Tests } from "../SelfTest";
 import { Readable } from "stream";
 import { JailResult } from "../Spawn/Jail";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
-import { ExecType } from "../Spawn/LanguageV2/decl";
+import { ExecType } from "../Spawn/Language/decl";
 
 const UsrCompileResultTransformer = {
     mle: JudgeResultKind.CompileMemoryLimitExceeded,

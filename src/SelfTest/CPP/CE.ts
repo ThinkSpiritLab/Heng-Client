@@ -1,5 +1,5 @@
 import { JudgeResultKind } from "heng-protocol";
-import { generateNormalSelfTest } from ".";
+import { generateNormalSelfTest } from "../util";
 
 const input = `1 2
 `;
@@ -7,21 +7,20 @@ const output = `3
 `;
 const usrCode = `
 #include <bits/stdc++.h>
-using namespace std;
 
 int main(void) {
     int a, b;
     cin >> a >> b;
-    cout << a + b + 1 << endl;
+    cout << a + b << endl;
     return 0;
 }
 `;
 
-export const NormalWA = generateNormalSelfTest("NormalWA", "cpp", usrCode, [
+export const CppCE = generateNormalSelfTest("CppCE", "cpp", usrCode, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.WrongAnswer,
+        expectResultType: JudgeResultKind.CompileError,
         count: false,
     },
 ]);

@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import { Executable } from "heng-protocol";
 import path from "path";
 import fs from "fs";
-import { ExecType, Language } from "../Spawn/LanguageV2/decl";
+import { ExecType, Language } from "../Spawn/Language/decl";
 import { FileAgent, readStream, waitForOpen } from "./File";
 import {
     JailBindMountOption,
@@ -13,16 +13,17 @@ import {
 } from "../Spawn/Jail";
 import { getConfig } from "../Config";
 import { BasicSpawnOption, CompleteStdioOptions } from "../Spawn/BasicSpawn";
-import { getConfiguredLanguage } from "../Spawn/LanguageV2";
+import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
 
-const compileCachedJudge = new Set<string>();
+const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";
 export const CompileLogName = "compile.log";
 export const CompileStatisticName = "compile.statistic";
 
 export class ExecutableAgent {
     private readonly judgeHash: string;
+    private readonly dirHash: string;
     readonly fileAgent: FileAgent;
     private compiled = false;
     private compileCached = false;
@@ -43,25 +44,36 @@ export class ExecutableAgent {
                 })
             )
             .digest("hex");
-        this.fileAgent = new FileAgent(
-            path.join(getConfig().judger.tmpdirBase, "bin", this.judgeHash),
-            null
-        );
         this.configuredLanguage = getConfiguredLanguage(
             this.excutable.environment.language,
             {
                 execType: this.execType,
                 excutable: this.excutable,
-                workSpaceDir: this.fileAgent.dir,
+                compileDir: "",
             }
         );
+        let dirHash: string | undefined = undefined;
         if (
             this.configuredLanguage.compileCacheable &&
-            compileCachedJudge.has(this.judgeHash)
+            (dirHash = compileCachedJudge.get(this.judgeHash))
         ) {
+            this.dirHash = dirHash;
             this.compileCached = true;
             this.compiled = true;
+        } else {
+            this.dirHash = crypto.randomBytes(32).toString("hex");
         }
+
+        this.fileAgent = new FileAgent(
+            path.join(
+                getConfig().judger.tmpdirBase,
+                "bin",
+                execType,
+                this.dirHash
+            ),
+            null
+        );
+        this.configuredLanguage.compileDir = this.fileAgent.dir;
     }
 
     /**
@@ -122,7 +134,7 @@ export class ExecutableAgent {
         }
         if (this.compiled || this.compileCached) {
             this.logger.info(
-                `skip compile, compiled: ${this.compiled}, compileCached：${this.compileCached}`
+                `skip ${this.execType} compile, compiled: ${this.compiled}, compileCached：${this.compileCached}`
             );
             return JSON.parse(
                 await readStream(
@@ -207,7 +219,7 @@ export class ExecutableAgent {
             );
             this.fileAgent.register(CompileStatisticName, CompileStatisticName);
             this.compiled = true;
-            compileCachedJudge.add(this.judgeHash);
+            compileCachedJudge.set(this.judgeHash, this.dirHash);
             if (this.configuredLanguage.compileCacheable) {
                 this.compileCached = true;
             }
@@ -293,7 +305,7 @@ export class ExecutableAgent {
      * hey, clean me
      */
     async clean(): Promise<void> {
-        if (!this.compileCached) {
+        if (this.dirHash !== compileCachedJudge.get(this.judgeHash)) {
             await this.fileAgent.clean();
         }
     }

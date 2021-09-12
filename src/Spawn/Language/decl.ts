@@ -1,13 +1,18 @@
 import { Executable } from "heng-protocol";
 import { JailSpawnOption } from "..";
 
-
 export enum ExecType {
-    System = "System",
-    Usr = "Usr",
-    Spj = "Spj",
-    Interactor = "Interactor",
+    System = "system",
+    Usr = "usr",
+    Spj = "spj",
+    Interactor = "interactor",
 }
+export const ExecTypeArray = [
+    ExecType.System,
+    ExecType.Usr,
+    ExecType.Spj,
+    ExecType.Interactor,
+];
 
 // Extract from BasicSpawnOption and JailSpawnOption and spawn's args
 export type RunOption =
@@ -26,22 +31,20 @@ export type RunOption =
 export interface LanguageConfigureOption {
     execType: ExecType;
     excutable: Executable;
-    workSpaceDir: string;
+    compileDir: string;
 }
 
 export abstract class Language {
     readonly execType: ExecType;
     readonly excutable: Executable;
-    workSpaceDir: string;
+    compileDir: string;
     constructor(option: LanguageConfigureOption) {
         this.execType = option.execType;
         this.excutable = option.excutable;
-        this.workSpaceDir = option.workSpaceDir;
+        this.compileDir = option.compileDir;
     }
     abstract get compileCacheable(): boolean;
     abstract get srcFileName(): string;
     abstract compileOptionGenerator(): RunOption;
     abstract execOptionGenerator(): RunOption;
 }
-
-

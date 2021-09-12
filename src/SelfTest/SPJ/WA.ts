@@ -1,5 +1,5 @@
 import { JudgeResultKind } from "heng-protocol";
-import { generateSpjSelfTest } from ".";
+import { generateSpjSelfTest } from "../util";
 
 const input = `1 7
 `;
@@ -14,7 +14,7 @@ int main(void) {
     long long a, b;
     cin >> a >> b;
     int rd = rand();
-    cout << a + rd << ' ' << b - rd << endl;
+    cout << a + rd << ' ' << b << endl;
     return 0;
 }
 `;
@@ -40,11 +40,11 @@ int main(void) {
 }
 `;
 
-export const SpjAC = generateSpjSelfTest("SpjAC", "cpp", usrCode, spjCode, [
+export const SpjWA = generateSpjSelfTest("SpjWA", "cpp", usrCode, spjCode, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.Accepted,
+        expectResultType: JudgeResultKind.WrongAnswer,
         count: false,
     },
 ]);

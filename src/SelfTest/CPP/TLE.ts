@@ -1,6 +1,6 @@
 import { JudgeResultKind } from "heng-protocol";
 import { range } from "lodash";
-import { generateNormalSelfTest } from ".";
+import { generateNormalSelfTest } from "../util";
 
 const input = `
 `;
@@ -15,8 +15,8 @@ int main(void) {
 }
 `;
 
-export const NormalTLE = generateNormalSelfTest(
-    "NormalTLE",
+export const CppTLE = generateNormalSelfTest(
+    "CppTLE",
     "cpp",
     usrCode,
     range(2).map(() => {

@@ -1,5 +1,5 @@
 import { JudgeResultKind } from "heng-protocol";
-import { generateNormalSelfTest } from ".";
+import { generateNormalSelfTest } from "../util";
 
 const input = `1 2
 `;
@@ -17,7 +17,7 @@ public class Main {
 }
 `;
 
-export const NormalJavaAC = generateNormalSelfTest("NormalJavaAC", "java", usrCode, [
+export const JavaAC = generateNormalSelfTest("JavaAC", "java", usrCode, [
     {
         input,
         output,

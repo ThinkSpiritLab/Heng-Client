@@ -8,17 +8,10 @@ import { getJudgerFactory } from "./Utilities/Judge";
 import { Throttle } from "./Utilities/Throttle";
 import { getgid, getuid } from "process";
 import path from "path";
+import { ExecTypeArray } from "./Spawn/Language/decl";
+import { chownR } from "./Utilities/File";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
-}
-
-async function createDir(dir: string) {
-    await fs.promises.mkdir(dir + "/", { recursive: true, mode: 0o700 });
-    await fs.promises.chown(
-        dir,
-        getConfig().judger.uid,
-        getConfig().judger.gid
-    );
 }
 
 async function main() {
@@ -47,12 +40,26 @@ async function main() {
         path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
         { recursive: true }
     );
-    await createDir(path.join(os.tmpdir(), getConfig().judger.tmpdirBase));
-    await createDir(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "bin")
+    for (const execType of ExecTypeArray) {
+        await fs.promises.mkdir(
+            path.join(
+                os.tmpdir(),
+                getConfig().judger.tmpdirBase,
+                "bin",
+                execType
+            ),
+            { recursive: true }
+        );
+    }
+    await fs.promises.mkdir(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace"),
+        { recursive: true }
     );
-    await createDir(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace")
+    await chownR(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
+        getConfig().judger.uid,
+        getConfig().judger.gid,
+        1
     );
     await fs.promises.mkdir("/sys/fs/cgroup/cpu/NSJAIL", { recursive: true });
     await fs.promises.mkdir("/sys/fs/cgroup/memory/NSJAIL", {
