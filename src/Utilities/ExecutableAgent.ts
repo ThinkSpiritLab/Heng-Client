@@ -307,8 +307,11 @@ export class ExecutableAgent {
      * hey, clean me
      */
     async clean(): Promise<void> {
-        // if (this.dirHash !== compileCachedJudge.get(this.judgeHash)) {
-        //     await this.fileAgent.clean();
-        // }
+        if (
+            getConfig().judger.unsupervised ||
+            this.dirHash !== compileCachedJudge.get(this.judgeHash)
+        ) {
+            await this.fileAgent.clean();
+        }
     }
 }

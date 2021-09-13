@@ -1,6 +1,7 @@
 import { BOMB } from "./BOMB";
 import { C } from "./C";
 import { CPP } from "./CPP";
+import { INTERACTOR } from "./INTERACTOR";
 import { JAVA } from "./JAVA";
 import { PYTHON } from "./PYTHON";
 import { SPJ } from "./SPJ";
@@ -14,5 +15,5 @@ export const Tests = [
     ...TIME,
     ...SPJ,
     ...BOMB,
+    ...INTERACTOR,
 ];
-// export const Tests = [...PYTHON];
