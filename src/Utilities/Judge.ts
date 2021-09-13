@@ -585,8 +585,12 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                         userProcess.stderr !== null
                             ? readStream(userProcess.stderr)
                             : "",
-                        compProcess.stdio[5]
-                            ? readStream(compProcess.stdio[5] as Readable)
+                        (compProcess.stdio as unknown as Readable[])[5]
+                            ? readStream(
+                                  (
+                                      compProcess.stdio as unknown as Readable[]
+                                  )[5]
+                              )
                             : "",
                         compProcess.stderr !== null
                             ? readStream(compProcess.stderr)

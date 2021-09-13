@@ -57,9 +57,7 @@
 
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
 
-url 缓存
-
-通知 language workspace
+> spj 返回值汇总
 
 ```cpp
 int resultExitCode(TResult r) {
@@ -87,41 +85,41 @@ int resultExitCode(TResult r) {
 }
 
 
-    switch (result) {
-        case _ok:
-            errorName = "ok ";
-            quitscrS(LightGreen, errorName);
-            break;
-        case _wa:
-            errorName = "wrong answer ";
-            quitscrS(LightRed, errorName);
-            break;
-        case _pe:
-            errorName = "wrong output format ";
-            quitscrS(LightRed, errorName);
-            break;
-        case _fail:
-            errorName = "FAIL ";
-            quitscrS(LightRed, errorName);
-            break;
-        case _dirt:
-            errorName = "wrong output format ";
-            quitscrS(LightCyan, errorName);
-            result = _pe;
-            break;
-        case _points:
-            errorName = "points ";
+switch (result) {
+    case _ok:
+        errorName = "ok ";
+        quitscrS(LightGreen, errorName);
+        break;
+    case _wa:
+        errorName = "wrong answer ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _pe:
+        errorName = "wrong output format ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _fail:
+        errorName = "FAIL ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _dirt:
+        errorName = "wrong output format ";
+        quitscrS(LightCyan, errorName);
+        result = _pe;
+        break;
+    case _points:
+        errorName = "points ";
+        quitscrS(LightYellow, errorName);
+        break;
+    case _unexpected_eof:
+        errorName = "unexpected eof ";
+        quitscrS(LightCyan, errorName);
+        break;
+    default:
+        if (result >= _partially) {
+            errorName = format("partially correct (%d) ", pctype);
+            isPartial = true;
             quitscrS(LightYellow, errorName);
-            break;
-        case _unexpected_eof:
-            errorName = "unexpected eof ";
-            quitscrS(LightCyan, errorName);
-            break;
-        default:
-            if (result >= _partially) {
-                errorName = format("partially correct (%d) ", pctype);
-                isPartial = true;
-                quitscrS(LightYellow, errorName);
-            } else
-                quit(_fail, "What is the code ??? ");
+        } else
+            quit(_fail, "What is the code ??? ");
 ```

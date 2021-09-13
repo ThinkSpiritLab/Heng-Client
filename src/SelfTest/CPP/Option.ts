@@ -23,7 +23,7 @@ export const CppOption = generateNormalSelfTest(
     "CppOption",
     "cpp",
     usrCode,
-    { version: "c++11" },
+    { version: "c++03" },
     [
         {
             type: "direct",

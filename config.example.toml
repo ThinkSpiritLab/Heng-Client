@@ -17,6 +17,7 @@ python = "/usr/bin/python3"
 java = "/usr/bin/java"
 javac = "/usr/bin/javac"
 [judger]
+unsupervised = true
 tmpdirBase = 'Heng_Client'
 timeRatioTolerance = 5
 cmp = '/usr/bin/ojcmp'
