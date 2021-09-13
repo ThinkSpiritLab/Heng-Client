@@ -65,7 +65,6 @@ int main(int argc, char ** argv){
 	if(!found)
 		quitf(_wa, "couldn't guess the number with 50 questions");
 	quitf(_ok, "guessed the number with %d questions!", 50 - left);
-
 }
 `;
 

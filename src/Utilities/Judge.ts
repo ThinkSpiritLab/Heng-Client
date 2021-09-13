@@ -142,7 +142,9 @@ export abstract class JudgeAgent {
                     await fs.promises.readFile(
                         await executableAgent.fileAgent.getPath(CompileLogName)
                     )
-                ).toString("utf-8"),
+                )
+                    .toString("utf-8")
+                    .slice(executable.limit.compiler.message),
             };
             if (execType === ExecType.Usr) {
                 this.extra.user = exteaInfo;
@@ -160,7 +162,7 @@ export abstract class JudgeAgent {
             ) {
                 compileJudgeType = transformer.tle;
             } else if (
-                compileResult.memory >
+                compileResult.memory >=
                 this.judge.judge.user.limit.compiler.memory
             ) {
                 compileJudgeType = transformer.mle;
@@ -249,7 +251,7 @@ export abstract class JudgeAgent {
                     userResult.time.usr > userExec.limit.runtime.cpuTime
                 ) {
                     return JudgeResultKind.TimeLimitExceeded;
-                } else if (userResult.memory > userExec.limit.runtime.memory) {
+                } else if (userResult.memory >= userExec.limit.runtime.memory) {
                     return JudgeResultKind.MemoryLimitExceeded;
                 } else if (
                     userResult.signal !== -1 ||
