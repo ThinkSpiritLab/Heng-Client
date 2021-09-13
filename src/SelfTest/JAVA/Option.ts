@@ -9,7 +9,7 @@ const usrCode = `
 import java.util.Scanner;
 
 
-public class Main {
+public class APLUSB {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         int a = sc.nextInt();
@@ -19,11 +19,17 @@ public class Main {
 }
 `;
 
-export const JavaAC = generateNormalSelfTest("JavaAC", "java", usrCode, {}, [
-    {
-        input,
-        output,
-        expectResultType: JudgeResultKind.Accepted,
-        count: false,
-    },
-]);
+export const JavaOption = generateNormalSelfTest(
+    "JavaOption",
+    "java",
+    usrCode,
+    { className: "APLUSB" },
+    [
+        {
+            input,
+            output,
+            expectResultType: JudgeResultKind.Accepted,
+            count: false,
+        },
+    ]
+);

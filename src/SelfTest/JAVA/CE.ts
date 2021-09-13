@@ -6,17 +6,17 @@ const input = `1 2
 const output = `3
 `;
 const usrCode = `
-#include <bits/stdc++.h>
-
-int main(void) {
-    int a, b;
-    cin >> a >> b;
-    cout << a + b << endl;
-    return 0;
+public class Main {
+    public static void main(String[] args) {
+        int dp[] = new int[500000000] // 2G
+        for (int i = 0; i < 500000000; i++) {
+            dp[i] = 1;
+        }
+    }
 }
 `;
 
-export const CppCE = generateNormalSelfTest("CppCE", "cpp", usrCode, {}, [
+export const JavaCE = generateNormalSelfTest("JavaCE", "java", usrCode, {}, [
     {
         input,
         output,

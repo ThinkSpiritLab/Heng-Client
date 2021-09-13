@@ -17,7 +17,7 @@ int main(void) {
 }
 `;
 
-export const CppAC = generateNormalSelfTest("CppAC", "cpp", usrCode, [
+export const CppAC = generateNormalSelfTest("CppAC", "cpp", usrCode, {}, [
     {
         input,
         output,

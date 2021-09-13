@@ -14,16 +14,16 @@ public class Main {
         Scanner sc = new Scanner(System.in);
         int a = sc.nextInt();
         int b = sc.nextInt();
-        System.out.println(a + b);
+        System.out.println(a + b + 1);
     }
 }
 `;
 
-export const JavaAC = generateNormalSelfTest("JavaAC", "java", usrCode, {}, [
+export const JavaWA = generateNormalSelfTest("JavaWA", "java", usrCode, {}, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.Accepted,
+        expectResultType: JudgeResultKind.WrongAnswer,
         count: false,
     },
 ]);

@@ -55,13 +55,12 @@ export const TimeBIT = generateNormalSelfTest(
     "TimeBIT",
     "cpp",
     usrCode,
-    range(20).map(() => {
-        return {
-            input,
-            output,
-            expectResultType: JudgeResultKind.Accepted,
-            count: true,
-            expectedTime: 1000,
-        };
-    })
+    {},
+    range(20).map(() => ({
+        input,
+        output,
+        expectResultType: JudgeResultKind.Accepted,
+        count: true,
+        expectedTime: 1000,
+    }))
 );

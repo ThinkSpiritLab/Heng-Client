@@ -7,16 +7,22 @@ const input = `
 const output = `
 `;
 const usrCode = `
-#include <bits/stdc++.h>
-int main(void) {
-    while(1);
-    return 0;
+import java.util.Scanner;
+
+
+public class Main {
+    public static void main(String[] args) {
+        int a = 0;
+        while (true) {
+            a++;
+        }
+    }
 }
 `;
 
-export const CppTLE = generateNormalSelfTest(
-    "CppTLE",
-    "cpp",
+export const JavaTLE2 = generateNormalSelfTest(
+    "JavaTLE2",
+    "java",
     usrCode,
     {},
     range(2).map(() => ({

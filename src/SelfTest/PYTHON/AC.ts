@@ -10,11 +10,17 @@ s = input().split()
 print(int(s[0]) + int(s[1]))
 `;
 
-export const PythonAC = generateNormalSelfTest("PythonAC", "python3", usrCode, [
-    {
-        input,
-        output,
-        expectResultType: JudgeResultKind.Accepted,
-        count: false,
-    },
-]);
+export const PythonAC = generateNormalSelfTest(
+    "PythonAC",
+    "python3",
+    usrCode,
+    {},
+    [
+        {
+            input,
+            output,
+            expectResultType: JudgeResultKind.Accepted,
+            count: false,
+        },
+    ]
+);

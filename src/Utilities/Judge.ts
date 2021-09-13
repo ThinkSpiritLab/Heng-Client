@@ -191,32 +191,45 @@ export abstract class JudgeAgent {
 
     abstract getResult(): Promise<JudgeResult>;
 
-    async getResultNoException(): Promise<JudgeResult> {
+    getResultNoException(): Promise<JudgeResult> {
         this.checkInit();
-        try {
-            return await this.getResult();
-        } catch (e) {
-            this.logger.fatal(e);
-            return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                    },
-                ],
-            };
-        }
+        return this.getResult()
+            .then((ret) => {
+                stat.tick(this.judge.id);
+                return ret;
+            })
+            .catch((err) => {
+                stat.error(this.judge.id);
+                this.logger.fatal(err);
+                return {
+                    cases: [
+                        {
+                            kind: JudgeResultKind.SystemError,
+                            time: 0,
+                            memory: 0,
+                        },
+                    ],
+                };
+            });
     }
 
-    generateCaseResult(
-        userResult: JailResult,
-        userExec: Executable,
-        sysResult: JailResult,
-        sysExec: Executable,
-        sysOut: string,
-        sysErr: string
-    ): JudgeCaseResult {
+    generateCaseResult({
+        userResult,
+        userExec,
+        sysResult,
+        sysExec,
+        // userErr,
+        sysOut,
+        sysErr,
+    }: {
+        userResult: JailResult;
+        userExec: Executable;
+        sysResult: JailResult;
+        sysExec: Executable;
+        userErr: string;
+        sysOut: string;
+        sysErr: string;
+    }): JudgeCaseResult {
         this.checkInit();
         sysOut = sysOut.trim();
         sysErr = sysErr.trim();
@@ -309,24 +322,25 @@ export class NormalJudgeAgent extends JudgeAgent {
         if (judgeResult1 !== undefined) {
             return judgeResult1;
         }
+        const cmpExec: Executable = {
+            source: {
+                hashsum:
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                type: "direct",
+                content: "",
+            },
+            environment: {
+                language: "cmp",
+                system: "Linux",
+                arch: "x64",
+                options: {},
+            },
+            limit: this.judge.judge.user.limit,
+        };
         const [cmpExecutableAgent, judgeResult2] =
             await this.compileAndFillExtra(
                 ExecType.System,
-                {
-                    source: {
-                        hashsum:
-                            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                        type: "direct",
-                        content: "",
-                    },
-                    environment: {
-                        language: "cmp",
-                        system: "Linux",
-                        arch: "x64",
-                        options: {},
-                    },
-                    limit: this.judge.judge.user.limit,
-                },
+                cmpExec,
                 OtherCompileResultTransformer
             );
         if (judgeResult2 !== undefined) {
@@ -353,10 +367,13 @@ export class NormalJudgeAgent extends JudgeAgent {
                     "pipe",
                     stdFd,
                 ]);
-                const [userResult, cmpResult, cmpOut, cmpErr] =
+                const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
                     await Promise.all([
                         userProcess.result,
                         compProcess.result,
+                        userProcess.stderr !== null
+                            ? readStream(userProcess.stderr)
+                            : "",
                         compProcess.stdout !== null
                             ? readStream(compProcess.stdout)
                             : "",
@@ -364,14 +381,15 @@ export class NormalJudgeAgent extends JudgeAgent {
                             ? readStream(compProcess.stderr)
                             : "",
                     ]);
-                return this.generateCaseResult(
-                    userResult,
-                    this.judge.judge.user,
-                    cmpResult,
-                    this.judge.judge.user,
-                    cmpOut,
-                    cmpErr
-                );
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: cmpExec,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
+                });
             });
         });
 
@@ -448,10 +466,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     inputFd2,
                     stdFd,
                 ]);
-                const [userResult, cmpResult, cmpOut, cmpErr] =
+                const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
                     await Promise.all([
                         userProcess.result,
                         compProcess.result,
+                        userProcess.stderr !== null
+                            ? readStream(userProcess.stderr)
+                            : "",
                         compProcess.stdout !== null
                             ? readStream(compProcess.stdout)
                             : "",
@@ -459,14 +480,16 @@ export class SpecialJudgeAgent extends JudgeAgent {
                             ? readStream(compProcess.stderr)
                             : "",
                     ]);
-                return this.generateCaseResult(
-                    userResult,
-                    this.judge.judge.user,
-                    cmpResult,
-                    this.judge.judge.user,
-                    cmpOut,
-                    cmpErr
-                );
+
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: this.judge.judge.user,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
+                });
             });
         });
 
@@ -545,10 +568,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                         "pipe",
                     ]
                 );
-                const [userResult, cmpResult, cmpOut, cmpErr] =
+                const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
                     await Promise.all([
                         userProcess.result,
                         compProcess.result,
+                        userProcess.stderr !== null
+                            ? readStream(userProcess.stderr)
+                            : "",
                         compProcess.stdio[5]
                             ? readStream(compProcess.stdio[5] as Readable)
                             : "",
@@ -556,14 +582,16 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                             ? readStream(compProcess.stderr)
                             : "",
                     ]);
-                return this.generateCaseResult(
-                    userResult,
-                    this.judge.judge.user,
-                    cmpResult,
-                    this.judge.judge.user,
-                    cmpOut,
-                    cmpErr
-                );
+
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: this.judge.judge.user,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
+                });
             });
         });
 
@@ -664,7 +692,10 @@ export async function getJudgerFactory(
                 console.log(result);
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
-                    if (expectedResult.expectResultType !== c.kind) {
+                    if (
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.unsupervised
+                    ) {
                         throw `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
                     }
                 });
@@ -687,7 +718,10 @@ export async function getJudgerFactory(
                 await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
-                    if (expectedResult.expectResultType !== c.kind) {
+                    if (
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.unsupervised
+                    ) {
                         throw `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
                     }
                     if (expectedResult.count) {
@@ -719,7 +753,10 @@ export async function getJudgerFactory(
                 await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
-                    if (expectedResult.expectResultType !== c.kind) {
+                    if (
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.unsupervised
+                    ) {
                         throw `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
                     }
                     if (expectedResult.count) {
@@ -727,7 +764,10 @@ export async function getJudgerFactory(
                             expectedResult.expectedTime - c.time
                         );
                         const percentage = diff / expectedResult.expectedTime;
-                        if (diff > 200 || percentage > 0.15) {
+                        if (
+                            (diff > 200 || percentage > 0.15) &&
+                            !getConfig().judger.unsupervised
+                        ) {
                             throw `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`;
                         }
                     }

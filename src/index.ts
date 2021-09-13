@@ -49,12 +49,12 @@ async function main() {
                 "bin",
                 execType
             ),
-            { recursive: true }
+            { recursive: true, mode: 0o700 }
         );
     }
     await fs.promises.mkdir(
         path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace"),
-        { recursive: true }
+        { recursive: true, mode: 0o700 }
     );
     await chownR(
         path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
@@ -81,11 +81,20 @@ async function main() {
         judgeAgent.init().then(async () => {
             const judgeResult = await judgeAgent.getResultNoException();
             await judgeAgent.clean();
-            stat.tick(task.id);
-            await controller.do("FinishJudges", {
-                id: task.id,
-                result: judgeResult,
-            });
+            for (let i = 0; i < 3; i++) {
+                try {
+                    await controller.do("FinishJudges", {
+                        id: task.id,
+                        result: judgeResult,
+                    });
+                    break;
+                } catch (error) {
+                    logger.warn(
+                        `返回 ${task.id} 的评测结果失败，${2 << i}秒后重试`
+                    );
+                    await wait((2 << i) * 1000);
+                }
+            }
         });
         return Promise.resolve(null);
     });

@@ -6,24 +6,21 @@ const input = `1 2
 const output = `3
 `;
 const usrCode = `
-import java.util.Scanner;
-
-
 public class Main {
     public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        int a = sc.nextInt();
-        int b = sc.nextInt();
-        System.out.println(a + b);
+        int dp[] = new int[5000]; // 2G
+        for (int i = 0; i < 500000000; i++) {
+            dp[i] = 1;
+        }
     }
 }
 `;
 
-export const JavaAC = generateNormalSelfTest("JavaAC", "java", usrCode, {}, [
+export const JavaRE = generateNormalSelfTest("JavaRE", "java", usrCode, {}, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.Accepted,
+        expectResultType: JudgeResultKind.RuntimeError,
         count: false,
     },
 ]);

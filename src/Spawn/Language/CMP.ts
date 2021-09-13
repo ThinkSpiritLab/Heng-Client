@@ -4,7 +4,8 @@ import { RunOption, Language, LanguageConfigureOption, ExecType } from "./decl";
 export class CMP extends Language {
     constructor(option: LanguageConfigureOption) {
         super(option);
-        if (this.execType !== ExecType.System) throw new Error("Unrecognized language");
+        if (this.execType !== ExecType.System)
+            throw new Error("Unrecognized language");
     }
     get compileCacheable(): boolean {
         return true;

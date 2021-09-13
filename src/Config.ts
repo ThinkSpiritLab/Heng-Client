@@ -1,6 +1,7 @@
 import * as TOML from "@iarna/toml";
 import { Type, plainToClass } from "class-transformer";
 import {
+    IsBoolean,
     IsInt,
     IsNotEmpty,
     IsNumber,
@@ -56,7 +57,6 @@ export class ControllerConfig {
 }
 export class SelfConfig {
     @IsInt()
-    @IsNotEmpty()
     @IsPositive()
     judgeCapability!: number;
     @IsString()
@@ -70,11 +70,12 @@ export class SelfConfig {
     software?: string;
 }
 export class JudgeFactoryConfig {
+    @IsBoolean()
+    unsupervised!: boolean;
     @IsString()
     @IsNotEmpty()
     tmpdirBase!: string;
     @IsNumber()
-    @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
     @IsString()

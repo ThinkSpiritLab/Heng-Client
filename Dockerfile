@@ -31,24 +31,24 @@ RUN dnf update --assumeyes && \
     && rm -rf /var/cache/dnf
 RUN wget -O /usr/bin/ojcmp https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp/releases/download/v0.4.0/ojcmp-v0.4.0-x86_64-unknown-linux-gnu \
     && chmod 755 /usr/bin/ojcmp
-    #WORKDIR /ojcmp
-    #run git clone https://github.com/ThinkSpiritLab/ojcmp.git /ojcmp && \
+#WORKDIR /ojcmp
+#RUN git clone https://github.com/ThinkSpiritLab/ojcmp.git /ojcmp && \
     #curl https://sh.rustup.rs -sSf | bash -s -- -y && \
     #source $HOME/.cargo/env && \
     #cargo build --release && \
     #cp target/release/ojcmp /usr/bin && \
     #RM -rf -- /ojcmp
-WORKDIR /hc
-RUN git clone https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git /hc && \
-    make && \
-    make install && \
-    rm -rf -- /hc
+# WORKDIR /hc
+# RUN git clone https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git /hc && \
+#     make && \
+#     make install && \
+#     rm -rf -- /hc
 WORKDIR /nsjail
-RUN git clone https://github.com.cnpmjs.org/google/nsjail.git /nsjail && \
+RUN git clone https://github.com.cnpmjs.org/flaryer/nsjail.git /nsjail && git checkout real_usr_time_kill \
     make && mv /nsjail/nsjail /usr/bin && rm -rf -- /nsjail
 WORKDIR /usr/src/app
-COPY package*.json ./
+# COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
-CMD ["node","dist/index.js"]
+CMD ["node", "dist/index.js"]

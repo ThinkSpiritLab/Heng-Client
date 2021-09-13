@@ -6,21 +6,21 @@ const input = `1 2
 const output = `3
 `;
 const usrCode = `
-#include <bits/stdc++.h>
+#include <stdio.h>
 
 int main(void) {
     int a, b;
-    cin >> a >> b;
-    cout << a + b << endl;
+    scanf("%d%d", &a, &b);
+    printf("%d\\n", a + b + 1);
     return 0;
 }
 `;
 
-export const CppCE = generateNormalSelfTest("CppCE", "cpp", usrCode, {}, [
+export const CWA = generateNormalSelfTest("CWA", "c", usrCode, {}, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.CompileError,
+        expectResultType: JudgeResultKind.WrongAnswer,
         count: false,
     },
 ]);

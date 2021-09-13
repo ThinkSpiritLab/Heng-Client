@@ -9,7 +9,7 @@ const usrCode = `
 #include <bits/stdc++.h>
 using namespace std;
 
-int a[1000] = {};
+int a[1000000000] = {}; // 4GB
 
 int main(void)
 {
@@ -25,11 +25,11 @@ int main(void)
 }
 `;
 
-export const CppRE = generateNormalSelfTest("CppRE", "cpp", usrCode, {}, [
+export const CppMLE = generateNormalSelfTest("CppMLE", "cpp", usrCode, {}, [
     {
         input,
         output,
-        expectResultType: JudgeResultKind.RuntimeError,
+        expectResultType: JudgeResultKind.MemoryLimitExceeded,
         count: false,
     },
 ]);

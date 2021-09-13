@@ -44,23 +44,31 @@ int main(int argc, char *argv[]) {
 }
 `;
 
-export const SpjEPS = generateSpjSelfTest("SpjEPS", "cpp", usrCode, spjCode, [
-    {
-        input,
-        output,
-        expectResultType: JudgeResultKind.Accepted,
-        count: false,
-    },
-    {
-        input: input2,
-        output: output2,
-        expectResultType: JudgeResultKind.Accepted,
-        count: false,
-    },
-    {
-        input: input3,
-        output: output3,
-        expectResultType: JudgeResultKind.WrongAnswer,
-        count: false,
-    },
-]);
+export const SpjEPS = generateSpjSelfTest(
+    "SpjEPS",
+    "cpp",
+    usrCode,
+    {},
+    spjCode,
+    {},
+    [
+        {
+            input,
+            output,
+            expectResultType: JudgeResultKind.Accepted,
+            count: false,
+        },
+        {
+            input: input2,
+            output: output2,
+            expectResultType: JudgeResultKind.Accepted,
+            count: false,
+        },
+        {
+            input: input3,
+            output: output3,
+            expectResultType: JudgeResultKind.WrongAnswer,
+            count: false,
+        },
+    ]
+);

@@ -20,31 +20,42 @@ int main(void) {
 `;
 
 const spjCode = `
-#include <bits/stdc++.h>
-using namespace std;
+#include "testlib.h"
 
-int main(void) {
-    FILE *f = fdopen(3, "r"); // input
-    FILE *d = fdopen(4, "r"); // stdOutput
+int main(int argc, char *argv[])
+{
+    registerTestlibCmd(argc, argv);
 
-    int a, b;
-    fscanf(f, "%d%d", &a, &b);
-
-    int x, y;
-    scanf("%d%d", &x, &y); // usrOutput
+    int a, b, x, y;
+    a = inf.readInt();
+    b = inf.readInt();
+    x = ouf.readInt();
+    y = ouf.readInt();
     if (x + y == a + b)
-        std::cout << "AC";
+    {
+        quitf(_ok, "expected %d, found %d", a + b, x + y);
+    }
     else
-        std::cout << "WA";
+    {
+        quitf(_wa, "expected %d, found %d", a + b, x + y);
+    }
     return 0;
 }
 `;
 
-export const SpjAC = generateSpjSelfTest("SpjAC", "cpp", usrCode, spjCode, [
-    {
-        input,
-        output,
-        expectResultType: JudgeResultKind.Accepted,
-        count: false,
-    },
-]);
+export const SpjAC = generateSpjSelfTest(
+    "SpjAC",
+    "cpp",
+    usrCode,
+    {},
+    spjCode,
+    {},
+    [
+        {
+            input,
+            output,
+            expectResultType: JudgeResultKind.Accepted,
+            count: false,
+        },
+    ]
+);

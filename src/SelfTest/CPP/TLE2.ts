@@ -8,21 +8,23 @@ const output = `
 `;
 const usrCode = `
 #include <bits/stdc++.h>
+#include <unistd.h>
+using namespace std;
 int main(void) {
-    while(1);
+    sleep(100);
     return 0;
 }
 `;
 
-export const CppTLE = generateNormalSelfTest(
-    "CppTLE",
+export const CppTLE2 = generateNormalSelfTest(
+    "CppTLE2",
     "cpp",
     usrCode,
     {},
     range(2).map(() => ({
         input,
         output,
-        expectResultType: JudgeResultKind.TimeLimitExceeded,
+        expectResultType: JudgeResultKind.RuntimeError,
         count: false,
     })),
     2000

@@ -6,6 +6,7 @@ export function generateNormalSelfTest(
     name: string,
     language: string,
     usrCode: string,
+    usrOption: { [key: string]: string | number | boolean },
     cases: TestCase[],
     timeLimit: number = MaxTime
 ): SelfTest {
@@ -45,7 +46,7 @@ export function generateNormalSelfTest(
                         language: language,
                         system: "Linux",
                         arch: "x64",
-                        options: {},
+                        options: usrOption,
                     },
                     limit: {
                         runtime: {
@@ -87,7 +88,9 @@ export function generateSpjSelfTest(
     name: string,
     language: string,
     usrCode: string,
+    usrOption: { [key: string]: string | number | boolean },
     spjCode: string,
+    spjOption: { [key: string]: string | number | boolean },
     cases: TestCase[],
     timeLimit: number = MaxTime
 ): SelfTest {
@@ -127,7 +130,7 @@ export function generateSpjSelfTest(
                         language: language,
                         system: "Linux",
                         arch: "x64",
-                        options: {},
+                        options: usrOption,
                     },
                     limit: {
                         runtime: {
@@ -152,7 +155,7 @@ export function generateSpjSelfTest(
                         language: language,
                         system: "Linux",
                         arch: "x64",
-                        options: {},
+                        options: spjOption,
                     },
                     limit: {
                         runtime: {

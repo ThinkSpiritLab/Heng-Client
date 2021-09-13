@@ -17,7 +17,7 @@ int main(void) {
 }
 `;
 
-export const CppWA = generateNormalSelfTest("CppWA", "cpp", usrCode, [
+export const CppWA = generateNormalSelfTest("CppWA", "cpp", usrCode, {}, [
     {
         input,
         output,

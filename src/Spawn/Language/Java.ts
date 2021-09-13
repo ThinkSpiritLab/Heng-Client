@@ -47,10 +47,10 @@ export class Java extends Language {
                 ? `-Xss${this.excutable.environment.options.stackSize}k`
                 : "-Xss256k",
             `-Xms${Math.ceil(
-                this.excutable.limit.runtime.memory / 1024 / 1024 / 4
+                (this.excutable.limit.runtime.memory * 1.5) / 1024 / 1024 / 4
             )}m`,
             `-Xmx${Math.ceil(
-                this.excutable.limit.runtime.memory / 1024 / 1024
+                (this.excutable.limit.runtime.memory * 1.5) / 1024 / 1024
             )}m`
         );
         args.push("-classpath", this.compileDir);

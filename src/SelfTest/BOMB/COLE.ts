@@ -6,17 +6,10 @@ const input = `1 2
 const output = `3
 `;
 const usrCode = `
-#include <bits/stdc++.h>
-
-int main(void) {
-    int a, b;
-    cin >> a >> b;
-    cout << a + b << endl;
-    return 0;
-}
+int main[-1u]={1};
 `;
 
-export const CppCE = generateNormalSelfTest("CppCE", "cpp", usrCode, {}, [
+export const BOMBCOLE = generateNormalSelfTest("BOMBCOLE", "c", usrCode, {}, [
     {
         input,
         output,
