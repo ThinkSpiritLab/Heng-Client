@@ -27,6 +27,7 @@ export const BOMBFORKBOMB = generateNormalSelfTest(
     {},
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.RuntimeError,

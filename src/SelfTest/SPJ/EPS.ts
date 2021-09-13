@@ -53,18 +53,21 @@ export const SpjEPS = generateSpjSelfTest(
     {},
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.Accepted,
             count: false,
         },
         {
+            type: "direct",
             input: input2,
             output: output2,
             expectResultType: JudgeResultKind.Accepted,
             count: false,
         },
         {
+            type: "direct",
             input: input3,
             output: output3,
             expectResultType: JudgeResultKind.WrongAnswer,

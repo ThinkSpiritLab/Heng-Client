@@ -18,6 +18,7 @@ public class Main {
 
 export const JavaCE = generateNormalSelfTest("JavaCE", "java", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.CompileError,

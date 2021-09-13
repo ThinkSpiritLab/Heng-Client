@@ -2,10 +2,13 @@ import os from "os";
 import fs from "fs";
 import stream, { Readable } from "stream";
 import unzip from "unzip-stream";
-import Axios from "axios";
 import path, { PlatformPath } from "path";
 import util from "util";
 import { getConfig } from "../Config";
+import * as crypto from "crypto";
+import { Throttle } from "./Throttle";
+import http from "http";
+import https from "https";
 const pipeline = util.promisify(stream.pipeline);
 
 export type File = {
@@ -54,22 +57,100 @@ export function waitForOpen(s: fs.WriteStream | fs.ReadStream): Promise<null> {
     });
 }
 
-// todo pending fix
-export function readableFromFile(file: File): Promise<Readable> {
-    if (file.content !== undefined) {
-        // if (file.hashsum) {
-        //     if (
-        //         file.hashsum !==
-        //         crypto.createHash("sha256").update(file.content).digest("hex")
-        //     ) {
-        //         throw new Error("data broken");
-        //     }
-        // }
-        return Promise.resolve(Readable.from(file.content));
-    } else if (file.url) {
-        return Axios.get(file.url);
+export function readableFromUrl(url: string): Promise<Readable> {
+    if (url.startsWith("http://")) {
+        return new Promise((resolve) => {
+            http.get(url, (res) => {
+                resolve(res);
+            });
+        });
+    } else if (url.startsWith("https://")) {
+        return new Promise((resolve) => {
+            https.get(url, (res) => {
+                resolve(res);
+            });
+        });
     } else {
-        throw "Bad File";
+        throw new Error("Bad url");
+    }
+}
+
+const remoteFileMap = new Map<string, [string, boolean, Throttle]>();
+
+export async function readableFromFile(file: File): Promise<Readable> {
+    if (file.content !== undefined) {
+        return Readable.from(file.content);
+    } else if (file.url) {
+        const returnFun = async (fileId: string) => {
+            const readable = fs.createReadStream(
+                path.join(
+                    os.tmpdir(),
+                    getConfig().judger.tmpdirBase,
+                    "file",
+                    fileId
+                )
+            );
+            await waitForOpen(readable);
+            return readable;
+        };
+        let record = remoteFileMap.get(file.url);
+        if (record === undefined) {
+            record = ["", false, new Throttle(1)];
+            remoteFileMap.set(file.url, record);
+        }
+
+        let [fileId, writed] = record;
+        const [, , throttle] = record;
+        if (writed) {
+            return await returnFun(fileId);
+        }
+        return throttle.withThrottle(async () => {
+            record = remoteFileMap.get(file.url as string);
+            if (record === undefined) {
+                throw new Error("Unreachable code");
+            }
+            [, writed] = record;
+            if (writed) {
+                return await returnFun(fileId);
+            }
+
+            fileId = crypto.randomBytes(32).toString("hex");
+            await pipeline(
+                await readableFromUrl(file.url as string),
+                // await Axios.get(file.url as string),
+                fs.createWriteStream(
+                    path.join(
+                        os.tmpdir(),
+                        getConfig().judger.tmpdirBase,
+                        "file",
+                        fileId as string
+                    ),
+                    { mode: 0o700 }
+                )
+            );
+            if (file.hashsum) {
+                const hash = crypto.createHash("sha256");
+                await pipeline(
+                    fs.createReadStream(
+                        path.join(
+                            os.tmpdir(),
+                            getConfig().judger.tmpdirBase,
+                            "file",
+                            fileId as string
+                        ),
+                        { encoding: "binary" }
+                    ),
+                    hash
+                );
+                if (hash.digest("hex") !== file.hashsum) {
+                    throw new Error("Hash verification failed");
+                }
+            }
+            remoteFileMap.set(file.url as string, [fileId, true, throttle]);
+            return await returnFun(fileId);
+        });
+    } else {
+        throw new Error("Bad file");
     }
 }
 
@@ -77,7 +158,7 @@ export class FileAgent {
     readonly dir: string;
     private nameToFile = new Map<
         string,
-        [File | null, string, boolean | Promise<boolean>]
+        [File | null, string, boolean, Throttle]
     >();
     private Initialized = false;
     constructor(readonly prefix: string, readonly primaryFile: File | null) {
@@ -123,7 +204,7 @@ export class FileAgent {
         if (!path.isAbsolute(subpath)) {
             subpath = path.join(this.dir, subpath);
         }
-        this.nameToFile.set(name, [null, subpath, true]);
+        this.nameToFile.set(name, [null, subpath, true, new Throttle(1)]);
     }
     add(name: string, file: File, subpath?: string): PlatformPath {
         this.checkInit();
@@ -131,7 +212,7 @@ export class FileAgent {
             subpath = name;
         }
         subpath = path.join(this.dir, subpath);
-        this.nameToFile.set(name, [file, subpath, false]);
+        this.nameToFile.set(name, [file, subpath, false, new Throttle(1)]);
         return path;
     }
     async getStream(name: string): Promise<Readable> {
@@ -147,52 +228,48 @@ export class FileAgent {
     }
     async getPath(name: string): Promise<string> {
         this.checkInit();
-        const record = this.nameToFile.get(name);
+        let record = this.nameToFile.get(name);
         if (record !== undefined) {
-            const [file, subpath, writed] = record;
-            let ret = false;
-            if (typeof writed !== "boolean") {
-                try {
-                    ret = await writed;
-                } catch (error) {
-                    ret = false;
+            const [file, subpath, , throttle] = record;
+            let [, , writed] = record;
+            if (writed === true) {
+                return subpath;
+            }
+            return throttle.withThrottle(async () => {
+                record = this.nameToFile.get(name);
+                if (record === undefined) {
+                    throw new Error("Unreachable code");
                 }
-            } else {
-                ret = writed;
-            }
-            if (ret) {
-                return subpath;
-            } else {
-                const promise = Promise.resolve().then(async () => {
-                    if (file) {
-                        await fs.promises.mkdir(path.dirname(subpath), {
-                            recursive: true,
-                            mode: 0o700,
-                        });
-                        await fs.promises.chown(
-                            path.dirname(subpath),
-                            getConfig().judger.uid,
-                            getConfig().judger.gid
-                        ); // maybe not enough
-                        await pipeline(
-                            await readableFromFile(file),
-                            fs.createWriteStream(subpath)
-                        );
-                        await fs.promises.chown(
-                            subpath,
-                            getConfig().judger.uid,
-                            getConfig().judger.gid
-                        );
-                        return true;
-                    } else {
-                        throw new Error("File not found nor writen");
-                    }
+                [, , writed] = record;
+                if (writed === true) {
+                    return subpath;
+                }
+                if (file === null) {
+                    throw new Error("File not found, unreachable code");
+                }
+                await fs.promises.mkdir(path.dirname(subpath), {
+                    recursive: true,
+                    mode: 0o700,
                 });
-                // this step maybe? too late / slow, then double promise
-                this.nameToFile.set(name, [file, subpath, promise]);
-                await promise;
+                await fs.promises.chown(
+                    path.dirname(subpath),
+                    getConfig().judger.uid,
+                    getConfig().judger.gid
+                ); // maybe not enough
+                await pipeline(
+                    await readableFromFile(file),
+                    fs.createWriteStream(subpath, {
+                        mode: 0o700,
+                    })
+                );
+                await fs.promises.chown(
+                    subpath,
+                    getConfig().judger.uid,
+                    getConfig().judger.gid
+                );
+                this.nameToFile.set(name, [file, subpath, true, throttle]);
                 return subpath;
-            }
+            });
         } else if (this.primaryFile !== null) {
             return path.join(this.dir, "data", name);
         } else {

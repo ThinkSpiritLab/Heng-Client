@@ -153,7 +153,9 @@ export class ExecutableAgent {
                 this.fileAgent.dir,
                 CompileLogName
             );
-            const compileLogFileStream = fs.createWriteStream(compileLogPath);
+            const compileLogFileStream = fs.createWriteStream(compileLogPath, {
+                mode: 0o700,
+            });
             await waitForOpen(compileLogFileStream);
             if (stdio === undefined) {
                 stdio = ["pipe", "pipe", "pipe"];

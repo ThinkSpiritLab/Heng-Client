@@ -11,6 +11,7 @@ int main[-1u]={1};
 
 export const BOMBCOLE = generateNormalSelfTest("BOMBCOLE", "c", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.CompileError,

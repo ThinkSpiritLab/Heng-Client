@@ -28,6 +28,7 @@ export const JavaTLE = generateNormalSelfTest(
     usrCode,
     {},
     range(2).map(() => ({
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.RuntimeError,

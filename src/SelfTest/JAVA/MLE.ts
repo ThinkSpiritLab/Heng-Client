@@ -18,6 +18,7 @@ public class Main {
 
 export const JavaMLE = generateNormalSelfTest("JavaMLE", "java", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.RuntimeError,

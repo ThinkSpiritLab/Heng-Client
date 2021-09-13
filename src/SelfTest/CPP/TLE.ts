@@ -20,6 +20,7 @@ export const CppTLE = generateNormalSelfTest(
     usrCode,
     {},
     range(2).map(() => ({
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.TimeLimitExceeded,

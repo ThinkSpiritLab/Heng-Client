@@ -18,6 +18,7 @@ int main(void) {
 
 export const CAC = generateNormalSelfTest("CAC", "c", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.Accepted,

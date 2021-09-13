@@ -15,4 +15,4 @@ export const Tests = [
     ...SPJ,
     ...BOMB,
 ];
-// export const Tests = [...BOMB];
+// export const Tests = [...PYTHON];

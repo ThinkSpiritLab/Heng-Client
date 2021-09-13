@@ -11,6 +11,7 @@ const usrCode = `
 
 export const BOMBCTLE = generateNormalSelfTest("BOMBCTLE", "c", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.CompileError,

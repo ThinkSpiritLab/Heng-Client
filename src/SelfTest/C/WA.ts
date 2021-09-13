@@ -18,6 +18,7 @@ int main(void) {
 
 export const CWA = generateNormalSelfTest("CWA", "c", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.WrongAnswer,

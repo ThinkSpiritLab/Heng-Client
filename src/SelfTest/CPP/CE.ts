@@ -18,6 +18,7 @@ int main(void) {
 
 export const CppCE = generateNormalSelfTest("CppCE", "cpp", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.CompileError,

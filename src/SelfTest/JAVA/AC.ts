@@ -21,6 +21,7 @@ public class Main {
 
 export const JavaAC = generateNormalSelfTest("JavaAC", "java", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.Accepted,

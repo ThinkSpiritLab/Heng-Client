@@ -12,22 +12,41 @@ export function generateNormalSelfTest(
 ): SelfTest {
     const fileArray: DynamicFile[] = [];
     cases.forEach((c, idx) => {
-        fileArray.push({
-            type: "remote",
-            name: "in" + idx,
-            file: {
-                type: "direct",
-                content: c.input,
-            },
-        });
-        fileArray.push({
-            type: "remote",
-            name: "out" + idx,
-            file: {
-                type: "direct",
-                content: c.output,
-            },
-        });
+        if (c.type === "direct") {
+            fileArray.push({
+                type: "remote",
+                name: "in" + idx,
+                file: {
+                    type: "direct",
+                    content: c.input,
+                },
+            });
+            fileArray.push({
+                type: "remote",
+                name: "out" + idx,
+                file: {
+                    type: "direct",
+                    content: c.output,
+                },
+            });
+        } else {
+            fileArray.push({
+                type: "remote",
+                name: "in" + idx,
+                file: {
+                    type: "url",
+                    url: c.input,
+                },
+            });
+            fileArray.push({
+                type: "remote",
+                name: "out" + idx,
+                file: {
+                    type: "url",
+                    url: c.output,
+                },
+            });
+        }
     });
 
     return {
@@ -96,22 +115,41 @@ export function generateSpjSelfTest(
 ): SelfTest {
     const fileArray: DynamicFile[] = [];
     cases.forEach((c, idx) => {
-        fileArray.push({
-            type: "remote",
-            name: "in" + idx,
-            file: {
-                type: "direct",
-                content: c.input,
-            },
-        });
-        fileArray.push({
-            type: "remote",
-            name: "out" + idx,
-            file: {
-                type: "direct",
-                content: c.output,
-            },
-        });
+        if (c.type === "direct") {
+            fileArray.push({
+                type: "remote",
+                name: "in" + idx,
+                file: {
+                    type: "direct",
+                    content: c.input,
+                },
+            });
+            fileArray.push({
+                type: "remote",
+                name: "out" + idx,
+                file: {
+                    type: "direct",
+                    content: c.output,
+                },
+            });
+        } else {
+            fileArray.push({
+                type: "remote",
+                name: "in" + idx,
+                file: {
+                    type: "url",
+                    url: c.input,
+                },
+            });
+            fileArray.push({
+                type: "remote",
+                name: "out" + idx,
+                file: {
+                    type: "url",
+                    url: c.output,
+                },
+            });
+        }
     });
 
     return {

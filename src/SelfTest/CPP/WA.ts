@@ -19,6 +19,7 @@ int main(void) {
 
 export const CppWA = generateNormalSelfTest("CppWA", "cpp", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.WrongAnswer,

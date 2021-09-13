@@ -26,6 +26,7 @@ export const CppOption = generateNormalSelfTest(
     { version: "c++11" },
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.CompileError,

@@ -183,7 +183,7 @@ export function getConfig(): Config {
         // logger.fatal(JSON.stringify(config));
         if (!tryValidate(config as unknown as Record<string, unknown>)) {
             config = undefined;
-            throw "Failed to get Config,Please check configToml";
+            throw new Error("Failed to get Config,Please check configToml");
         }
         logger.info("Loaded Config from file");
     }

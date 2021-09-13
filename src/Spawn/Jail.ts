@@ -71,7 +71,7 @@ export function useJail(
             options: BasicSpawnOption
         ): JailedChildProcess {
             if (!jailConfig.path) {
-                throw "Jail not configured";
+                throw new Error("Jail not configured");
             }
             const jailArgs: string[] = [];
 

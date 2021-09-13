@@ -18,6 +18,7 @@ public class Main {
 
 export const JavaRE = generateNormalSelfTest("JavaRE", "java", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.RuntimeError,

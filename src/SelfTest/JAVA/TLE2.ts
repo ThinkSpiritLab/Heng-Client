@@ -26,6 +26,7 @@ export const JavaTLE2 = generateNormalSelfTest(
     usrCode,
     {},
     range(2).map(() => ({
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.TimeLimitExceeded,

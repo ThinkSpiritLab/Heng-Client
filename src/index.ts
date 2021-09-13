@@ -53,6 +53,10 @@ async function main() {
         );
     }
     await fs.promises.mkdir(
+        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "file"),
+        { recursive: true, mode: 0o700 }
+    );
+    await fs.promises.mkdir(
         path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace"),
         { recursive: true, mode: 0o700 }
     );

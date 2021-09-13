@@ -236,7 +236,9 @@ export class Controller {
         if (method !== undefined) {
             return method(msg.body.args);
         } else {
-            throw `Method ${msg.body.method} doesn't exist or not inited.`;
+            throw new Error(
+                `Method ${msg.body.method} doesn't exist or not inited.`
+            );
         }
     }
 

@@ -57,6 +57,7 @@ export const TimeBIT = generateNormalSelfTest(
     usrCode,
     {},
     range(20).map(() => ({
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.Accepted,

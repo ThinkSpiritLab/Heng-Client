@@ -52,6 +52,7 @@ export const SpjWA = generateSpjSelfTest(
     {},
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.WrongAnswer,

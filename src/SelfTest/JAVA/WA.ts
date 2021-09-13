@@ -21,6 +21,7 @@ public class Main {
 
 export const JavaWA = generateNormalSelfTest("JavaWA", "java", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.WrongAnswer,

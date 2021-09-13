@@ -1,8 +1,10 @@
 import { JudgeResultKind } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 export type TestCase = {
+    type: "direct" | "url";
     input: string;
     output: string;
+} & {
     expectResultType: JudgeResultKind;
 } & ({ count: true; expectedTime: number } | { count: false });
 export type ExpectedResult = {

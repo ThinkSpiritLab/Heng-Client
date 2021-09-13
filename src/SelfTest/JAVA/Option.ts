@@ -26,6 +26,7 @@ export const JavaOption = generateNormalSelfTest(
     { className: "APLUSB" },
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.Accepted,

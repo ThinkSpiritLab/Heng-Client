@@ -303,7 +303,9 @@ export class NormalJudgeAgent extends JudgeAgent {
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Normal) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
+            throw new Error(
+                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`
+            );
         }
     }
 
@@ -410,14 +412,18 @@ export class SpecialJudgeAgent extends JudgeAgent {
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Special) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`;
+            throw new Error(
+                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`
+            );
         }
     }
 
     async getResult(): Promise<JudgeResult> {
         this.checkInit();
         if (this.judge.judge.type !== JudgeType.Special) {
-            throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`
+            );
         }
 
         this.updateStatus(JudgeState.Preparing);
@@ -510,14 +516,18 @@ export class InteractiveJudgeAgent extends JudgeAgent {
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
         if (judge.judge.type !== JudgeType.Interactive) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`;
+            throw new Error(
+                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`
+            );
         }
     }
 
     async getResult(): Promise<JudgeResult> {
         this.checkInit();
         if (this.judge.judge.type !== JudgeType.Interactive) {
-            throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`
+            );
         }
 
         this.updateStatus(JudgeState.Preparing);
@@ -661,7 +671,7 @@ export class JudgeFactory {
                 );
             }
             default:
-                throw "Unkown JudgeType";
+                throw new Error("Unkown JudgeType");
         }
     }
 }
@@ -696,7 +706,9 @@ export async function getJudgerFactory(
                         expectedResult.expectResultType !== c.kind &&
                         !getConfig().judger.unsupervised
                     ) {
-                        throw `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                        throw new Error(
+                            `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
                     }
                 });
             })
@@ -722,7 +734,9 @@ export async function getJudgerFactory(
                         expectedResult.expectResultType !== c.kind &&
                         !getConfig().judger.unsupervised
                     ) {
-                        throw `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                        throw new Error(
+                            `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
                     }
                     if (expectedResult.count) {
                         costTime += c.time;
@@ -757,7 +771,9 @@ export async function getJudgerFactory(
                         expectedResult.expectResultType !== c.kind &&
                         !getConfig().judger.unsupervised
                     ) {
-                        throw `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`;
+                        throw new Error(
+                            `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
                     }
                     if (expectedResult.count) {
                         const diff = Math.abs(
@@ -768,7 +784,9 @@ export async function getJudgerFactory(
                             (diff > 200 || percentage > 0.15) &&
                             !getConfig().judger.unsupervised
                         ) {
-                            throw `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`;
+                            throw new Error(
+                                `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`
+                            );
                         }
                     }
                 });

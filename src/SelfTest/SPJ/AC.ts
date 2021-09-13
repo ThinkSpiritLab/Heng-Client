@@ -52,6 +52,7 @@ export const SpjAC = generateSpjSelfTest(
     {},
     [
         {
+            type: "direct",
             input,
             output,
             expectResultType: JudgeResultKind.Accepted,

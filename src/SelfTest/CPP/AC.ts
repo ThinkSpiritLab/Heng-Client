@@ -19,6 +19,7 @@ int main(void) {
 
 export const CppAC = generateNormalSelfTest("CppAC", "cpp", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.Accepted,

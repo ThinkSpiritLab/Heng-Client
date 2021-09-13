@@ -27,6 +27,7 @@ int main(void)
 
 export const CppRE = generateNormalSelfTest("CppRE", "cpp", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.RuntimeError,

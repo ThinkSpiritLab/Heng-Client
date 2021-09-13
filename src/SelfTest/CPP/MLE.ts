@@ -27,6 +27,7 @@ int main(void)
 
 export const CppMLE = generateNormalSelfTest("CppMLE", "cpp", usrCode, {}, [
     {
+        type: "direct",
         input,
         output,
         expectResultType: JudgeResultKind.MemoryLimitExceeded,
