@@ -28,7 +28,7 @@ class Statistics {
         }
     }
 
-    error(id: string) {
+    finish(id: string) {
         const level = this.stateMap.get(id);
         if (level !== undefined) {
             this.count[level]--;

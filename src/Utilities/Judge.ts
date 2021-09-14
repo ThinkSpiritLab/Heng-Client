@@ -198,11 +198,11 @@ export abstract class JudgeAgent {
         stat.tick(this.judge.id);
         return this.getResult()
             .then((ret) => {
-                stat.tick(this.judge.id);
+                stat.finish(this.judge.id);
                 return ret;
             })
             .catch((err) => {
-                stat.error(this.judge.id);
+                stat.finish(this.judge.id);
                 this.logger.fatal(err);
                 return {
                     cases: [
