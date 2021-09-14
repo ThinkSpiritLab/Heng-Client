@@ -144,7 +144,7 @@ export abstract class JudgeAgent {
                     )
                 )
                     .toString("utf-8")
-                    .slice(executable.limit.compiler.message),
+                    .slice(0, executable.limit.compiler.message),
             };
             if (execType === ExecType.Usr) {
                 this.extra.user = exteaInfo;
