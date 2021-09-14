@@ -2,9 +2,8 @@ import path from "path";
 import { getConfig } from "../../Config";
 import { RunOption, Language, LanguageConfigureOption } from "./decl";
 
-export class Pascal extends Language {
-    private src = "src.pas";
-    private bin = "src";
+export class PlainText extends Language {
+    private src = "src.in";
 
     constructor(option: LanguageConfigureOption) {
         super(option);
@@ -19,24 +18,15 @@ export class Pascal extends Language {
     }
 
     compileOptionGenerator(): RunOption {
-        const compilerOptions: string[] = [this.src, `-o${this.bin}`];
-        if (this.excutable.environment.options?.o2 !== false) {
-            compilerOptions.push("-O2");
-        }
-
-        return {
-            skip: false,
-            command: getConfig().language.pascal,
-            args: compilerOptions,
-        };
+        return { skip: true };
     }
 
     execOptionGenerator(): RunOption {
-        const binPath = path.join(this.compileDir, this.bin);
+        const binPath = path.join(this.compileDir, this.src);
         return {
             skip: false,
-            command: binPath,
-            spawnOption: {},
+            command: getConfig().language.cat,
+            args: [binPath],
             jailSpawnOption: {
                 bindMount: [
                     {

@@ -10,6 +10,7 @@ export class CPP extends Language {
     constructor(option: LanguageConfigureOption) {
         super(option);
     }
+
     get compileCacheable(): boolean {
         return true;
     }

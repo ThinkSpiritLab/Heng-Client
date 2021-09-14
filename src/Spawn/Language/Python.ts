@@ -8,6 +8,7 @@ export class Python extends Language {
     constructor(option: LanguageConfigureOption) {
         super(option);
     }
+
     get compileCacheable(): boolean {
         return true;
     }

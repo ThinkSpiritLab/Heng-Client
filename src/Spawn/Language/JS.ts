@@ -8,6 +8,7 @@ export class JS extends Language {
     constructor(option: LanguageConfigureOption) {
         super(option);
     }
+
     get compileCacheable(): boolean {
         return true;
     }

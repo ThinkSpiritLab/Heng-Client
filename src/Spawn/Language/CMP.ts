@@ -7,9 +7,11 @@ export class CMP extends Language {
         if (this.execType !== ExecType.System)
             throw new Error("Unrecognized language");
     }
+
     get compileCacheable(): boolean {
         return true;
     }
+
     get srcFileName(): string {
         return "src";
     }

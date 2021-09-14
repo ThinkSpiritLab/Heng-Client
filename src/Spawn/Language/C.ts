@@ -9,6 +9,7 @@ export class C extends Language {
     constructor(option: LanguageConfigureOption) {
         super(option);
     }
+
     get compileCacheable(): boolean {
         return true;
     }

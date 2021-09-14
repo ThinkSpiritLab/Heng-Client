@@ -5,6 +5,7 @@ import { INTERACTOR } from "./INTERACTOR";
 import { JAVA } from "./JAVA";
 import { JS } from "./JS";
 import { PASCAL } from "./PASCAL";
+import { PLAINTEXT } from "./PLAINTEXT";
 import { PYTHON } from "./PYTHON";
 import { SPJ } from "./SPJ";
 import { TIME } from "./Time";
@@ -20,4 +21,5 @@ export const Tests = [
     ...SPJ,
     ...BOMB,
     ...INTERACTOR,
+    ...PLAINTEXT,
 ];

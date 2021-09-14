@@ -16,6 +16,9 @@ testlib = "/testlib.h"
 python = "/usr/bin/python3"
 java = "/usr/bin/java"
 javac = "/usr/bin/javac"
+cat = "/usr/bin/cat"
+node = "/usr/bin/node"
+pascal = "/usr/bin/fpc"
 [judger]
 unsupervised = true
 tmpdirBase = 'Heng_Client'

@@ -18,6 +18,7 @@ export class Java extends Language {
             this.bin = this.excutable.environment.options?.className + ".class";
         }
     }
+
     get compileCacheable(): boolean {
         return true;
     }

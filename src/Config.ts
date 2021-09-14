@@ -37,6 +37,9 @@ export class LanguageConfig {
     javac!: string;
     @IsString()
     @IsNotEmpty()
+    cat!: string;
+    @IsString()
+    @IsNotEmpty()
     node!: string;
     @IsString()
     @IsNotEmpty()
