@@ -217,7 +217,8 @@ export class ExecutableAgent {
             );
             await fs.promises.writeFile(
                 compileStatisticPath,
-                JSON.stringify(jailResult)
+                JSON.stringify(jailResult),
+                { mode: 0o700 }
             );
             this.fileAgent.register(CompileStatisticName, CompileStatisticName);
             this.compiled = true;

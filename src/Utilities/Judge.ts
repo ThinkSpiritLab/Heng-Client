@@ -138,13 +138,15 @@ export abstract class JudgeAgent {
                 compileTime: Math.ceil(
                     compileResult.time.usr * this.timeRatio + this.timeIntercept
                 ),
-                compileMessage: (
-                    await fs.promises.readFile(
-                        await executableAgent.fileAgent.getPath(CompileLogName)
+                compileMessage: await readStream(
+                    fs.createReadStream(
+                        await executableAgent.fileAgent.getPath(CompileLogName),
+                        {
+                            encoding: "utf-8",
+                            end: executable.limit.compiler.message - 1,
+                        }
                     )
-                )
-                    .toString("utf-8")
-                    .slice(0, executable.limit.compiler.message),
+                ),
             };
             if (execType === ExecType.Usr) {
                 this.extra.user = exteaInfo;
@@ -364,7 +366,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                 const userProcess = await userExecutableAgent.exec(undefined, [
                     inputFd,
                     "pipe",
-                    "pipe",
+                    "ignore",
                 ]);
                 const compProcess = await cmpExecutableAgent.exec(undefined, [
                     userProcess.stdout,
@@ -462,10 +464,9 @@ export class SpecialJudgeAgent extends JudgeAgent {
             ]);
             return this.throttle.withThrottle(async () => {
                 const userProcess = await userExecutableAgent.exec(undefined, [
-                    // "pipe",
                     inputFd,
                     "pipe",
-                    "pipe",
+                    "ignore",
                 ]);
 
                 const compProcess = await spjExecutableAgent.exec(undefined, [
@@ -567,7 +568,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                 const userProcess = await userExecutableAgent.exec(undefined, [
                     "pipe",
                     "pipe",
-                    "pipe",
+                    "ignore",
                 ]);
 
                 const compProcess = await interactorExecutableAgent.exec(
@@ -578,7 +579,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                         "pipe",
                         inputFd,
                         stdFd,
-                        "pipe",
+                        "ignore",
                     ]
                 );
                 const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
