@@ -173,7 +173,9 @@ export function useJail(
             }
 
             if (options.env !== undefined) {
-                //
+                for (const name in options.env) {
+                    jailArgs.push("-E", `${name}=${options.env[name]}`);
+                }
                 options.env = undefined;
             }
 
@@ -192,7 +194,7 @@ export function useJail(
             options.stdio[outFd] = "pipe";
             jailArgs.push("-f", outFd.toString());
 
-            jailArgs.push("--nice_level", "0");
+            // jailArgs.push("--nice_level", "0");
 
             jailArgs.push("--", command, ...args);
 

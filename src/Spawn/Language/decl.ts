@@ -1,5 +1,5 @@
 import { Executable } from "heng-protocol";
-import { JailSpawnOption } from "..";
+import { JailSpawnOption } from "../Jail";
 
 export enum ExecType {
     System = "system",
