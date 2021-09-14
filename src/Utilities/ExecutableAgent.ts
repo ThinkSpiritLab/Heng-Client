@@ -221,8 +221,11 @@ export class ExecutableAgent {
             );
             this.fileAgent.register(CompileStatisticName, CompileStatisticName);
             this.compiled = true;
-            compileCachedJudge.set(this.judgeHash, this.dirHash);
-            if (this.configuredLanguage.compileCacheable) {
+            if (
+                !getConfig().judger.unsupervised &&
+                this.configuredLanguage.compileCacheable
+            ) {
+                compileCachedJudge.set(this.judgeHash, this.dirHash);
                 this.compileCached = true;
             }
             return jailResult;
@@ -307,10 +310,7 @@ export class ExecutableAgent {
      * hey, clean me
      */
     async clean(): Promise<void> {
-        if (
-            getConfig().judger.unsupervised ||
-            this.dirHash !== compileCachedJudge.get(this.judgeHash)
-        ) {
+        if (this.dirHash !== compileCachedJudge.get(this.judgeHash)) {
             await this.fileAgent.clean();
         }
     }
