@@ -10,7 +10,6 @@ import { getgid, getuid } from "process";
 import path from "path";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
-import { stat } from "./Utilities/Statistics";
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
 }
@@ -81,7 +80,6 @@ async function main() {
 
     controller.on("CreateJudge", (task) => {
         const judgeAgent = judgerFactory.getJudgerAgent(task);
-        stat.tick(task.id);
         judgeAgent.init().then(async () => {
             const judgeResult = await judgeAgent.getResultNoException();
             await judgeAgent.clean();

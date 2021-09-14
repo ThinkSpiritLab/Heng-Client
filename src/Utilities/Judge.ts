@@ -195,6 +195,7 @@ export abstract class JudgeAgent {
 
     getResultNoException(): Promise<JudgeResult> {
         this.checkInit();
+        stat.tick(this.judge.id);
         return this.getResult()
             .then((ret) => {
                 stat.tick(this.judge.id);
