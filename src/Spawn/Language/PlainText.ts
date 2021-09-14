@@ -1,12 +1,14 @@
 import path from "path";
 import { getConfig } from "../../Config";
-import { RunOption, Language, LanguageConfigureOption } from "./decl";
+import { RunOption, Language, LanguageConfigureOption, ExecType } from "./decl";
 
 export class PlainText extends Language {
     private src = "src.in";
 
     constructor(option: LanguageConfigureOption) {
         super(option);
+        if (this.execType !== ExecType.Usr)
+            throw new Error("Unrecognized language");
     }
 
     get compileCacheable(): boolean {
