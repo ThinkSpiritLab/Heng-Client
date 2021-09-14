@@ -1,6 +1,7 @@
 import { JudgeResultKind } from "heng-protocol";
 import { generateNormalSelfTest } from "../util";
 
+// Discard, may bad internet
 const input = "https://www.ssst.top/in";
 const output = "https://www.ssst.top/out";
 const usrCode = `
