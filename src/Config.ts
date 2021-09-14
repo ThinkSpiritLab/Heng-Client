@@ -35,6 +35,12 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     javac!: string;
+    @IsString()
+    @IsNotEmpty()
+    node!: string;
+    @IsString()
+    @IsNotEmpty()
+    pascal!: string;
 }
 export class JailConfig {
     @IsString()

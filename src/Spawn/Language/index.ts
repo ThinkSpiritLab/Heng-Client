@@ -3,6 +3,8 @@ import { CMP } from "./CMP";
 import { CPP } from "./CPP";
 import { Language, LanguageConfigureOption } from "./decl";
 import { Java } from "./Java";
+import { JS } from "./JS";
+import { Pascal } from "./Pascal";
 import { Python } from "./Python";
 
 export function getConfiguredLanguage(
@@ -28,6 +30,13 @@ export function getConfiguredLanguage(
         case "python3":
             return new Python(option);
             break;
+        // case "js":
+        // case "javascript":
+        //     return new JS(option);
+        //     break;
+        // case "pascal":
+        //     return new Pascal(option);
+        //     break;
         case "cmp":
             return new CMP(option);
         default:
