@@ -3,7 +3,7 @@ import { Executable } from "heng-protocol";
 import path from "path";
 import fs from "fs";
 import { ExecType, Language } from "../Spawn/Language/decl";
-import { FileAgent, readStream, waitForOpen } from "./File";
+import { FileAgent, waitForOpen } from "./File";
 import {
     JailBindMountOption,
     JailedChildProcess,
@@ -25,10 +25,11 @@ export class ExecutableAgent {
     private readonly judgeHash: string;
     private readonly dirHash: string;
     readonly fileAgent: FileAgent;
-    private compiled = false;
-    private compileCached = false;
+    private compiled = false; // whether compile in this instance
+    private compileCacheable: boolean;
+    private compileCached = false; // whether use cached dir
     readonly configuredLanguage: Language;
-    private Initialized = false;
+    private Initialized = 0;
     protected logger = getLogger("ExecutableAgent");
 
     constructor(
@@ -52,14 +53,19 @@ export class ExecutableAgent {
                 compileDir: "",
             }
         );
-        let dirHash: string | undefined = undefined;
+
+        let dirHash_t: string | undefined = undefined;
+
+        this.compileCacheable =
+            !getConfig().judger.unsupervised &&
+            this.configuredLanguage.compileCacheable;
+
         if (
-            this.configuredLanguage.compileCacheable &&
-            (dirHash = compileCachedJudge.get(this.judgeHash))
+            this.compileCacheable &&
+            (dirHash_t = compileCachedJudge.get(this.judgeHash))
         ) {
-            this.dirHash = dirHash;
+            this.dirHash = dirHash_t;
             this.compileCached = true;
-            this.compiled = true;
         } else {
             this.dirHash = crypto.randomBytes(32).toString("hex");
         }
@@ -86,28 +92,33 @@ export class ExecutableAgent {
                 SourceCodeName,
                 this.configuredLanguage.srcFileName
             );
-            if (!this.configuredLanguage.compileOptionGenerator().skip) {
-                this.fileAgent.register(CompileLogName, CompileLogName);
-                this.fileAgent.register(
-                    CompileStatisticName,
-                    CompileStatisticName
-                );
-            }
+            // below files may not really exist if skip compile
+            this.fileAgent.register(CompileLogName, CompileLogName);
+            this.fileAgent.register(CompileStatisticName, CompileStatisticName);
         } else {
-            await this.fileAgent.init();
+            await this.fileAgent.init(false);
             this.fileAgent.add(
                 SourceCodeName,
                 this.excutable.source,
                 this.configuredLanguage.srcFileName
             );
         }
-        this.Initialized = true;
-        return;
+        this.Initialized++;
     }
 
     checkInit(): void {
-        if (!this.Initialized) {
-            throw new Error("Don't forget to call init");
+        if (this.Initialized !== 1) {
+            throw new Error("Don't forget to call init or init multiple times");
+        }
+    }
+
+    signCompileCache(): void {
+        if (
+            this.compileCacheable &&
+            compileCachedJudge.get(this.judgeHash) === undefined
+        ) {
+            compileCachedJudge.set(this.judgeHash, this.dirHash);
+            this.compileCached = true;
         }
     }
 
@@ -130,6 +141,7 @@ export class ExecutableAgent {
             this.configuredLanguage.compileOptionGenerator();
         if (languageRunOption.skip) {
             this.compiled = true;
+            this.signCompileCache();
             return;
         }
         if (this.compiled || this.compileCached) {
@@ -137,9 +149,11 @@ export class ExecutableAgent {
                 `skip ${this.execType} compile, compiled: ${this.compiled}, compileCached：${this.compileCached}`
             );
             return JSON.parse(
-                await readStream(
-                    await this.fileAgent.getStream(CompileStatisticName)
-                )
+                (
+                    await fs.promises.readFile(
+                        await this.fileAgent.getPath(CompileStatisticName)
+                    )
+                ).toString("utf-8")
             );
         } else {
             const command = languageRunOption.command;
@@ -222,13 +236,7 @@ export class ExecutableAgent {
             );
             this.fileAgent.register(CompileStatisticName, CompileStatisticName);
             this.compiled = true;
-            if (
-                !getConfig().judger.unsupervised &&
-                this.configuredLanguage.compileCacheable
-            ) {
-                compileCachedJudge.set(this.judgeHash, this.dirHash);
-                this.compileCached = true;
-            }
+            this.signCompileCache();
             return jailResult;
         }
     }
@@ -252,7 +260,7 @@ export class ExecutableAgent {
         if (languageRunOption.skip) {
             throw new Error("Can't skip exec");
         }
-        if (!this.compiled) {
+        if (!this.compiled && !this.compileCached) {
             throw new Error("Please compile first");
         } else {
             const command = languageRunOption.command;
@@ -311,7 +319,11 @@ export class ExecutableAgent {
      * hey, clean me
      */
     async clean(): Promise<void> {
-        if (this.dirHash !== compileCachedJudge.get(this.judgeHash)) {
+        if (
+            this.dirHash &&
+            this.judgeHash &&
+            this.dirHash !== compileCachedJudge.get(this.judgeHash)
+        ) {
             await this.fileAgent.clean();
         }
     }

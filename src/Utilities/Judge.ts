@@ -41,7 +41,7 @@ export abstract class JudgeAgent {
     protected ExecutableAgents: ExecutableAgent[] = [];
     protected fileAgent: FileAgent;
     protected logger = getLogger("JudgeAgent");
-    protected Initialized = false;
+    protected Initialized = 0;
     protected extra: {
         user?: {
             compileMessage?: string;
@@ -79,12 +79,12 @@ export abstract class JudgeAgent {
                 }
             });
         }
-        this.Initialized = true;
+        this.Initialized++;
     }
 
     checkInit(): void {
-        if (!this.Initialized) {
-            throw new Error("Don't forget to call init");
+        if (this.Initialized !== 1) {
+            throw new Error("Don't forget to call init or init multiple times");
         }
     }
 

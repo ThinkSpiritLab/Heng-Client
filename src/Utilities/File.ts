@@ -160,7 +160,7 @@ export class FileAgent {
         string,
         [File | null, string, boolean, Throttle]
     >();
-    private Initialized = false;
+    private Initialized = 0;
     constructor(readonly prefix: string, readonly primaryFile: File | null) {
         this.dir = path.join(os.tmpdir(), prefix);
     }
@@ -190,12 +190,12 @@ export class FileAgent {
                 1
             );
         }
-        this.Initialized = true;
+        this.Initialized++;
     }
 
     checkInit(): void {
-        if (!this.Initialized) {
-            throw new Error("Don't forget to call init");
+        if (this.Initialized !== 1) {
+            throw new Error("Don't forget to call init or init multiple times");
         }
     }
 
