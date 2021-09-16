@@ -58,7 +58,7 @@ export function readStream(s: Readable, size: number): Promise<string> {
         }
     });
     return new Promise<string>((resolve, reject) => {
-        s.on("end", () => resolve(data.join()));
+        s.on("end", () => resolve(data.join("")));
         s.on("error", (err) => reject(err));
     });
 }
