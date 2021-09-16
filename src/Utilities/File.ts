@@ -39,10 +39,23 @@ export async function chownR(
     await curdir.close();
 }
 
-export function readStream(s: Readable): Promise<string> {
+/**
+ * @param s
+ * @param size -1 == inf
+ * @returns
+ */
+export function readStream(s: Readable, size: number): Promise<string> {
+    let length = 0;
     const data: string[] = [];
-    s.on("data", (chunk) => {
-        data.push(chunk.toString());
+    s.on("data", (chunk: Buffer) => {
+        if (size === -1) {
+            data.push(chunk.toString("utf-8"));
+        } else {
+            if (length < size) {
+                data.push(chunk.slice(0, size - length).toString("utf-8"));
+                length += chunk.byteLength;
+            }
+        }
     });
     return new Promise<string>((resolve, reject) => {
         s.on("end", () => resolve(data.join()));

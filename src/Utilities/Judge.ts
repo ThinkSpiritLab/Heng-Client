@@ -145,7 +145,8 @@ export abstract class JudgeAgent {
                             encoding: "utf-8",
                             end: executable.limit.compiler.message - 1,
                         }
-                    )
+                    ),
+                    -1
                 ),
             };
             if (execType === ExecType.Usr) {
@@ -379,13 +380,13 @@ export class NormalJudgeAgent extends JudgeAgent {
                         userProcess.result,
                         compProcess.result,
                         userProcess.stderr !== null
-                            ? readStream(userProcess.stderr)
+                            ? readStream(userProcess.stderr, 1024)
                             : "",
                         compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
+                            ? readStream(compProcess.stdout, 1024)
                             : "",
                         compProcess.stderr !== null
-                            ? readStream(compProcess.stderr)
+                            ? readStream(compProcess.stderr, 1024)
                             : "",
                     ]);
                 return this.generateCaseResult({
@@ -481,13 +482,13 @@ export class SpecialJudgeAgent extends JudgeAgent {
                         userProcess.result,
                         compProcess.result,
                         userProcess.stderr !== null
-                            ? readStream(userProcess.stderr)
+                            ? readStream(userProcess.stderr, 1024)
                             : "",
                         compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
+                            ? readStream(compProcess.stdout, 1024)
                             : "",
                         compProcess.stderr !== null
-                            ? readStream(compProcess.stderr)
+                            ? readStream(compProcess.stderr, 1024)
                             : "",
                     ]);
 
@@ -587,17 +588,18 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                         userProcess.result,
                         compProcess.result,
                         userProcess.stderr !== null
-                            ? readStream(userProcess.stderr)
+                            ? readStream(userProcess.stderr, 1024)
                             : "",
                         (compProcess.stdio as unknown as Readable[])[5]
                             ? readStream(
                                   (
                                       compProcess.stdio as unknown as Readable[]
-                                  )[5]
+                                  )[5],
+                                  1024
                               )
                             : "",
                         compProcess.stderr !== null
-                            ? readStream(compProcess.stderr)
+                            ? readStream(compProcess.stderr, 1024)
                             : "",
                     ]);
 
