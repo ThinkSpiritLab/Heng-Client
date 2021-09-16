@@ -193,7 +193,7 @@ export class Controller {
                 timer: setTimeout(() => {
                     this.messageCallbackMap.delete(nonce);
                     reject("Time out");
-                }, 10000),
+                }, 5000),
             });
             const msg = JSON.stringify({
                 type: "req",
