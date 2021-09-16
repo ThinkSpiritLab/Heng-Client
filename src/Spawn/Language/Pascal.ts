@@ -19,7 +19,7 @@ export class Pascal extends Language {
     }
 
     compileOptionGenerator(): RunOption {
-        const compilerOptions: string[] = [this.src, `-o${this.bin}`];
+        const compilerOptions: string[] = [this.src, `-o${this.bin}`, "-vnw"];
         if (this.excutable.environment.options?.o2 !== false) {
             compilerOptions.push("-O2");
         }

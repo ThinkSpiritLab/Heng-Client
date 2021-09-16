@@ -27,7 +27,9 @@ export class C extends Language {
                 ? `--std=${this.excutable.environment.options.version}`
                 : "--std=c99",
         ];
-        if (this.excutable.environment.options?.o2 !== false) {
+        if (this.excutable.environment.options?.o2 === false) {
+            compilerOptions.push("-O0");
+        } else {
             compilerOptions.push("-O2");
         }
         if (this.excutable.environment.options?.static) {
