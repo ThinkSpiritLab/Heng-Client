@@ -94,73 +94,92 @@ export async function readableFromFile(file: File): Promise<Readable> {
     if (file.content !== undefined) {
         return Readable.from(file.content);
     } else if (file.url) {
-        const returnFun = async (fileId: string) => {
+        const returnFun = async (fileName: string) => {
             const readable = fs.createReadStream(
                 path.join(
                     os.tmpdir(),
                     getConfig().judger.tmpdirBase,
                     "file",
-                    fileId
+                    fileName
                 )
             );
             await waitForOpen(readable);
             return readable;
         };
-        let record = remoteFileMap.get(file.url);
-        if (record === undefined) {
-            record = ["", false, new Throttle(1)];
-            remoteFileMap.set(file.url, record);
+
+        let fileKey: string;
+        if (file.hashsum) {
+            fileKey = file.hashsum;
+        } else {
+            fileKey = file.url;
         }
 
-        let [fileId, writed] = record;
+        let record = remoteFileMap.get(fileKey);
+        if (record === undefined) {
+            record = ["", false, new Throttle(1)];
+            remoteFileMap.set(fileKey, record);
+        }
+
+        let [fileName, writed] = record;
         const [, , throttle] = record;
         if (writed) {
-            return await returnFun(fileId);
+            return await returnFun(fileName);
         }
         return throttle.withThrottle(async () => {
-            record = remoteFileMap.get(file.url as string);
+            record = remoteFileMap.get(fileKey);
             if (record === undefined) {
                 throw new Error("Unreachable code");
             }
-            [, writed] = record;
+            [fileName, writed] = record;
             if (writed) {
-                return await returnFun(fileId);
+                return await returnFun(fileName);
             }
 
-            fileId = crypto.randomBytes(32).toString("hex");
-            await pipeline(
-                await readableFromUrl(file.url as string),
-                // await Axios.get(file.url as string),
-                fs.createWriteStream(
-                    path.join(
-                        os.tmpdir(),
-                        getConfig().judger.tmpdirBase,
-                        "file",
-                        fileId as string
-                    ),
-                    { mode: 0o700 }
-                )
-            );
-            if (file.hashsum) {
-                const hash = crypto.createHash("sha256");
+            fileName = crypto.randomBytes(32).toString("hex");
+            try {
                 await pipeline(
-                    fs.createReadStream(
+                    await readableFromUrl(file.url as string),
+                    fs.createWriteStream(
                         path.join(
                             os.tmpdir(),
                             getConfig().judger.tmpdirBase,
                             "file",
-                            fileId as string
+                            fileName
                         ),
-                        { encoding: "binary" }
-                    ),
-                    hash
+                        { mode: 0o700 }
+                    )
                 );
-                if (hash.digest("hex") !== file.hashsum) {
-                    throw new Error("Hash verification failed");
+                if (file.hashsum) {
+                    const hash = crypto.createHash("sha256");
+                    await pipeline(
+                        fs.createReadStream(
+                            path.join(
+                                os.tmpdir(),
+                                getConfig().judger.tmpdirBase,
+                                "file",
+                                fileName
+                            ),
+                            { encoding: "binary" }
+                        ),
+                        hash
+                    );
+                    if (hash.digest("hex") !== file.hashsum) {
+                        throw new Error("Hash verification failed");
+                    }
                 }
+            } catch (error) {
+                await fs.promises.unlink(
+                    path.join(
+                        os.tmpdir(),
+                        getConfig().judger.tmpdirBase,
+                        "file",
+                        fileName
+                    )
+                );
+                throw error;
             }
-            remoteFileMap.set(file.url as string, [fileId, true, throttle]);
-            return await returnFun(fileId);
+            remoteFileMap.set(fileKey, [fileName, true, throttle]);
+            return await returnFun(fileName);
         });
     } else {
         throw new Error("Bad file");
