@@ -143,7 +143,10 @@ export abstract class JudgeAgent {
                         await executableAgent.fileAgent.getPath(CompileLogName),
                         {
                             encoding: "utf-8",
-                            end: executable.limit.compiler.message - 1,
+                            end: Math.min(
+                                executable.limit.compiler.message,
+                                1 * 1024 * 1024
+                            ),
                         }
                     ),
                     -1
