@@ -41,7 +41,7 @@ class Statistics {
         return {
             hardware: {
                 cpu: { percentage: os.loadavg()[0] / os.cpus().length },
-                memory: { percentage: os.freemem() / os.totalmem() },
+                memory: { percentage: 1 - os.freemem() / os.totalmem() },
             },
             judge: {
                 pending: this.count[0],
