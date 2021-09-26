@@ -95,14 +95,13 @@ export async function readableFromFile(file: File): Promise<Readable> {
         return Readable.from(file.content);
     } else if (file.url) {
         const returnFun = async (fileName: string) => {
-            const readable = fs.createReadStream(
-                path.join(
-                    os.tmpdir(),
-                    getConfig().judger.tmpdirBase,
-                    "file",
-                    fileName
-                )
+            const filePath = path.join(
+                os.tmpdir(),
+                getConfig().judger.tmpdirBase,
+                "file",
+                fileName
             );
+            const readable = fs.createReadStream(filePath);
             await waitForOpen(readable);
             return readable;
         };
@@ -136,31 +135,21 @@ export async function readableFromFile(file: File): Promise<Readable> {
             }
 
             fileName = crypto.randomBytes(32).toString("hex");
+            const filePath = path.join(
+                os.tmpdir(),
+                getConfig().judger.tmpdirBase,
+                "file",
+                fileName
+            );
             try {
                 await pipeline(
                     await readableFromUrl(file.url as string),
-                    fs.createWriteStream(
-                        path.join(
-                            os.tmpdir(),
-                            getConfig().judger.tmpdirBase,
-                            "file",
-                            fileName
-                        ),
-                        { mode: 0o700 }
-                    )
+                    fs.createWriteStream(filePath, { mode: 0o700 })
                 );
                 if (file.hashsum) {
                     const hash = crypto.createHash("sha256");
                     await pipeline(
-                        fs.createReadStream(
-                            path.join(
-                                os.tmpdir(),
-                                getConfig().judger.tmpdirBase,
-                                "file",
-                                fileName
-                            ),
-                            { encoding: "binary" }
-                        ),
+                        fs.createReadStream(filePath, { encoding: "binary" }),
                         hash
                     );
                     if (hash.digest("hex") !== file.hashsum) {
@@ -168,14 +157,7 @@ export async function readableFromFile(file: File): Promise<Readable> {
                     }
                 }
             } catch (error) {
-                await fs.promises.unlink(
-                    path.join(
-                        os.tmpdir(),
-                        getConfig().judger.tmpdirBase,
-                        "file",
-                        fileName
-                    )
-                );
+                await fs.promises.unlink(filePath);
                 throw error;
             }
             remoteFileMap.set(fileKey, [fileName, true, throttle]);
