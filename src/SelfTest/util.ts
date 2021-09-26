@@ -232,7 +232,7 @@ export function generateSpjSelfTest(
     };
 }
 
-export function generateInteractorSelfTest(
+export function generateInteractiveSelfTest(
     name: string,
     language: string,
     usrCode: string,

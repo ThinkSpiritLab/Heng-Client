@@ -21,7 +21,7 @@ export class CMP extends Language {
     }
 
     execOptionGenerator(): RunOption {
-        const binPath = getConfig().judger.cmp;
+        const binPath = getConfig().language.ojcmp;
         return {
             skip: false,
             command: binPath,

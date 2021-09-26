@@ -1,5 +1,5 @@
 import { JudgeResultKind } from "heng-protocol";
-import { generateInteractorSelfTest } from "../util";
+import { generateInteractiveSelfTest } from "../util";
 
 const input = `1764335
 `;
@@ -68,8 +68,8 @@ int main(int argc, char ** argv){
 }
 `;
 
-export const InteractorGuessNumber = generateInteractorSelfTest(
-    "InteractorGuessNumber",
+export const InteractiveGuessNumber = generateInteractiveSelfTest(
+    "InteractiveGuessNumber",
     "cpp",
     usrCode,
     {},

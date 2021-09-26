@@ -56,9 +56,24 @@ export class ExecutableAgent {
 
         let dirHash_t: string | undefined = undefined;
 
-        this.compileCacheable =
-            !getConfig().judger.unsupervised &&
-            this.configuredLanguage.compileCacheable;
+        this.compileCacheable = this.configuredLanguage.compileCacheable;
+
+        switch (execType) {
+            case ExecType.Usr:
+                this.compileCacheable =
+                    this.compileCacheable && getConfig().judger.cacheUsr;
+                break;
+            case ExecType.Spj:
+                this.compileCacheable =
+                    this.compileCacheable && getConfig().judger.cacheSpj;
+                break;
+            case ExecType.Interactive:
+                this.compileCacheable =
+                    this.compileCacheable && getConfig().judger.cacheInteractor;
+                break;
+            default:
+                break;
+        }
 
         if (
             this.compileCacheable &&

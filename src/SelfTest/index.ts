@@ -1,7 +1,7 @@
 import { BOMB } from "./BOMB";
 import { C } from "./C";
 import { CPP } from "./CPP";
-import { INTERACTOR } from "./INTERACTOR";
+import { INTERACTIVE } from "./INTERACTIVE";
 import { JAVA } from "./JAVA";
 import { JS } from "./JS";
 import { PASCAL } from "./PASCAL";
@@ -20,6 +20,6 @@ export const Tests = [
     ...TIME,
     ...SPJ,
     ...BOMB,
-    ...INTERACTOR,
+    ...INTERACTIVE,
     ...PLAINTEXT,
 ];

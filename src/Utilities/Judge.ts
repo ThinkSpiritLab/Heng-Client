@@ -156,7 +156,7 @@ export abstract class JudgeAgent {
                 this.extra.user = exteaInfo;
             } else if (execType === ExecType.Spj) {
                 this.extra.spj = exteaInfo;
-            } else if (execType === ExecType.Interactor) {
+            } else if (execType === ExecType.Interactive) {
                 this.extra.interactor = exteaInfo;
             }
             let compileJudgeType: JudgeResultKind | undefined = undefined;
@@ -552,7 +552,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         }
         const [interactorExecutableAgent, judgeResult2] =
             await this.compileAndFillExtra(
-                ExecType.Interactor,
+                ExecType.Interactive,
                 this.judge.judge.interactor,
                 OtherCompileResultTransformer
             );
@@ -717,7 +717,7 @@ export async function getJudgerFactory(
                     const expectedResult = test.expectedResult[idx];
                     if (
                         expectedResult.expectResultType !== c.kind &&
-                        !getConfig().judger.unsupervised
+                        !getConfig().judger.noSelfTestError
                     ) {
                         throw new Error(
                             `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
@@ -745,7 +745,7 @@ export async function getJudgerFactory(
                     const expectedResult = test.expectedResult[idx];
                     if (
                         expectedResult.expectResultType !== c.kind &&
-                        !getConfig().judger.unsupervised
+                        !getConfig().judger.noSelfTestError
                     ) {
                         throw new Error(
                             `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
@@ -762,9 +762,21 @@ export async function getJudgerFactory(
 
     let timeRatio = 1;
     if (expectedTime && costTime) {
+        // reportTime = realTime * timeRatio
         timeRatio = expectedTime / costTime;
     }
     logger.warn(`timeRatio is ${timeRatio}`);
+    logger.warn(
+        `timeRatioTolerance is ${getConfig().judger.timeRatioTolerance}`
+    );
+
+    if (
+        timeRatio / 1.0 > getConfig().judger.timeRatioTolerance ||
+        1.0 / timeRatio > getConfig().judger.timeRatioTolerance
+    ) {
+        throw new Error("timeRatio exceeds timeRatioTolerance");
+    }
+
     judgerFactory = new JudgeFactory(timeRatio, timeIntercept, throttle);
 
     // 校验
@@ -782,7 +794,7 @@ export async function getJudgerFactory(
                     const expectedResult = test.expectedResult[idx];
                     if (
                         expectedResult.expectResultType !== c.kind &&
-                        !getConfig().judger.unsupervised
+                        !getConfig().judger.noSelfTestError
                     ) {
                         throw new Error(
                             `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
@@ -795,7 +807,7 @@ export async function getJudgerFactory(
                         const percentage = diff / expectedResult.expectedTime;
                         if (
                             (diff > 200 || percentage > 0.15) &&
-                            !getConfig().judger.unsupervised
+                            !getConfig().judger.noSelfTestError
                         ) {
                             throw new Error(
                                 `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`

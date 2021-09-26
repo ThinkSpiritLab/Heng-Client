@@ -197,3 +197,5 @@ loj：https://github.com/syzoj/syzoj-ng-judge/tree/master/src/languages
 lojv3：https://github.com/syzoj/judge-v3/tree/master/src/languages
 
 uoj：https://github.com/UniversalOJ/UOJ-System/blob/230738b770022cc6b882c42b67b82d7b29b82003/judger/uoj_judger/include/uoj_judger.h#L1137
+
+pta: https://github.com/pintia/ljudge/tree/master/etc/ljudge

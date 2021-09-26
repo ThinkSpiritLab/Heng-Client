@@ -42,7 +42,7 @@ export class CPP extends Language {
         const bindMount: JailBindMountOption[] = [];
         if (
             this.execType === ExecType.Spj ||
-            this.execType === ExecType.Interactor
+            this.execType === ExecType.Interactive
         ) {
             bindMount.push({
                 source: getConfig().language.testlib,

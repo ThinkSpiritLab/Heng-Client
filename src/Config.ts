@@ -44,6 +44,9 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     pascal!: string;
+    @IsString()
+    @IsNotEmpty()
+    ojcmp!: string;
 }
 export class JailConfig {
     @IsString()
@@ -80,21 +83,18 @@ export class SelfConfig {
 }
 export class JudgeFactoryConfig {
     @IsBoolean()
-    unsupervised!: boolean;
+    noSelfTestError!: boolean;
     @IsString()
     @IsNotEmpty()
     tmpdirBase!: string;
     @IsNumber()
     @IsPositive()
     timeRatioTolerance!: number;
-    @IsString()
-    @IsNotEmpty()
-    cmp!: string;
     @IsInt()
     @IsPositive()
     defaultPidLimit!: number;
     @IsInt()
-    @IsPositive()
+    @Min(0)
     selfTestRound!: number;
     @IsInt()
     @Min(1000)
@@ -102,6 +102,12 @@ export class JudgeFactoryConfig {
     @IsInt()
     @Min(1000)
     gid!: number;
+    @IsBoolean()
+    cacheUsr!: boolean;
+    @IsBoolean()
+    cacheSpj!: boolean;
+    @IsBoolean()
+    cacheInteractor!: boolean;
 }
 export class Config {
     @ValidateNested()

@@ -5,13 +5,13 @@ export enum ExecType {
     System = "system",
     Usr = "usr",
     Spj = "spj",
-    Interactor = "interactor",
+    Interactive = "interactive",
 }
 export const ExecTypeArray = [
     ExecType.System,
     ExecType.Usr,
     ExecType.Spj,
-    ExecType.Interactor,
+    ExecType.Interactive,
 ];
 
 // Extract from BasicSpawnOption and JailSpawnOption and spawn's args
