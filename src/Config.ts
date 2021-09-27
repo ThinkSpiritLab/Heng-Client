@@ -108,6 +108,9 @@ export class JudgeFactoryConfig {
     cacheSpj!: boolean;
     @IsBoolean()
     cacheInteractor!: boolean;
+    @IsInt()
+    @IsPositive()
+    remoteFileCacheBytes!: number;
 }
 export class Config {
     @ValidateNested()

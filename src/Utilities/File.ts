@@ -9,7 +9,10 @@ import * as crypto from "crypto";
 import { Throttle } from "./Throttle";
 import http from "http";
 import https from "https";
+import { getLogger } from "log4js";
 const pipeline = util.promisify(stream.pipeline);
+
+const logger = getLogger("File");
 
 export type File = {
     hashsum?: string;
@@ -88,13 +91,113 @@ export function readableFromUrl(url: string): Promise<Readable> {
     }
 }
 
-const remoteFileMap = new Map<string, [string, boolean, Throttle]>();
+/**
+ * may affect original array
+ * @param arr
+ * @param count
+ */
+function getRandomArrayElements(arr: string[], count: number) {
+    count = Math.min(count, arr.length);
+    for (let i = 0; i < count; i++) {
+        const pos: number = Math.floor(Math.random() * (arr.length - i)) + i;
+        [arr[i], arr[pos]] = [arr[pos], arr[i]];
+    }
+    return arr.slice(0, count);
+}
 
+const remoteFileMap = new Map<
+    string,
+    // fileName, writed, throttle, readCount, lastVisit
+    [string, boolean, Throttle, number, number]
+>();
+const freeCacheThrottle = new Throttle(1);
+let evictionPool: string[] = [];
+let remoteFileBytesCount = 0;
+// https://developer.aliyun.com/article/63034
+// https://developer.aliyun.com/article/64435
+function freeRemoteFileCache(requiredBtyes: number): Promise<void> {
+    return freeCacheThrottle.withThrottle(async () => {
+        let count = 0;
+        while (
+            count++ < 5 &&
+            remoteFileMap.size &&
+            remoteFileBytesCount + requiredBtyes >
+                getConfig().judger.remoteFileCacheBytes
+        ) {
+            evictionPool = [
+                ...evictionPool,
+                ...getRandomArrayElements([...remoteFileMap.keys()], 10),
+            ]
+                .map((fileKey: string): [string, number] => {
+                    const record = remoteFileMap.get(fileKey);
+                    if (
+                        record === undefined ||
+                        record[1] !== true ||
+                        record[3] !== 0 ||
+                        Date.now() - record[4] <= 30000
+                    ) {
+                        return [fileKey, -1];
+                    }
+                    return [fileKey, record[4]];
+                })
+                .filter((keyAndTime: [string, number]) => {
+                    return keyAndTime[1] !== -1;
+                })
+                .sort((a, b) => {
+                    return a[1] - b[1];
+                })
+                .map((a) => a[0])
+                .slice(0, 10);
+
+            const pendingFreeFileKey = evictionPool.shift();
+            if (pendingFreeFileKey === undefined) {
+                // evictionPool.length === 0
+                logger.warn(
+                    "Remote file cache size exceeds, but can't free more space"
+                );
+                break;
+            }
+            const record = remoteFileMap.get(pendingFreeFileKey);
+            if (!record) {
+                logger.error("Unreachable code");
+                continue;
+            }
+            const filePath = path.join(
+                os.tmpdir(),
+                getConfig().judger.tmpdirBase,
+                "file",
+                record[0]
+            );
+            try {
+                /** @throw ENOENT fatal error! */
+                const stat = await fs.promises.stat(filePath);
+                stat.isFile() && (await fs.promises.unlink(filePath));
+                // isFile and deleted
+                remoteFileBytesCount -= stat.size;
+                remoteFileMap.delete(pendingFreeFileKey);
+            } catch (error) {
+                logger.fatal("Remote file disappear");
+                continue;
+            }
+        }
+    });
+}
+
+const remoteFileDownloadThrottle = new Throttle(1);
 export async function readableFromFile(file: File): Promise<Readable> {
     if (file.content !== undefined) {
         return Readable.from(file.content);
     } else if (file.url) {
-        const returnFun = async (fileName: string) => {
+        const returnFun = async (fileKey: string) => {
+            const record = remoteFileMap.get(fileKey);
+            if (record === undefined) {
+                throw new Error(
+                    "Remote file record disappear(Unreachable code)"
+                );
+            }
+            const fileName = record[0];
+            record[4] = Date.now();
+            remoteFileMap.set(fileKey, record);
             const filePath = path.join(
                 os.tmpdir(),
                 getConfig().judger.tmpdirBase,
@@ -102,6 +205,18 @@ export async function readableFromFile(file: File): Promise<Readable> {
                 fileName
             );
             const readable = fs.createReadStream(filePath);
+            readable.on("close", () => {
+                const record = remoteFileMap.get(fileKey);
+                if (record === undefined) return;
+                record[3]--;
+                remoteFileMap.set(fileKey, record);
+            });
+            readable.on("open", () => {
+                const record = remoteFileMap.get(fileKey);
+                if (record === undefined) return;
+                record[3]++, (record[4] = Date.now());
+                remoteFileMap.set(fileKey, record);
+            });
             await waitForOpen(readable);
             return readable;
         };
@@ -115,14 +230,14 @@ export async function readableFromFile(file: File): Promise<Readable> {
 
         let record = remoteFileMap.get(fileKey);
         if (record === undefined) {
-            record = ["", false, new Throttle(1)];
+            record = ["", false, new Throttle(1), 0, Date.now()];
             remoteFileMap.set(fileKey, record);
         }
 
         let [fileName, writed] = record;
         const [, , throttle] = record;
         if (writed) {
-            return await returnFun(fileName);
+            return await returnFun(fileKey);
         }
         return throttle.withThrottle(async () => {
             record = remoteFileMap.get(fileKey);
@@ -131,7 +246,7 @@ export async function readableFromFile(file: File): Promise<Readable> {
             }
             [fileName, writed] = record;
             if (writed) {
-                return await returnFun(fileName);
+                return await returnFun(fileKey);
             }
 
             fileName = crypto.randomBytes(32).toString("hex");
@@ -142,9 +257,14 @@ export async function readableFromFile(file: File): Promise<Readable> {
                 fileName
             );
             try {
-                await pipeline(
-                    await readableFromUrl(file.url as string),
-                    fs.createWriteStream(filePath, { mode: 0o700 })
+                await remoteFileDownloadThrottle.withThrottle(
+                    async () =>
+                        await pipeline(
+                            await readableFromUrl(file.url as string),
+                            fs.createWriteStream(filePath, {
+                                mode: 0o700,
+                            })
+                        )
                 );
                 if (file.hashsum) {
                     const hash = crypto.createHash("sha256");
@@ -156,12 +276,28 @@ export async function readableFromFile(file: File): Promise<Readable> {
                         throw new Error("Hash verification failed");
                     }
                 }
+                /** @throw ENOENT */
+                const stat = await fs.promises.stat(filePath);
+                if (!stat.isFile()) {
+                    throw new Error("File disappear");
+                }
+                const fileSize = stat.size;
+                await freeRemoteFileCache(fileSize);
+                remoteFileMap.set(fileKey, [
+                    fileName,
+                    true,
+                    throttle,
+                    0,
+                    Date.now(),
+                ]);
+                remoteFileBytesCount += fileSize;
             } catch (error) {
+                // skip restore remoteFileMap
+                /** @throw ENOENT */
                 await fs.promises.unlink(filePath);
                 throw error;
             }
-            remoteFileMap.set(fileKey, [fileName, true, throttle]);
-            return await returnFun(fileName);
+            return await returnFun(fileKey);
         });
     } else {
         throw new Error("Bad file");
