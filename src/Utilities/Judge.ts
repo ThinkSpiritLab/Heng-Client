@@ -771,8 +771,9 @@ export async function getJudgerFactory(
     );
 
     if (
-        timeRatio / 1.0 > getConfig().judger.timeRatioTolerance ||
-        1.0 / timeRatio > getConfig().judger.timeRatioTolerance
+        (timeRatio / 1.0 > getConfig().judger.timeRatioTolerance ||
+            1.0 / timeRatio > getConfig().judger.timeRatioTolerance) &&
+        !getConfig().judger.noSelfTestError
     ) {
         throw new Error("timeRatio exceeds timeRatioTolerance");
     }
