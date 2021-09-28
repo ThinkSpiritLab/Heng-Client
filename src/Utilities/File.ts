@@ -7,9 +7,8 @@ import util from "util";
 import { getConfig } from "../Config";
 import * as crypto from "crypto";
 import { Throttle } from "./Throttle";
-import http from "http";
-import https from "https";
 import { getLogger } from "log4js";
+import axios from "axios";
 const pipeline = util.promisify(stream.pipeline);
 
 const logger = getLogger("File");
@@ -73,22 +72,9 @@ export function waitForOpen(s: fs.WriteStream | fs.ReadStream): Promise<null> {
     });
 }
 
-export function readableFromUrl(url: string): Promise<Readable> {
-    if (url.startsWith("http://")) {
-        return new Promise((resolve) => {
-            http.get(url, (res) => {
-                resolve(res);
-            });
-        });
-    } else if (url.startsWith("https://")) {
-        return new Promise((resolve) => {
-            https.get(url, (res) => {
-                resolve(res);
-            });
-        });
-    } else {
-        throw new Error("Bad url");
-    }
+export async function readableFromUrl(url: string): Promise<Readable> {
+    logger.info(`Downloading ${url}`);
+    return (await axios.get(url, { responseType: "stream" })).data;
 }
 
 /**
@@ -124,6 +110,9 @@ function freeRemoteFileCache(requiredBtyes: number): Promise<void> {
             remoteFileBytesCount + requiredBtyes >
                 getConfig().judger.remoteFileCacheBytes
         ) {
+            logger.info(
+                `try free cache, current cache size: ${remoteFileBytesCount} btyes`
+            );
             evictionPool = [
                 ...evictionPool,
                 ...getRandomArrayElements([...remoteFileMap.keys()], 10),
@@ -168,6 +157,7 @@ function freeRemoteFileCache(requiredBtyes: number): Promise<void> {
                 "file",
                 record[0]
             );
+            logger.warn(`free cache ${pendingFreeFileKey}`);
             try {
                 /** @throw ENOENT fatal error! */
                 const stat = await fs.promises.stat(filePath);
