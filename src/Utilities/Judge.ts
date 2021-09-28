@@ -199,27 +199,31 @@ export abstract class JudgeAgent {
 
     abstract getResult(): Promise<JudgeResult>;
 
-    getResultNoException(): Promise<JudgeResult> {
-        this.checkInit();
-        stat.tick(this.judge.id);
-        return this.getResult()
-            .then((ret) => {
-                stat.finish(this.judge.id);
-                return ret;
-            })
-            .catch((err) => {
-                stat.finish(this.judge.id);
-                this.logger.fatal(err);
-                return {
-                    cases: [
-                        {
-                            kind: JudgeResultKind.SystemError,
-                            time: 0,
-                            memory: 0,
-                        },
-                    ],
-                };
+    async getResultNoException(): Promise<JudgeResult> {
+        // this.checkInit();
+        try {
+            stat.tick(this.judge.id);
+            await this.init();
+            const ret = await this.getResult();
+            await this.clean();
+            stat.finish(this.judge.id);
+            return ret;
+        } catch (err) {
+            this.logger.fatal(err);
+            await this.clean().catch((error) => {
+                this.logger.fatal(error);
             });
+            stat.finish(this.judge.id);
+            return {
+                cases: [
+                    {
+                        kind: JudgeResultKind.SystemError,
+                        time: 0,
+                        memory: 0,
+                    },
+                ],
+            };
+        }
     }
 
     generateCaseResult({
@@ -709,9 +713,7 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
-                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
-                await judgeAgent.clean();
                 console.log(result);
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
@@ -737,10 +739,8 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
-                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
-                await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
                     if (
@@ -786,10 +786,8 @@ export async function getJudgerFactory(
                 const judgeAgent = judgerFactory.getJudgerAgent(
                     JSON.parse(JSON.stringify(test.task))
                 );
-                await judgeAgent.init();
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
-                await judgeAgent.clean();
                 result.cases.forEach((c, idx) => {
                     const expectedResult = test.expectedResult[idx];
                     if (

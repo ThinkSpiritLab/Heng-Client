@@ -5,6 +5,9 @@ import { CppOption } from "./Option";
 import { CppRE } from "./RE";
 import { CppTLE } from "./TLE";
 import { CppTLE2 } from "./TLE2";
+import { CppUrlBigData } from "./UrlBigData";
+import { CppUrlData } from "./UrlData";
+import { CppUrlFile } from "./UrlFile";
 import { CppWA } from "./WA";
 
 export const CPP = [
@@ -16,4 +19,7 @@ export const CPP = [
     CppMLE,
     CppRE,
     CppOption,
+    CppUrlFile,
+    CppUrlData,
+    CppUrlBigData,
 ];

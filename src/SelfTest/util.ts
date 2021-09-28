@@ -1,4 +1,4 @@
-import { DynamicFile, JudgeType, TestPolicy } from "heng-protocol";
+import { DynamicFile, File, JudgeType, TestPolicy } from "heng-protocol";
 import * as crypto from "crypto";
 import { MaxMemory, MaxOutput, MaxTime, SelfTest, TestCase } from "./decl";
 
@@ -8,7 +8,8 @@ export function generateNormalSelfTest(
     usrCode: string,
     usrOption: { [key: string]: string | number | boolean },
     cases: TestCase[],
-    timeLimit: number = MaxTime
+    timeLimit: number = MaxTime,
+    data?: File
 ): SelfTest {
     const fileArray: DynamicFile[] = [];
     cases.forEach((c, idx) => {
@@ -19,6 +20,7 @@ export function generateNormalSelfTest(
                 file: {
                     type: "direct",
                     content: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -27,15 +29,17 @@ export function generateNormalSelfTest(
                 file: {
                     type: "direct",
                     content: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
-        } else {
+        } else if (c.type === "url") {
             fileArray.push({
                 type: "remote",
                 name: "in" + idx,
                 file: {
                     type: "url",
                     url: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -44,6 +48,7 @@ export function generateNormalSelfTest(
                 file: {
                     type: "url",
                     url: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
         }
@@ -53,6 +58,7 @@ export function generateNormalSelfTest(
         name,
         task: {
             id: crypto.randomBytes(32).toString("hex"),
+            data,
             dynamicFiles: fileArray,
             judge: {
                 type: JudgeType.Normal,
@@ -83,8 +89,10 @@ export function generateNormalSelfTest(
                 },
             },
             test: {
-                cases: cases.map((value, idx) => {
-                    return { input: "in" + idx, output: "out" + idx };
+                cases: cases.map((c, idx) => {
+                    return c.type === "primary"
+                        ? { input: c.input, output: c.output }
+                        : { input: "in" + idx, output: "out" + idx };
                 }),
                 policy: TestPolicy.All,
             },
@@ -111,7 +119,8 @@ export function generateSpjSelfTest(
     spjCode: string,
     spjOption: { [key: string]: string | number | boolean },
     cases: TestCase[],
-    timeLimit: number = MaxTime
+    timeLimit: number = MaxTime,
+    data?: File
 ): SelfTest {
     const fileArray: DynamicFile[] = [];
     cases.forEach((c, idx) => {
@@ -122,6 +131,7 @@ export function generateSpjSelfTest(
                 file: {
                     type: "direct",
                     content: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -130,15 +140,17 @@ export function generateSpjSelfTest(
                 file: {
                     type: "direct",
                     content: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
-        } else {
+        } else if (c.type === "url") {
             fileArray.push({
                 type: "remote",
                 name: "in" + idx,
                 file: {
                     type: "url",
                     url: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -147,6 +159,7 @@ export function generateSpjSelfTest(
                 file: {
                     type: "url",
                     url: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
         }
@@ -156,6 +169,7 @@ export function generateSpjSelfTest(
         name,
         task: {
             id: crypto.randomBytes(32).toString("hex"),
+            data,
             dynamicFiles: fileArray,
             judge: {
                 type: JudgeType.Special,
@@ -211,8 +225,10 @@ export function generateSpjSelfTest(
                 },
             },
             test: {
-                cases: cases.map((value, idx) => {
-                    return { input: "in" + idx, output: "out" + idx };
+                cases: cases.map((c, idx) => {
+                    return c.type === "primary"
+                        ? { input: c.input, output: c.output }
+                        : { input: "in" + idx, output: "out" + idx };
                 }),
                 policy: TestPolicy.All,
             },
@@ -240,7 +256,8 @@ export function generateInteractiveSelfTest(
     interactorCode: string,
     interactorOption: { [key: string]: string | number | boolean },
     cases: TestCase[],
-    timeLimit: number = MaxTime
+    timeLimit: number = MaxTime,
+    data?: File
 ): SelfTest {
     const fileArray: DynamicFile[] = [];
     cases.forEach((c, idx) => {
@@ -251,6 +268,7 @@ export function generateInteractiveSelfTest(
                 file: {
                     type: "direct",
                     content: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -259,15 +277,17 @@ export function generateInteractiveSelfTest(
                 file: {
                     type: "direct",
                     content: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
-        } else {
+        } else if (c.type === "url") {
             fileArray.push({
                 type: "remote",
                 name: "in" + idx,
                 file: {
                     type: "url",
                     url: c.input,
+                    hashsum: c.inHashSum,
                 },
             });
             fileArray.push({
@@ -276,6 +296,7 @@ export function generateInteractiveSelfTest(
                 file: {
                     type: "url",
                     url: c.output,
+                    hashsum: c.outHashSum,
                 },
             });
         }
@@ -285,6 +306,7 @@ export function generateInteractiveSelfTest(
         name,
         task: {
             id: crypto.randomBytes(32).toString("hex"),
+            data,
             dynamicFiles: fileArray,
             judge: {
                 type: JudgeType.Interactive,
@@ -340,8 +362,10 @@ export function generateInteractiveSelfTest(
                 },
             },
             test: {
-                cases: cases.map((value, idx) => {
-                    return { input: "in" + idx, output: "out" + idx };
+                cases: cases.map((c, idx) => {
+                    return c.type === "primary"
+                        ? { input: c.input, output: c.output }
+                        : { input: "in" + idx, output: "out" + idx };
                 }),
                 policy: TestPolicy.All,
             },
