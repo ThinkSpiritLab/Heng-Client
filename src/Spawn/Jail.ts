@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from "child_process";
 import { getLogger } from "log4js";
 import path from "path";
+import fs from "fs";
 import { Readable } from "stream";
 import { loggedSpawn } from ".";
 import { getConfig } from "../Config";
@@ -203,6 +204,13 @@ export function useJail(
                 jailArgs,
                 options
             ) as JailedChildProcess;
+            subProcess.on("close", () => {
+                options.stdio?.forEach((io) => {
+                    if (typeof io === "number") {
+                        fs.close(io, () => undefined);
+                    }
+                });
+            });
             Object.assign(subProcess, {
                 outFd,
                 result: new Promise((resolve, reject) => {
