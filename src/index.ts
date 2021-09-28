@@ -80,9 +80,8 @@ async function main() {
 
     controller.on("CreateJudge", (task) => {
         const judgeAgent = judgerFactory.getJudgerAgent(task);
-        judgeAgent.init().then(async () => {
+        (async () => {
             const judgeResult = await judgeAgent.getResultNoException();
-            await judgeAgent.clean();
             for (let i = 0; i < 3; i++) {
                 try {
                     await controller.do("FinishJudges", {
@@ -97,7 +96,7 @@ async function main() {
                     await wait((2 << i) * 1000);
                 }
             }
-        });
+        })().catch((error) => logger.fatal(error));
         return Promise.resolve(null);
     });
 
