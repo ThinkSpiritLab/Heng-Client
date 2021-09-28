@@ -21,10 +21,9 @@ node = "/usr/bin/node"
 pascal = "/usr/bin/fpc"
 ojcmp = '/usr/bin/ojcmp'
 [judger]
-noSelfTestError = true
+noSelfTestError = false
 tmpdirBase = 'Heng_Client'
 timeRatioTolerance = 5
-cmp = '/usr/bin/ojcmp'
 defaultPidLimit = 64
 selfTestRound = 5
 uid = 1000
