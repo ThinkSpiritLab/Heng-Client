@@ -19,7 +19,7 @@ export const CPP = [
     CppMLE,
     CppRE,
     CppOption,
-    CppUrlFile,
-    CppUrlData,
-    CppUrlBigData,
+    // CppUrlFile,
+    // CppUrlData,
+    // CppUrlBigData,
 ];
