@@ -8,4 +8,3 @@ config.toml
 *.out
 *.o
 src.*
-package-lock.json
