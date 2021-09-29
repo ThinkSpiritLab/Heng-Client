@@ -35,7 +35,7 @@ export class C extends Language {
         if (this.excutable.environment.options?.static) {
             compilerOptions.push("-static");
         }
-        if (this.excutable.environment.options?.lm) {
+        if (this.excutable.environment.options?.lm !== false) {
             compilerOptions.push("-lm");
         }
         return {
