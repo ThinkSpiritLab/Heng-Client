@@ -19,10 +19,10 @@ javac = "/usr/bin/javac"
 cat = "/usr/bin/cat"
 node = "/usr/bin/node"
 pascal = "/usr/bin/fpc"
-ojcmp = '/usr/bin/ojcmp'
+ojcmp = "/usr/bin/ojcmp"
 [judger]
 noSelfTestError = false
-tmpdirBase = 'Heng_Client'
+tmpdirBase = "Heng_Client"
 timeRatioTolerance = 5
 defaultPidLimit = 64
 selfTestRound = 5
