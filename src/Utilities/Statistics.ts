@@ -38,9 +38,13 @@ class Statistics {
     }
 
     collect(): StatusReport {
+        const loadavg = os.loadavg() as [number, number, number];
         return {
             hardware: {
-                cpu: { percentage: os.loadavg()[0] / os.cpus().length },
+                cpu: {
+                    percentage: loadavg[0] / os.cpus().length,
+                    loadavg,
+                },
                 memory: { percentage: 1 - os.freemem() / os.totalmem() },
             },
             judge: {
