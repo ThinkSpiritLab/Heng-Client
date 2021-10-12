@@ -105,7 +105,7 @@ export class Controller {
         if (this.statusReportTimer !== undefined) {
             this.stopReport();
         }
-        this.statusReportTimer = setInterval(async () => {
+        const fn = async () => {
             this.do("ReportStatus", {
                 collectTime: moment().format("YYYY-MM-DDTHH:mm:ssZ"),
                 nextReportTime: moment(Date.now() + interval).format(
@@ -113,7 +113,9 @@ export class Controller {
                 ),
                 report: stat.collect(),
             });
-        }, interval);
+        };
+        this.statusReportTimer = setInterval(fn, interval);
+        fn();
     }
     stopReport(): void {
         if (this.statusReportTimer !== undefined) {

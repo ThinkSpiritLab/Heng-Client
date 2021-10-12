@@ -10,6 +10,9 @@ import { getgid, getuid } from "process";
 import path from "path";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
+import { ExitArgs } from "heng-protocol/internal-protocol/ws";
+import { stat } from "./Utilities/Statistics";
+
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
 }
@@ -78,7 +81,27 @@ async function main() {
     const controller = new Controller(getConfig().controller);
     judgerFactory.controller = controller;
 
+    let pendingExit = 0;
+
+    controller.on("Exit", (args: ExitArgs) => {
+        logger.warn(JSON.stringify(args));
+        pendingExit = 1;
+        setInterval(() => {
+            const col = stat.collect();
+            if (col.judge.total === col.judge.finished)
+                controller.ws.close(1000, "控制端命令下线"), process.exit(1);
+        }, 3000);
+        setTimeout(() => {
+            controller.ws.close(1000, "控制端命令下线，但评测任务超时"),
+                process.exit(2);
+        }, 300000);
+        return Promise.resolve(null);
+    });
+
     controller.on("CreateJudge", (task) => {
+        if (pendingExit) {
+            throw new Error("评测机正在等待下线");
+        }
         const judgeAgent = judgerFactory.getJudgerAgent(task);
         (async () => {
             const judgeResult = await judgeAgent.getResultNoException();
