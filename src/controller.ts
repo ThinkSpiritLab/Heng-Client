@@ -257,6 +257,9 @@ export class Controller {
             this.ws.on("close", () => {
                 this.logger.fatal("Ws Closed");
                 this.stopReport();
+                setTimeout(() => {
+                    process.exit(3);
+                }, 2000);
             });
             this.ws.on("message", async (msg) => {
                 if (typeof msg === "string") {
