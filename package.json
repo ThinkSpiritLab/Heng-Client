@@ -46,7 +46,7 @@
         "class-validator": "^0.12.2",
         "fs-extra": "^8.1.0",
         "heng-protocol": "^0.0.4",
-        "heng-sign-js": "^0.0.15",
+        "heng-sign-js": "^0.0.17",
         "lodash": "^4.17.20",
         "log4js": "^6.3.0",
         "moment": "^2.29.1",
