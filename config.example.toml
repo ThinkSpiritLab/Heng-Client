@@ -25,6 +25,7 @@ noSelfTestError = false
 tmpdirBase = "Heng_Client"
 timeRatioTolerance = 5
 defaultPidLimit = 64
+defaultTimeRatio = 1
 selfTestRound = 5
 uid = 1000
 gid = 1000

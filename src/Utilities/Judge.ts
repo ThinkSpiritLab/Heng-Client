@@ -760,7 +760,7 @@ export async function getJudgerFactory(
         );
     }
 
-    let timeRatio = 1;
+    let timeRatio = getConfig().judger.defaultTimeRatio;
     if (expectedTime && costTime) {
         // reportTime = realTime * timeRatio
         timeRatio = expectedTime / costTime;

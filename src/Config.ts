@@ -93,6 +93,9 @@ export class JudgeFactoryConfig {
     @IsInt()
     @IsPositive()
     defaultPidLimit!: number;
+    @IsNumber()
+    @IsPositive()
+    defaultTimeRatio!: number;
     @IsInt()
     @Min(0)
     selfTestRound!: number;
