@@ -81,6 +81,7 @@ export class Controller {
         return this._nonce++;
     }
     logger = getLogger("Controller");
+    exitTimer: NodeJS.Timeout | undefined = undefined;
     constructor(config: ControllerConfig) {
         this.host = config.host;
         this.SecrectKey = config.SecrectKey;
@@ -257,9 +258,11 @@ export class Controller {
             this.ws.on("close", () => {
                 this.logger.fatal("Ws Closed");
                 this.stopReport();
-                setTimeout(() => {
-                    process.exit(3);
-                }, 2000);
+                if (this.exitTimer === undefined) {
+                    setTimeout(() => {
+                        process.exit(3);
+                    }, 2000);
+                }
             });
             this.ws.on("message", async (msg) => {
                 if (typeof msg === "string") {

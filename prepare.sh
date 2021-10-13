@@ -31,7 +31,7 @@ cd ~
 git clone https://github.com.cnpmjs.org/flaryer/nsjail.git && cd nsjail && git checkout real_usr_time_kill && \
     make && mv ./nsjail /usr/bin
 cd ~
-git clone https://github.com.cnpmjs.org/flaryer/Heng-Client.git && cd Heng-Client && git checkout dev && cnpm i && npm run build
+git clone https://github.com.cnpmjs.org/flaryer/Heng-Client.git && cd Heng-Client && git checkout only_nsjail && cnpm i && npm run build
 cd ~
 cp ~/Heng-Client/Tools/testlib.h /testlib.h && chown 1000:1000 /testlib.h
 cd ~

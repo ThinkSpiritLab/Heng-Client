@@ -82,18 +82,28 @@ async function main() {
     judgerFactory.controller = controller;
 
     let pendingExit = 0;
+    let exitInterval: NodeJS.Timeout;
 
     controller.on("Exit", (args: ExitArgs) => {
-        logger.warn(JSON.stringify(args));
+        logger.warn(
+            `控制端命令下线，原因：${args.reason ?? "无"}，重连等待时间：${
+                args?.reconnect?.delay ?? 0
+            } ms`
+        );
         pendingExit = 1;
-        setInterval(() => {
+        exitInterval = setInterval(() => {
             const col = stat.collect();
-            if (col.judge.total === col.judge.finished)
-                controller.ws.close(1000, "控制端命令下线"), process.exit(1);
+            if (col.judge.total === col.judge.finished) {
+                controller.ws.close(1000, "控制端命令下线");
+                controller.exitTimer = setTimeout(() => {
+                    process.exit(0);
+                }, args?.reconnect?.delay);
+                clearInterval(exitInterval);
+            }
         }, 3000);
         setTimeout(() => {
-            controller.ws.close(1000, "控制端命令下线，但评测任务超时"),
-                process.exit(2);
+            controller.ws.close(1000, "控制端命令下线，但评测任务超时");
+            process.exit(1);
         }, 300000);
         return Promise.resolve(null);
     });
