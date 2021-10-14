@@ -1,5 +1,6 @@
 import {
     Executable,
+    Judge,
     JudgeCaseResult,
     JudgeResult,
     JudgeResultKind,
@@ -145,7 +146,7 @@ export abstract class JudgeAgent {
                             encoding: "utf-8",
                             end: Math.min(
                                 executable.limit.compiler.message,
-                                1 * 1024 * 1024
+                                10 * 1024
                             ),
                         }
                     ),
@@ -164,7 +165,11 @@ export abstract class JudgeAgent {
                 compileJudgeType = transformer.ole;
             } else if (
                 compileResult.time.usr >
-                this.judge.judge.user.limit.compiler.cpuTime
+                    this.judge.judge.user.limit.compiler.cpuTime ||
+                (compileResult.time.real >
+                    this.judge.judge.user.limit.compiler.cpuTime &&
+                    compileResult.returnCode === -1 &&
+                    compileResult.signal === 9)
             ) {
                 compileJudgeType = transformer.tle;
             } else if (
@@ -260,7 +265,10 @@ export abstract class JudgeAgent {
                 if (userResult.signal === 25) {
                     return JudgeResultKind.OutpuLimitExceeded;
                 } else if (
-                    userResult.time.usr > userExec.limit.runtime.cpuTime
+                    userResult.time.usr > userExec.limit.runtime.cpuTime ||
+                    (userResult.time.real > userExec.limit.runtime.cpuTime &&
+                        userResult.returnCode === -1 &&
+                        userResult.signal === 9)
                 ) {
                     return JudgeResultKind.TimeLimitExceeded;
                 } else if (userResult.memory >= userExec.limit.runtime.memory) {
@@ -272,7 +280,12 @@ export abstract class JudgeAgent {
                     return JudgeResultKind.RuntimeError;
                 } else if (sysResult.signal === 25) {
                     return JudgeResultKind.SystemOutpuLimitExceeded;
-                } else if (sysResult.time.usr > sysExec.limit.runtime.cpuTime) {
+                } else if (
+                    sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
+                    (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
+                        sysResult.returnCode === -1 &&
+                        sysResult.signal === 9)
+                ) {
                     return JudgeResultKind.SystemTimeLimitExceeded;
                 } else if (sysResult.memory > sysExec.limit.runtime.memory) {
                     return JudgeResultKind.SystemMemoryLimitExceeded;
@@ -316,15 +329,15 @@ export class NormalJudgeAgent extends JudgeAgent {
         protected readonly controller?: Controller
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
-        if (judge.judge.type !== JudgeType.Normal) {
-            throw new Error(
-                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`
-            );
-        }
     }
 
     async getResult(): Promise<JudgeResult> {
         this.checkInit();
+        if (this.judge.judge.type !== JudgeType.Normal) {
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Normal})`
+            );
+        }
 
         this.updateStatus(JudgeState.Preparing);
         stat.tick(this.judge.id);
@@ -425,11 +438,6 @@ export class SpecialJudgeAgent extends JudgeAgent {
         protected readonly controller?: Controller
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
-        if (judge.judge.type !== JudgeType.Special) {
-            throw new Error(
-                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`
-            );
-        }
     }
 
     async getResult(): Promise<JudgeResult> {
@@ -472,6 +480,12 @@ export class SpecialJudgeAgent extends JudgeAgent {
                 this.fileAgent.getFd(testCase.output),
             ]);
             return this.throttle.withThrottle(async () => {
+                if (this.judge.judge.type !== JudgeType.Special) {
+                    throw new Error(
+                        `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`
+                    );
+                }
+
                 const userProcess = await userExecutableAgent.exec(undefined, [
                     inputFd,
                     "pipe",
@@ -504,7 +518,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     userResult: userResult,
                     userExec: this.judge.judge.user,
                     sysResult: cmpResult,
-                    sysExec: this.judge.judge.user,
+                    sysExec: this.judge.judge.spj,
                     userErr: userErr,
                     sysOut: cmpOut,
                     sysErr: cmpErr,
@@ -528,11 +542,6 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         protected readonly controller?: Controller
     ) {
         super(judge, timeRatio, timeIntercept, throttle, controller);
-        if (judge.judge.type !== JudgeType.Interactive) {
-            throw new Error(
-                `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`
-            );
-        }
     }
 
     async getResult(): Promise<JudgeResult> {
@@ -574,6 +583,12 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                 this.fileAgent.getFd(testCase.output),
             ]);
             return this.throttle.withThrottle(async () => {
+                if (this.judge.judge.type !== JudgeType.Interactive) {
+                    throw new Error(
+                        `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`
+                    );
+                }
+
                 const userProcess = await userExecutableAgent.exec(undefined, [
                     "pipe",
                     "pipe",
@@ -615,7 +630,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                     userResult: userResult,
                     userExec: this.judge.judge.user,
                     sysResult: cmpResult,
-                    sysExec: this.judge.judge.user,
+                    sysExec: this.judge.judge.interactor,
                     userErr: userErr,
                     sysOut: cmpOut,
                     sysErr: cmpErr,
@@ -638,18 +653,17 @@ export class JudgeFactory {
         public controller?: Controller
     ) {}
 
-    getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
-        // why so ugly? reduce further bugs
-        judge.judge.user.limit.compiler.cpuTime = Math.ceil(
-            judge.judge.user.limit.compiler.cpuTime / this.timeRatio
+    getJudgerAgent(judgeInfo: CreateJudgeArgs): JudgeAgent {
+        judgeInfo.judge.user.limit.compiler.cpuTime = Math.ceil(
+            judgeInfo.judge.user.limit.compiler.cpuTime / this.timeRatio
         );
-        judge.judge.user.limit.runtime.cpuTime = Math.ceil(
-            judge.judge.user.limit.runtime.cpuTime / this.timeRatio
+        judgeInfo.judge.user.limit.runtime.cpuTime = Math.ceil(
+            judgeInfo.judge.user.limit.runtime.cpuTime / this.timeRatio
         );
-        switch (judge.judge.type) {
+        switch (judgeInfo.judge.type) {
             case JudgeType.Normal: {
                 return new NormalJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
@@ -657,14 +671,15 @@ export class JudgeFactory {
                 );
             }
             case JudgeType.Special: {
-                judge.judge.spj.limit.compiler.cpuTime = Math.ceil(
-                    judge.judge.spj.limit.compiler.cpuTime / this.timeRatio
+                judgeInfo.judge.spj.limit.compiler.cpuTime = Math.ceil(
+                    judgeInfo.judge.spj.limit.compiler.cpuTime / this.timeRatio
                 );
-                judge.judge.spj.limit.runtime.cpuTime = Math.ceil(
-                    judge.judge.spj.limit.runtime.cpuTime / this.timeRatio
+                judgeInfo.judge.spj.limit.runtime.cpuTime = Math.ceil(
+                    judgeInfo.judge.spj.limit.runtime.cpuTime / this.timeRatio +
+                        judgeInfo.judge.user.limit.runtime.cpuTime
                 );
                 return new SpecialJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
@@ -672,16 +687,17 @@ export class JudgeFactory {
                 );
             }
             case JudgeType.Interactive: {
-                judge.judge.interactor.limit.compiler.cpuTime = Math.ceil(
-                    judge.judge.interactor.limit.compiler.cpuTime /
+                judgeInfo.judge.interactor.limit.compiler.cpuTime = Math.ceil(
+                    judgeInfo.judge.interactor.limit.compiler.cpuTime /
                         this.timeRatio
                 );
-                judge.judge.interactor.limit.runtime.cpuTime = Math.ceil(
-                    judge.judge.interactor.limit.runtime.cpuTime /
-                        this.timeRatio
+                judgeInfo.judge.interactor.limit.runtime.cpuTime = Math.ceil(
+                    judgeInfo.judge.interactor.limit.runtime.cpuTime /
+                        this.timeRatio +
+                        judgeInfo.judge.user.limit.runtime.cpuTime
                 );
                 return new InteractiveJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,

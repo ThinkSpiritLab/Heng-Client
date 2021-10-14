@@ -25,7 +25,7 @@ export const CppTLE2 = generateNormalSelfTest(
         type: "direct",
         input,
         output,
-        expectResultType: JudgeResultKind.RuntimeError,
+        expectResultType: JudgeResultKind.TimeLimitExceeded,
         count: false,
     })),
     2000

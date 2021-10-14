@@ -30,7 +30,7 @@ export const BOMBFORKBOMB = generateNormalSelfTest(
             type: "direct",
             input,
             output,
-            expectResultType: JudgeResultKind.RuntimeError,
+            expectResultType: JudgeResultKind.TimeLimitExceeded,
             count: false,
         },
     ],

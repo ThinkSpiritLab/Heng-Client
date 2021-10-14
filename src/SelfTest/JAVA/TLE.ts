@@ -12,11 +12,10 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        while (true) {
-            Scanner sc = new Scanner(System.in);
-            int a = sc.nextInt();
-            int b = sc.nextInt();
-            System.out.println(a + b + 1);
+        try {
+            Thread.sleep(100000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }
@@ -31,7 +30,7 @@ export const JavaTLE = generateNormalSelfTest(
         type: "direct",
         input,
         output,
-        expectResultType: JudgeResultKind.RuntimeError,
+        expectResultType: JudgeResultKind.TimeLimitExceeded,
         count: false,
     })),
     2000

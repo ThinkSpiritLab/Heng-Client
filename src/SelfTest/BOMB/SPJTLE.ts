@@ -24,14 +24,14 @@ const spjCode = `
 using namespace std;
 int main(void) {
     while(true) {
-        printf("💣😋💣");
+        ;
     }
     return 0;
 }
 `;
 
-export const BOMBBADSPJ = generateSpjSelfTest(
-    "BOMBBADSPJ",
+export const BOMBSPJTLE = generateSpjSelfTest(
+    "BOMBSPJTLE",
     "cpp",
     usrCode,
     {},
