@@ -9,15 +9,15 @@ const usrCode = `
 #include <bits/stdc++.h>
 using namespace std;
 
-int a[1000000000] = {}; // 4GB
+int a[500000000] = {}; // 2GB
 
 int main(void)
 {
-    for (int i = 0; i < 1000000000; i++)
+    for (int i = 0; i < 500000000; i++)
     {
         a[i] = 1;
     }
-    for (int i = 0; i < 1000000000; i++)
+    for (int i = 0; i < 500000000; i++)
     {
         printf("");
     }
