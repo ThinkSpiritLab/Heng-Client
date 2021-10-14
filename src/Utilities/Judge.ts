@@ -220,6 +220,7 @@ export abstract class JudgeAgent {
                         kind: JudgeResultKind.SystemError,
                         time: 0,
                         memory: 0,
+                        extraMessage: String(err),
                     },
                 ],
             };
