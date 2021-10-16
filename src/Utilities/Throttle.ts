@@ -15,10 +15,10 @@ export class Throttle {
             this.next();
         }
     }
-    block(): Promise<void> {
+    private block(): Promise<void> {
         return new Promise<void>((resolve) => this.queue.push(() => resolve()));
     }
-    next(): void {
+    private next(): void {
         if (this.queue.length > 0) {
             const f = this.queue.shift();
             if (f !== undefined) f();

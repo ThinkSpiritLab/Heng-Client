@@ -84,13 +84,13 @@ export abstract class JudgeAgent {
         this.Initialized++;
     }
 
-    checkInit(): void {
+    protected checkInit(): void {
         if (this.Initialized !== 1) {
             throw new Error("Don't forget to call init or init multiple times");
         }
     }
 
-    async updateStatus(judgeState: JudgeState): Promise<void> {
+    protected async updateStatus(judgeState: JudgeState): Promise<void> {
         if (this.controller) {
             await this.controller.do("UpdateJudges", {
                 id: this.judge.id,
@@ -99,7 +99,7 @@ export abstract class JudgeAgent {
         }
     }
 
-    async runJudge(
+    protected async runJudge(
         judgeFunction: (testCase: TestCase) => Promise<JudgeCaseResult>
     ): Promise<JudgeCaseResult[]> {
         const judgeCaseResults: JudgeCaseResult[] = [];
@@ -118,7 +118,11 @@ export abstract class JudgeAgent {
         return judgeCaseResults;
     }
 
-    async compileAndFillExtra(
+    protected transformTime(rawTime: number): number {
+        return Math.ceil(rawTime * this.timeRatio + this.timeIntercept);
+    }
+
+    protected async compileAndFillExtra(
         execType: ExecType,
         executable: Executable,
         transformer: {
@@ -137,9 +141,7 @@ export abstract class JudgeAgent {
         });
         if (compileResult !== undefined) {
             const exteaInfo = {
-                compileTime: Math.ceil(
-                    compileResult.time.usr * this.timeRatio + this.timeIntercept
-                ),
+                compileTime: this.transformTime(compileResult.time.usr),
                 compileMessage: await readStream(
                     fs.createReadStream(
                         await executableAgent.fileAgent.getPath(CompileLogName),
@@ -203,7 +205,7 @@ export abstract class JudgeAgent {
         }
     }
 
-    abstract getResult(): Promise<JudgeResult>;
+    protected abstract getResult(): Promise<JudgeResult>;
 
     async getResultNoException(): Promise<JudgeResult> {
         // this.checkInit();
@@ -233,7 +235,7 @@ export abstract class JudgeAgent {
         }
     }
 
-    generateCaseResult({
+    protected generateCaseResult({
         userResult,
         userExec,
         sysResult,
@@ -261,62 +263,66 @@ export abstract class JudgeAgent {
             sysJudge += sysErr;
         }
         const sysSummary = sysJudge.slice(0, 4).toLocaleLowerCase();
+        const kind = ((): JudgeResultKind => {
+            if (userResult.signal === 25) {
+                return JudgeResultKind.OutpuLimitExceeded;
+            } else if (
+                userResult.time.usr > userExec.limit.runtime.cpuTime ||
+                (userResult.time.real > userExec.limit.runtime.cpuTime &&
+                    userResult.returnCode === -1 &&
+                    userResult.signal === 9)
+            ) {
+                return JudgeResultKind.TimeLimitExceeded;
+            } else if (userResult.memory >= userExec.limit.runtime.memory) {
+                return JudgeResultKind.MemoryLimitExceeded;
+            } else if (
+                userResult.signal !== -1 ||
+                userResult.returnCode !== 0
+            ) {
+                return JudgeResultKind.RuntimeError;
+            } else if (sysResult.signal === 25) {
+                return JudgeResultKind.SystemOutpuLimitExceeded;
+            } else if (
+                sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
+                (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
+                    sysResult.returnCode === -1 &&
+                    sysResult.signal === 9)
+            ) {
+                return JudgeResultKind.SystemTimeLimitExceeded;
+            } else if (sysResult.memory > sysExec.limit.runtime.memory) {
+                return JudgeResultKind.SystemMemoryLimitExceeded;
+            } else if (
+                sysResult.signal !== -1 ||
+                !range(9).includes(sysResult.returnCode)
+            ) {
+                return JudgeResultKind.SystemRuntimeError;
+            } else if (
+                (sysSummary.startsWith("ac") || sysSummary.startsWith("ok")) &&
+                sysResult.returnCode === 0
+            ) {
+                return JudgeResultKind.Accepted;
+            } else if (
+                sysSummary.startsWith("pe") &&
+                sysResult.returnCode === 2
+            ) {
+                return JudgeResultKind.PresentationError;
+            } else {
+                return JudgeResultKind.WrongAnswer;
+            }
+        })();
+        let rawTime = userResult.time.usr;
+        if (kind === JudgeResultKind.TimeLimitExceeded) {
+            if (!(userResult.time.usr > userExec.limit.runtime.cpuTime))
+                rawTime = userResult.time.real;
+        }
         return {
-            kind: (() => {
-                if (userResult.signal === 25) {
-                    return JudgeResultKind.OutpuLimitExceeded;
-                } else if (
-                    userResult.time.usr > userExec.limit.runtime.cpuTime ||
-                    (userResult.time.real > userExec.limit.runtime.cpuTime &&
-                        userResult.returnCode === -1 &&
-                        userResult.signal === 9)
-                ) {
-                    return JudgeResultKind.TimeLimitExceeded;
-                } else if (userResult.memory >= userExec.limit.runtime.memory) {
-                    return JudgeResultKind.MemoryLimitExceeded;
-                } else if (
-                    userResult.signal !== -1 ||
-                    userResult.returnCode !== 0
-                ) {
-                    return JudgeResultKind.RuntimeError;
-                } else if (sysResult.signal === 25) {
-                    return JudgeResultKind.SystemOutpuLimitExceeded;
-                } else if (
-                    sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
-                    (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
-                        sysResult.returnCode === -1 &&
-                        sysResult.signal === 9)
-                ) {
-                    return JudgeResultKind.SystemTimeLimitExceeded;
-                } else if (sysResult.memory > sysExec.limit.runtime.memory) {
-                    return JudgeResultKind.SystemMemoryLimitExceeded;
-                } else if (
-                    sysResult.signal !== -1 ||
-                    !range(9).includes(sysResult.returnCode)
-                ) {
-                    return JudgeResultKind.SystemRuntimeError;
-                } else if (
-                    (sysSummary.startsWith("ac") ||
-                        sysSummary.startsWith("ok")) &&
-                    sysResult.returnCode === 0
-                ) {
-                    return JudgeResultKind.Accepted;
-                } else if (
-                    sysSummary.startsWith("pe") &&
-                    sysResult.returnCode === 2
-                ) {
-                    return JudgeResultKind.PresentationError;
-                } else {
-                    return JudgeResultKind.WrongAnswer;
-                }
-            })(),
-            time: Math.ceil(
-                userResult.time.usr * this.timeRatio + this.timeIntercept
-            ),
+            kind,
+            time: this.transformTime(rawTime),
             memory: userResult.memory,
             extraMessage: sysJudge,
         };
     }
+
     async clean(): Promise<void> {
         for (const executableAgent of this.ExecutableAgents) {
             await executableAgent.clean();
@@ -336,7 +342,7 @@ export class NormalJudgeAgent extends JudgeAgent {
         super(judge, timeRatio, timeIntercept, throttle, controller);
     }
 
-    async getResult(): Promise<JudgeResult> {
+    protected async getResult(): Promise<JudgeResult> {
         this.checkInit();
         if (this.judge.judge.type !== JudgeType.Normal) {
             throw new Error(
@@ -445,7 +451,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
         super(judge, timeRatio, timeIntercept, throttle, controller);
     }
 
-    async getResult(): Promise<JudgeResult> {
+    protected async getResult(): Promise<JudgeResult> {
         this.checkInit();
         if (this.judge.judge.type !== JudgeType.Special) {
             throw new Error(
@@ -549,7 +555,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         super(judge, timeRatio, timeIntercept, throttle, controller);
     }
 
-    async getResult(): Promise<JudgeResult> {
+    protected async getResult(): Promise<JudgeResult> {
         this.checkInit();
         if (this.judge.judge.type !== JudgeType.Interactive) {
             throw new Error(

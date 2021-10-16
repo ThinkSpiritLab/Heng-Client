@@ -121,13 +121,13 @@ export class ExecutableAgent {
         this.Initialized++;
     }
 
-    checkInit(): void {
+    private checkInit(): void {
         if (this.Initialized !== 1) {
             throw new Error("Don't forget to call init or init multiple times");
         }
     }
 
-    signCompileCache(): void {
+    private signCompileCache(): void {
         if (
             this.compileCacheable &&
             compileCachedJudge.get(this.judgeHash) === undefined
