@@ -1,6 +1,5 @@
 import {
     Executable,
-    Judge,
     JudgeCaseResult,
     JudgeResult,
     JudgeResultKind,
@@ -310,11 +309,14 @@ export abstract class JudgeAgent {
                 return JudgeResultKind.WrongAnswer;
             }
         })();
-        let rawTime = userResult.time.usr;
-        if (kind === JudgeResultKind.TimeLimitExceeded) {
-            if (!(userResult.time.usr > userExec.limit.runtime.cpuTime))
-                rawTime = userResult.time.real;
-        }
+        const rawTime = userResult.time.usr;
+        // sleep(inf);
+        // codeforces: Idleness limit exceeded, time: 0ms
+        // luogu: TLE, time: 1ms
+        // if (kind === JudgeResultKind.TimeLimitExceeded) {
+        //     if (!(userResult.time.usr > userExec.limit.runtime.cpuTime))
+        //         rawTime = userResult.time.real;
+        // }
         return {
             kind,
             time: this.transformTime(rawTime),
