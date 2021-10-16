@@ -18,7 +18,7 @@ export const PlainTextPE = generateNormalSelfTest(
             type: "direct",
             input,
             output,
-            expectResultType: JudgeResultKind.WrongAnswer,
+            expectResultType: JudgeResultKind.PresentationError,
             count: false,
         },
     ]

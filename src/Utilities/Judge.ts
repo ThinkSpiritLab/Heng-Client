@@ -12,6 +12,7 @@ import {
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { getLogger } from "log4js";
 import { getConfig } from "../Config";
 import { FileAgent, readStream } from "./File";
@@ -299,8 +300,12 @@ export abstract class JudgeAgent {
                         sysSummary.startsWith("ok")) &&
                     sysResult.returnCode === 0
                 ) {
-                    // May add ResultType PE
                     return JudgeResultKind.Accepted;
+                } else if (
+                    sysSummary.startsWith("pe") &&
+                    sysResult.returnCode === 2
+                ) {
+                    return JudgeResultKind.PresentationError;
                 } else {
                     return JudgeResultKind.WrongAnswer;
                 }
@@ -778,6 +783,24 @@ export async function getJudgerFactory(
     }
 
     let timeRatio = getConfig().judger.defaultTimeRatio;
+    const lastTimeRatioFileName = path.join(
+        os.tmpdir(),
+        "Heng_Client.timeratio"
+    );
+    try {
+        const trStr = await fs.promises.readFile(lastTimeRatioFileName, {
+            encoding: "utf-8",
+        });
+        const lastTimeRatio = parseFloat(trStr);
+        timeRatio = lastTimeRatio;
+        logger.info(
+            `Succeed in loading last TimeRatio from ${lastTimeRatioFileName}`
+        );
+    } catch (error) {
+        logger.warn(
+            `Fail to load last TimeRatio from ${lastTimeRatioFileName}`
+        );
+    }
     if (expectedTime && costTime) {
         // reportTime = realTime * timeRatio
         timeRatio = expectedTime / costTime;
@@ -835,5 +858,15 @@ export async function getJudgerFactory(
         );
     }
     logger.warn(`timeRatio is ${timeRatio}`);
+    try {
+        await fs.promises.writeFile(lastTimeRatioFileName, String(timeRatio), {
+            mode: 0o700,
+        });
+        logger.info(
+            `Succeed in writing TimeRatio to ${lastTimeRatioFileName}`
+        );
+    } catch (error) {
+        logger.warn(`Fail to write TimeRatio to ${lastTimeRatioFileName}`);
+    }
     return judgerFactory;
 }
