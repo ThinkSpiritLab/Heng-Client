@@ -820,6 +820,8 @@ export async function getJudgerFactory(
 
     judgerFactory = new JudgeFactory(timeRatio, timeIntercept, throttle);
 
+    logger.warn("start test system stability");
+
     // 校验
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
@@ -862,9 +864,7 @@ export async function getJudgerFactory(
         await fs.promises.writeFile(lastTimeRatioFileName, String(timeRatio), {
             mode: 0o700,
         });
-        logger.info(
-            `Succeed in writing TimeRatio to ${lastTimeRatioFileName}`
-        );
+        logger.info(`Succeed in writing TimeRatio to ${lastTimeRatioFileName}`);
     } catch (error) {
         logger.warn(`Fail to write TimeRatio to ${lastTimeRatioFileName}`);
     }
