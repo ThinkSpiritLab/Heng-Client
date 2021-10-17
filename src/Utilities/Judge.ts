@@ -18,7 +18,7 @@ import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
 import { Readable } from "stream";
-import { JailResult } from "../Spawn/Jail";
+import { EmptyJailResult, JailResult } from "../Spawn/Jail";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
 import { ExecType } from "../Spawn/Language/decl";
 import { range } from "lodash";
@@ -236,6 +236,27 @@ export abstract class JudgeAgent {
         }
     }
 
+    protected preDetect(
+        userResult: JailResult,
+        userExec: Executable
+    ): JudgeResultKind | undefined {
+        if (userResult.signal === 25) {
+            return JudgeResultKind.OutpuLimitExceeded;
+        } else if (
+            userResult.time.usr > userExec.limit.runtime.cpuTime ||
+            (userResult.time.real > userExec.limit.runtime.cpuTime &&
+                userResult.returnCode === -1 &&
+                userResult.signal === 9)
+        ) {
+            return JudgeResultKind.TimeLimitExceeded;
+        } else if (userResult.memory >= userExec.limit.runtime.memory) {
+            return JudgeResultKind.MemoryLimitExceeded;
+        } else if (userResult.signal !== -1 || userResult.returnCode !== 0) {
+            return JudgeResultKind.RuntimeError;
+        }
+        return undefined;
+    }
+
     protected generateCaseResult({
         userResult,
         userExec,
@@ -418,12 +439,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                             throw new Error("Unreachable code");
                         const userProcess = await userExecutableAgent.exec(
                             undefined,
-                            // [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
-                            [
-                                stdInputFH.fd,
-                                userOutputFH_W.fd,
-                                userOutputFH_W.fd,
-                            ]
+                            [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
                         );
                         return await Promise.all([
                             userProcess.result,
@@ -434,6 +450,21 @@ export class NormalJudgeAgent extends JudgeAgent {
                     }
                 );
                 await stdInputFH.close(), await userOutputFH_W.close();
+
+                if (
+                    this.preDetect(userResult, this.judge.judge.user) !==
+                    undefined
+                ) {
+                    return this.generateCaseResult({
+                        userResult: userResult,
+                        userExec: this.judge.judge.user,
+                        sysResult: EmptyJailResult,
+                        sysExec: cmpExec,
+                        userErr: userErr,
+                        sysOut: "",
+                        sysErr: "",
+                    });
+                }
 
                 [userOutputFH_R, stdOutputFH] = await Promise.all([
                     fs.promises.open(userOutputFilePath, "r", 0o700),
@@ -571,8 +602,22 @@ export class SpecialJudgeAgent extends JudgeAgent {
                         ]);
                     }
                 );
-                await stdInputFH.close();
-                await userOutputFH_W.close();
+                await stdInputFH.close(), await userOutputFH_W.close();
+
+                if (
+                    this.preDetect(userResult, this.judge.judge.user) !==
+                    undefined
+                ) {
+                    return this.generateCaseResult({
+                        userResult: userResult,
+                        userExec: this.judge.judge.user,
+                        sysResult: EmptyJailResult,
+                        sysExec: this.judge.judge.spj,
+                        userErr: userErr,
+                        sysOut: "",
+                        sysErr: "",
+                    });
+                }
 
                 [userOutputFH_R, stdInputFH2, stdOutputFH] = await Promise.all([
                     fs.promises.open(userOutputFilePath, "r", 0o700),
@@ -607,7 +652,6 @@ export class SpecialJudgeAgent extends JudgeAgent {
                                 : "",
                         ]);
                     });
-
                 await userOutputFH_R.close();
                 await stdInputFH2.close();
                 await stdOutputFH.close();

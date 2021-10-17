@@ -38,6 +38,17 @@ export interface JailResult {
     };
 }
 
+export const EmptyJailResult: JailResult = {
+    memory: 0,
+    returnCode: 0,
+    signal: -1,
+    time: {
+        real: 0,
+        usr: 0,
+        sys: 0,
+    },
+};
+
 export interface JailedChildProcess extends ChildProcess {
     outFd: number;
     result: Promise<JailResult>;
