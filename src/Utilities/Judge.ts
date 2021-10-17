@@ -788,8 +788,7 @@ export class JudgeFactory {
                     judgeInfo.judge.spj.limit.compiler.cpuTime / this.timeRatio
                 );
                 judgeInfo.judge.spj.limit.runtime.cpuTime = Math.ceil(
-                    judgeInfo.judge.spj.limit.runtime.cpuTime / this.timeRatio +
-                        judgeInfo.judge.user.limit.runtime.cpuTime
+                    judgeInfo.judge.spj.limit.runtime.cpuTime / this.timeRatio
                 );
                 return new SpecialJudgeAgent(
                     judgeInfo,
@@ -806,8 +805,7 @@ export class JudgeFactory {
                 );
                 judgeInfo.judge.interactor.limit.runtime.cpuTime = Math.ceil(
                     judgeInfo.judge.interactor.limit.runtime.cpuTime /
-                        this.timeRatio +
-                        judgeInfo.judge.user.limit.runtime.cpuTime
+                        this.timeRatio
                 );
                 return new InteractiveJudgeAgent(
                     judgeInfo,
