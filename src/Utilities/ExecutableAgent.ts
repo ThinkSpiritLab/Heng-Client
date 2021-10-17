@@ -3,7 +3,7 @@ import { Executable } from "heng-protocol";
 import path from "path";
 import fs from "fs";
 import { ExecType, Language } from "../Spawn/Language/decl";
-import { FileAgent, waitForOpen } from "./File";
+import { FileAgent } from "./File";
 import {
     JailBindMountOption,
     JailedChildProcess,
@@ -15,6 +15,7 @@ import { getConfig } from "../Config";
 import { BasicSpawnOption, CompleteStdioOptions } from "../Spawn/BasicSpawn";
 import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
+import { FileHandle } from "fs/promises";
 
 const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";
@@ -171,88 +172,98 @@ export class ExecutableAgent {
                 ).toString("utf-8")
             );
         } else {
-            const command = languageRunOption.command;
-            if (!args) {
-                args = [];
-            }
-            if (languageRunOption.args) {
-                args = [...args, ...languageRunOption.args];
-            }
-            const compileLogPath = path.resolve(
-                this.fileAgent.dir,
-                CompileLogName
-            );
-            const compileLogFileStream = fs.createWriteStream(compileLogPath, {
-                mode: 0o700,
-            });
-            await waitForOpen(compileLogFileStream);
-            if (stdio === undefined) {
-                stdio = ["pipe", "pipe", "pipe"];
-            }
-            stdio[1] = compileLogFileStream;
-            stdio[2] = compileLogFileStream;
-            const spawnOption: BasicSpawnOption = {
-                cwd:
-                    languageRunOption.spawnOption?.cwd ??
-                    cwd ??
+            let compileLogFileFH: FileHandle | undefined = undefined;
+            try {
+                const command = languageRunOption.command;
+                if (!args) {
+                    args = [];
+                }
+                if (languageRunOption.args) {
+                    args = [...args, ...languageRunOption.args];
+                }
+                const compileLogPath = path.resolve(
                     this.fileAgent.dir,
-                env: languageRunOption.spawnOption?.env,
-                stdio: stdio,
-                uid: getConfig().judger.uid,
-                gid: getConfig().judger.gid,
-            };
-            let bindMount: JailBindMountOption[] = [
-                {
-                    source: this.fileAgent.dir,
-                    mode: "rw",
-                },
-            ];
-            if (languageRunOption.jailSpawnOption?.bindMount) {
-                bindMount = [
-                    ...bindMount,
-                    ...languageRunOption.jailSpawnOption.bindMount,
+                    CompileLogName
+                );
+                compileLogFileFH = await fs.promises.open(
+                    compileLogPath,
+                    "w",
+                    0o700
+                );
+                if (stdio === undefined) {
+                    stdio = ["ignore", "pipe", "pipe"];
+                }
+                stdio[1] = compileLogFileFH.fd;
+                stdio[2] = compileLogFileFH.fd;
+                const spawnOption: BasicSpawnOption = {
+                    cwd:
+                        languageRunOption.spawnOption?.cwd ??
+                        cwd ??
+                        this.fileAgent.dir,
+                    env: languageRunOption.spawnOption?.env,
+                    stdio: stdio,
+                    uid: getConfig().judger.uid,
+                    gid: getConfig().judger.gid,
+                };
+                let bindMount: JailBindMountOption[] = [
+                    {
+                        source: this.fileAgent.dir,
+                        mode: "rw",
+                    },
                 ];
+                if (languageRunOption.jailSpawnOption?.bindMount) {
+                    bindMount = [
+                        ...bindMount,
+                        ...languageRunOption.jailSpawnOption.bindMount,
+                    ];
+                }
+
+                const jailSpawnOption: JailSpawnOption = {
+                    timelimit:
+                        languageRunOption.jailSpawnOption?.timelimit ??
+                        this.excutable.limit.compiler.cpuTime,
+                    memorylimit:
+                        languageRunOption.jailSpawnOption?.memorylimit ??
+                        this.excutable.limit.compiler.memory,
+                    pidlimit:
+                        languageRunOption.jailSpawnOption?.pidlimit ??
+                        getConfig().judger.defaultPidLimit,
+                    filelimit:
+                        languageRunOption.jailSpawnOption?.filelimit ??
+                        this.excutable.limit.compiler.output,
+                    tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
+                    bindMount,
+                };
+
+                const subProc = jailSpawn(
+                    command,
+                    args,
+                    spawnOption,
+                    jailSpawnOption
+                );
+                const jailResult = await subProc.result;
+                await compileLogFileFH.close();
+
+                this.fileAgent.register(CompileLogName, CompileLogName);
+                const compileStatisticPath = path.resolve(
+                    this.fileAgent.dir,
+                    CompileStatisticName
+                );
+                await fs.promises.writeFile(
+                    compileStatisticPath,
+                    JSON.stringify(jailResult),
+                    { mode: 0o700 }
+                );
+                this.fileAgent.register(
+                    CompileStatisticName,
+                    CompileStatisticName
+                );
+                this.compiled = true;
+                this.signCompileCache();
+                return jailResult;
+            } finally {
+                compileLogFileFH && (await compileLogFileFH.close());
             }
-
-            const jailSpawnOption: JailSpawnOption = {
-                timelimit:
-                    languageRunOption.jailSpawnOption?.timelimit ??
-                    this.excutable.limit.compiler.cpuTime,
-                memorylimit:
-                    languageRunOption.jailSpawnOption?.memorylimit ??
-                    this.excutable.limit.compiler.memory,
-                pidlimit:
-                    languageRunOption.jailSpawnOption?.pidlimit ??
-                    getConfig().judger.defaultPidLimit,
-                filelimit:
-                    languageRunOption.jailSpawnOption?.filelimit ??
-                    this.excutable.limit.compiler.output,
-                tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
-                bindMount,
-            };
-
-            const subProc = jailSpawn(
-                command,
-                args,
-                spawnOption,
-                jailSpawnOption
-            );
-            const jailResult = await subProc.result;
-
-            this.fileAgent.register(CompileLogName, CompileLogName);
-            const compileStatisticPath = path.resolve(
-                this.fileAgent.dir,
-                CompileStatisticName
-            );
-            await fs.promises.writeFile(
-                compileStatisticPath,
-                JSON.stringify(jailResult),
-                { mode: 0o700 }
-            );
-            this.fileAgent.register(CompileStatisticName, CompileStatisticName);
-            this.compiled = true;
-            this.signCompileCache();
-            return jailResult;
         }
     }
 

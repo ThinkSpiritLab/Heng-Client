@@ -205,11 +205,12 @@ export function useJail(
                 options
             ) as JailedChildProcess;
             subProcess.on("close", () => {
-                options.stdio?.forEach((io) => {
-                    if (typeof io === "number") {
-                        fs.close(io, () => undefined);
-                    }
-                });
+                // let FileHandle do it
+                // options.stdio?.forEach((io) => {
+                //     if (typeof io === "number") {
+                //         fs.close(io, () => undefined);
+                //     }
+                // });
             });
             Object.assign(subProcess, {
                 outFd,

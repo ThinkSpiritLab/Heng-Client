@@ -1,4 +1,5 @@
 import { BOMBBADSPJ } from "./BADSPJ";
+import { BOMBBULL } from "./BULL";
 import { BOMBCMP } from "./CMP";
 import { BOMBCOLE } from "./COLE";
 import { BOMBCTLE } from "./CTLE";
@@ -12,4 +13,5 @@ export const BOMB = [
     BOMBCMP,
     BOMBBADSPJ,
     BOMBSPJTLE,
+    BOMBBULL
 ];
