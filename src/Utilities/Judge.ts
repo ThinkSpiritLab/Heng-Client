@@ -481,7 +481,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                             undefined,
                             [userOutputFH_R.fd, "pipe", "pipe", stdOutputFH.fd]
                         );
-                        return await Promise.all([
+                        const r = await Promise.all([
                             compProcess.result,
                             compProcess.stdout !== null
                                 ? readStream(compProcess.stdout, 1024)
@@ -490,6 +490,11 @@ export class NormalJudgeAgent extends JudgeAgent {
                                 ? readStream(compProcess.stderr, 1024)
                                 : "",
                         ]);
+                        compProcess.stdout !== null &&
+                            compProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
                     });
                 await userOutputFH_R.close(), await stdOutputFH.close();
 
@@ -642,7 +647,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
                                 stdOutputFH.fd,
                             ]
                         );
-                        return await Promise.all([
+                        const r = await Promise.all([
                             compProcess.result,
                             compProcess.stdout !== null
                                 ? readStream(compProcess.stdout, 1024)
@@ -651,6 +656,11 @@ export class SpecialJudgeAgent extends JudgeAgent {
                                 ? readStream(compProcess.stderr, 1024)
                                 : "",
                         ]);
+                        compProcess.stdout !== null &&
+                            compProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
                     });
                 await userOutputFH_R.close();
                 await stdInputFH2.close();
@@ -758,7 +768,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                                 stdOutputFH.fd,
                                 "ignore",
                             ]);
-                        return await Promise.all([
+                        const r = await Promise.all([
                             userProcess.result,
                             compProcess.result,
                             userProcess.stderr !== null
@@ -776,6 +786,13 @@ export class InteractiveJudgeAgent extends JudgeAgent {
                                 ? readStream(compProcess.stderr, 1024)
                                 : "",
                         ]);
+                        userProcess.stdin !== null &&
+                            userProcess.stdin.destroy();
+                        userProcess.stdout !== null &&
+                            userProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
                     });
                 await stdInputFH.close();
                 await stdOutputFH.close();
