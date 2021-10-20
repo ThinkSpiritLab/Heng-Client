@@ -24,6 +24,7 @@ import { StatusReport } from "heng-protocol";
 import { EncryptParam, Sign } from "heng-sign-js";
 import { stat } from "./Utilities/Statistics";
 import moment from "moment";
+import https from "https";
 
 class Param {
     key!: string;
@@ -82,6 +83,9 @@ export class Controller {
     }
     logger = getLogger("Controller");
     exitTimer: NodeJS.Timeout | undefined = undefined;
+    agent = new https.Agent({
+        rejectUnauthorized: false,
+    });
     constructor(config: ControllerConfig) {
         this.host = config.host;
         this.SecrectKey = config.SecrectKey;
@@ -125,6 +129,7 @@ export class Controller {
         }
     }
     async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
+        req.httpsAgent = this.agent;
         return (await Axios.request(req)) as AxiosResponse<unknown>;
     }
 
