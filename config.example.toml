@@ -1,7 +1,7 @@
 [controller]
 host = "http://localhost:8000"
-SecrectKey = "0xffffffff"
 AccessKey = "ox00000000"
+SecrectKey = "0xffffffff"
 [self]
 judgeCapability = 4
 name = "TestJudger"
