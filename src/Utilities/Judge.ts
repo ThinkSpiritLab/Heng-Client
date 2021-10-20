@@ -40,6 +40,15 @@ const OtherCompileResultTransformer = {
     ce: JudgeResultKind.SystemCompileError,
 };
 
+const signalToString: Record<number, string> = {
+    2: "SIGINT",
+    4: "非法指令",
+    6: "异常终止",
+    8: "错误算术运算",
+    11: "非法内存访问（分段错误）",
+    15: "SIGTERM",
+};
+
 export abstract class JudgeAgent {
     protected ExecutableAgents: ExecutableAgent[] = [];
     protected fileAgent: FileAgent;
@@ -168,17 +177,14 @@ export abstract class JudgeAgent {
             if (compileResult.signal === 25) {
                 compileJudgeType = transformer.ole;
             } else if (
-                compileResult.time.usr >
-                    this.judge.judge.user.limit.compiler.cpuTime ||
-                (compileResult.time.real >
-                    this.judge.judge.user.limit.compiler.cpuTime &&
+                compileResult.time.usr > executable.limit.compiler.cpuTime ||
+                (compileResult.time.real > executable.limit.compiler.cpuTime &&
                     compileResult.returnCode === -1 &&
                     compileResult.signal === 9)
             ) {
                 compileJudgeType = transformer.tle;
             } else if (
-                compileResult.memory >=
-                this.judge.judge.user.limit.compiler.memory
+                compileResult.memory >= executable.limit.compiler.memory
             ) {
                 compileJudgeType = transformer.mle;
             } else if (
@@ -189,14 +195,15 @@ export abstract class JudgeAgent {
             }
             let judgeResult: JudgeResult | undefined = undefined;
             if (compileJudgeType !== undefined) {
+                const e: JudgeCaseResult = {
+                    kind: compileJudgeType,
+                    time: 0,
+                    memory: 0,
+                };
                 judgeResult = {
-                    cases: [
-                        {
-                            kind: compileJudgeType,
-                            time: 0,
-                            memory: 0,
-                        },
-                    ],
+                    cases: range(this.judge.test?.cases.length ?? 1).map(
+                        () => e
+                    ),
                     extra: this.extra,
                 };
             }
@@ -301,6 +308,7 @@ export abstract class JudgeAgent {
                 userResult.signal !== -1 ||
                 userResult.returnCode !== 0
             ) {
+                sysJudge += signalToString[userResult.signal] ?? "";
                 return JudgeResultKind.RuntimeError;
             } else if (sysResult.signal === 25) {
                 return JudgeResultKind.SystemOutpuLimitExceeded;
