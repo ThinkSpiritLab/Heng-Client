@@ -125,6 +125,13 @@ export abstract class JudgeAgent {
                 }
             }
         }
+        while (judgeCaseResults.length < (this.judge.test?.cases.length ?? 1)) {
+            judgeCaseResults.push({
+                kind: JudgeResultKind.Unjudged,
+                time: 0,
+                memory: 0,
+            });
+        }
         return judgeCaseResults;
     }
 
@@ -230,15 +237,14 @@ export abstract class JudgeAgent {
                 this.logger.fatal(error);
             });
             stat.finish(this.judge.id);
+            const e = {
+                kind: JudgeResultKind.SystemError,
+                time: 0,
+                memory: 0,
+                extraMessage: String(err),
+            };
             return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                        extraMessage: String(err),
-                    },
-                ],
+                cases: range(this.judge.test?.cases.length ?? 1).map(() => e),
             };
         }
     }
