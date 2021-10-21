@@ -31,7 +31,6 @@ export class Java extends Language {
         const args: string[] = [];
         args.push("-encoding", "UTF-8");
         args.push("-sourcepath", this.compileDir);
-        args.push("-d", this.compileDir);
         args.push(path.join(this.compileDir, this.src));
         return {
             skip: false,
