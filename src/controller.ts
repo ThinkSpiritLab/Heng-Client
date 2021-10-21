@@ -253,7 +253,12 @@ export class Controller {
     async connectWs(token: string): Promise<Controller> {
         return new Promise((resolve) => {
             this.ws = new WebSocket(
-                `${this.host}/v1/judger/websocket?token=${token}`
+                `${this.host}/v1/judger/websocket?token=${token}`,
+                {
+                    agent: this.host.startsWith("https")
+                        ? this.agent
+                        : undefined,
+                }
             );
             this.ws.on("open", () => {
                 this.logger.info("Ws Opened");
