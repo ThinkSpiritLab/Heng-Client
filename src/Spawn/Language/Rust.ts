@@ -2,8 +2,8 @@ import path from "path";
 import { getConfig } from "../../Config";
 import { RunOption, Language, LanguageConfigureOption } from "./decl";
 
-export class Pascal extends Language {
-    private src = "src.pas";
+export class Rust extends Language {
+    private src = "src.rs";
     private bin = "src";
 
     constructor(option: LanguageConfigureOption) {
@@ -21,19 +21,20 @@ export class Pascal extends Language {
     compileOptionGenerator(): RunOption {
         const compilerOptions: string[] = [
             path.join(this.compileDir, this.src),
-            `-o${path.join(this.compileDir, this.bin)}`,
-            "-vnw",
+            "-o",
+            path.join(this.compileDir, this.bin),
+            "-O",
         ];
-        if (this.excutable.environment.options?.o2 !== false) {
-            compilerOptions.push("-O2");
-        }
-
         return {
             skip: false,
-            command: getConfig().language.pascal,
+            command: getConfig().language.rustc,
             args: compilerOptions,
             jailSpawnOption: {
                 bindMount: [
+                    {
+                        source: "/tmp",
+                        mode: "rw",
+                    },
                     {
                         source: this.compileDir,
                         mode: "rw",
@@ -52,7 +53,6 @@ export class Pascal extends Language {
         return {
             skip: false,
             command: binPath,
-            spawnOption: {},
             jailSpawnOption: {
                 bindMount: [
                     {

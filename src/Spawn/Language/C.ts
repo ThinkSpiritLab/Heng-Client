@@ -20,9 +20,9 @@ export class C extends Language {
 
     compileOptionGenerator(): RunOption {
         const compilerOptions: string[] = [
-            this.src,
+            path.join(this.compileDir, this.src),
             "-o",
-            this.bin,
+            path.join(this.compileDir, this.bin),
             this.excutable.environment.options?.version !== undefined
                 ? `--std=${this.excutable.environment.options.version}`
                 : "--std=c99",
@@ -42,7 +42,19 @@ export class C extends Language {
             skip: false,
             command: getConfig().language.c,
             args: compilerOptions,
+            jailSpawnOption: {
+                bindMount: [
+                    {
+                        source: this.compileDir,
+                        mode: "rw",
+                    },
+                ],
+            },
         };
+    }
+
+    get compiledFiles(): string[] {
+        return [path.join(this.compileDir, this.bin)];
     }
 
     execOptionGenerator(): RunOption {

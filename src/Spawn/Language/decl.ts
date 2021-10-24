@@ -45,6 +45,7 @@ export abstract class Language {
     }
     abstract get compileCacheable(): boolean;
     abstract get srcFileName(): string;
+    abstract get compiledFiles(): string[];
     abstract compileOptionGenerator(): RunOption;
     abstract execOptionGenerator(): RunOption;
 }

@@ -7,6 +7,7 @@ import { JS } from "./JS";
 import { Pascal } from "./Pascal";
 import { PlainText } from "./PlainText";
 import { Python } from "./Python";
+import { Rust } from "./Rust";
 
 export function getConfiguredLanguage(
     lang: string,
@@ -33,6 +34,9 @@ export function getConfiguredLanguage(
             break;
         case "plaintext":
             return new PlainText(option);
+            break;
+        case "rust":
+            return new Rust(option);
             break;
         // case "js":
         // case "javascript":

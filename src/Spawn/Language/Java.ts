@@ -36,7 +36,19 @@ export class Java extends Language {
             skip: false,
             command: getConfig().language.javac,
             args: args,
+            jailSpawnOption: {
+                bindMount: [
+                    {
+                        source: this.compileDir,
+                        mode: "rw",
+                    },
+                ],
+            },
         };
+    }
+
+    get compiledFiles(): string[] {
+        return [path.join(this.compileDir, this.bin)];
     }
 
     execOptionGenerator(): RunOption {

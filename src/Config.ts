@@ -47,6 +47,9 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     ojcmp!: string;
+    @IsString()
+    @IsNotEmpty()
+    rustc!: string;
 }
 export class JailConfig {
     @IsString()

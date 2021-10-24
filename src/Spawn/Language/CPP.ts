@@ -21,9 +21,9 @@ export class CPP extends Language {
 
     compileOptionGenerator(): RunOption {
         const compilerOptions: string[] = [
-            this.src,
+            path.join(this.compileDir, this.src),
             "-o",
-            this.bin,
+            path.join(this.compileDir, this.bin),
             this.excutable.environment.options?.version !== undefined
                 ? `--std=${this.excutable.environment.options.version}`
                 : "--std=c++17",
@@ -39,7 +39,12 @@ export class CPP extends Language {
         if (this.excutable.environment.options?.lm !== false) {
             compilerOptions.push("-lm");
         }
-        const bindMount: JailBindMountOption[] = [];
+        const bindMount: JailBindMountOption[] = [
+            {
+                source: this.compileDir,
+                mode: "rw",
+            },
+        ];
         if (
             this.execType === ExecType.Spj ||
             this.execType === ExecType.Interactive
@@ -58,6 +63,10 @@ export class CPP extends Language {
                 bindMount: bindMount,
             },
         };
+    }
+
+    get compiledFiles(): string[] {
+        return [path.join(this.compileDir, this.bin)];
     }
 
     execOptionGenerator(): RunOption {

@@ -179,7 +179,7 @@ export class ExecutableAgent {
                     args = [];
                 }
                 if (languageRunOption.args) {
-                    args = [...args, ...languageRunOption.args];
+                    args = [...languageRunOption.args, ...args];
                 }
                 const compileLogPath = path.resolve(
                     this.fileAgent.dir,
@@ -205,16 +205,11 @@ export class ExecutableAgent {
                     uid: getConfig().judger.uid,
                     gid: getConfig().judger.gid,
                 };
-                let bindMount: JailBindMountOption[] = [
-                    {
-                        source: this.fileAgent.dir,
-                        mode: "rw",
-                    },
-                ];
+                let bindMount: JailBindMountOption[] = [];
                 if (languageRunOption.jailSpawnOption?.bindMount) {
                     bindMount = [
-                        ...bindMount,
                         ...languageRunOption.jailSpawnOption.bindMount,
+                        ...bindMount,
                     ];
                 }
 
@@ -245,6 +240,15 @@ export class ExecutableAgent {
                 await compileLogFileFH.close();
 
                 this.fileAgent.register(CompileLogName, CompileLogName);
+
+                try {
+                    for (const file of this.configuredLanguage.compiledFiles) {
+                        await fs.promises.access(file);
+                    }
+                } catch (error) {
+                    jailResult.returnCode = jailResult.returnCode || 1;
+                }
+
                 const compileStatisticPath = path.resolve(
                     this.fileAgent.dir,
                     CompileStatisticName
@@ -294,7 +298,7 @@ export class ExecutableAgent {
                 args = [];
             }
             if (languageRunOption.args) {
-                args = [...args, ...languageRunOption.args];
+                args = [...languageRunOption.args, ...args];
             }
 
             const spawnOption: BasicSpawnOption = {
@@ -310,8 +314,8 @@ export class ExecutableAgent {
             let bindMount: JailBindMountOption[] = [];
             if (languageRunOption.jailSpawnOption?.bindMount) {
                 bindMount = [
-                    ...bindMount,
                     ...languageRunOption.jailSpawnOption.bindMount,
+                    ...bindMount,
                 ];
             }
             const jailSpawnOption: JailSpawnOption = {

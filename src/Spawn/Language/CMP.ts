@@ -20,6 +20,10 @@ export class CMP extends Language {
         return { skip: true };
     }
 
+    get compiledFiles(): string[] {
+        return [getConfig().language.ojcmp];
+    }
+
     execOptionGenerator(): RunOption {
         const binPath = getConfig().language.ojcmp;
         return {

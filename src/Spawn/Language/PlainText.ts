@@ -23,6 +23,10 @@ export class PlainText extends Language {
         return { skip: true };
     }
 
+    get compiledFiles(): string[] {
+        return [];
+    }
+
     execOptionGenerator(): RunOption {
         const binPath = path.join(this.compileDir, this.src);
         return {
