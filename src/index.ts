@@ -39,31 +39,25 @@ async function main() {
     if (getuid() || getgid()) {
         throw new Error("Please run with root");
     }
-    await fs.promises.rmdir(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
-        { recursive: true }
-    );
+    await fs.promises.rmdir(getConfig().judger.tmpdirBase, {
+        recursive: true,
+    });
     for (const execType of ExecTypeArray) {
         await fs.promises.mkdir(
-            path.join(
-                os.tmpdir(),
-                getConfig().judger.tmpdirBase,
-                "bin",
-                execType
-            ),
+            path.join(getConfig().judger.tmpdirBase, "bin", execType),
             { recursive: true, mode: 0o700 }
         );
     }
+    await fs.promises.mkdir(path.join(getConfig().judger.tmpdirBase, "file"), {
+        recursive: true,
+        mode: 0o700,
+    });
     await fs.promises.mkdir(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "file"),
-        { recursive: true, mode: 0o700 }
-    );
-    await fs.promises.mkdir(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase, "workspace"),
+        path.join(getConfig().judger.tmpdirBase, "workspace"),
         { recursive: true, mode: 0o700 }
     );
     await chownR(
-        path.join(os.tmpdir(), getConfig().judger.tmpdirBase),
+        getConfig().judger.tmpdirBase,
         getConfig().judger.uid,
         getConfig().judger.gid,
         1

@@ -87,12 +87,7 @@ export class ExecutableAgent {
         }
 
         this.fileAgent = new FileAgent(
-            path.join(
-                getConfig().judger.tmpdirBase,
-                "bin",
-                execType,
-                this.dirHash
-            ),
+            path.join("bin", execType, this.dirHash),
             null
         );
         this.configuredLanguage.compileDir = this.fileAgent.dir;

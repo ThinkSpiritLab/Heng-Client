@@ -169,7 +169,6 @@ function freeRemoteFileCache(requiredBtyes: number): Promise<void> {
                 continue;
             }
             const filePath = path.join(
-                os.tmpdir(),
                 getConfig().judger.tmpdirBase,
                 "file",
                 record[0]
@@ -207,7 +206,6 @@ export async function readableFromUrlFile(file: File): Promise<Readable> {
             record[4] = Date.now();
             remoteFileMap.set(fileKey, record);
             const filePath = path.join(
-                os.tmpdir(),
                 getConfig().judger.tmpdirBase,
                 "file",
                 fileName
@@ -259,7 +257,6 @@ export async function readableFromUrlFile(file: File): Promise<Readable> {
 
             fileName = crypto.randomBytes(32).toString("hex");
             const filePath = path.join(
-                os.tmpdir(),
                 getConfig().judger.tmpdirBase,
                 "file",
                 fileName
@@ -330,7 +327,7 @@ export class FileAgent {
     >();
     private Initialized = 0;
     constructor(readonly prefix: string, readonly primaryFile: File | null) {
-        this.dir = path.join(os.tmpdir(), prefix);
+        this.dir = path.join(getConfig().judger.tmpdirBase, prefix);
     }
 
     /**

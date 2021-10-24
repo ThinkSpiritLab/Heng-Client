@@ -23,7 +23,7 @@ ojcmp = "/usr/bin/ojcmp"
 rustc = "/usr/bin/rustc"
 [judger]
 noSelfTestError = false
-tmpdirBase = "Heng_Client"
+tmpdirBase = "/tmp/Heng_Client"
 timeRatioTolerance = 5
 defaultPidLimit = 64
 defaultTimeRatio = 1

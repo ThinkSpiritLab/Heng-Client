@@ -77,7 +77,7 @@ export abstract class JudgeAgent {
         protected readonly controller?: Controller
     ) {
         this.fileAgent = new FileAgent(
-            path.join(getConfig().judger.tmpdirBase, "workspace", judge.id),
+            path.join("workspace", judge.id),
             judge.data ?? null
         );
     }
