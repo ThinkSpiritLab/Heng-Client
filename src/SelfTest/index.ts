@@ -23,5 +23,5 @@ export const Tests = [
     ...BOMB,
     ...INTERACTIVE,
     ...PLAINTEXT,
-    ...RUST
+    ...RUST,
 ];

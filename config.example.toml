@@ -33,4 +33,4 @@ gid = 1999
 cacheUsr = false
 cacheSpj = true
 cacheInteractor = true
-remoteFileCacheBytes = 2147483648
+remoteFileCacheBytes = 536870912
