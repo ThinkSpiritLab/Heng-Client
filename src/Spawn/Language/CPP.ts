@@ -1,7 +1,7 @@
 import path from "path";
 import { getConfig } from "../../Config";
 import { JailBindMountOption } from "../Jail";
-import { RunOption, Language, LanguageConfigureOption, ExecType } from "./decl";
+import { RunOption, Language, LanguageConfigureOption } from "./decl";
 
 export class CPP extends Language {
     private src = "src.cpp";

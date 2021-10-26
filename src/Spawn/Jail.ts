@@ -1,7 +1,6 @@
 import { ChildProcess, spawn } from "child_process";
 import { getLogger } from "log4js";
 import path from "path";
-import fs from "fs";
 import { Readable } from "stream";
 import { loggedSpawn } from ".";
 import { getConfig } from "../Config";

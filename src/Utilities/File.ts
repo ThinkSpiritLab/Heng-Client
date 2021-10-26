@@ -1,4 +1,3 @@
-import os from "os";
 import fs from "fs";
 import stream, { Readable } from "stream";
 import unzip from "unzip-stream";
