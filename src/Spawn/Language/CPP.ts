@@ -28,14 +28,17 @@ export class CPP extends Language {
                 ? `--std=${this.excutable.environment.options.version}`
                 : "--std=c++17",
         ];
-        if (this.excutable.environment.options?.o2 === false) {
-            compilerOptions.push("-O0");
-        } else {
+        // default on
+        if (this.excutable.environment.options?.o2 !== false) {
             compilerOptions.push("-O2");
+        } else {
+            compilerOptions.push("-O0");
         }
-        if (this.excutable.environment.options?.static) {
+        // default on
+        if (this.excutable.environment.options?.static !== false) {
             compilerOptions.push("-static");
         }
+        // default on
         if (this.excutable.environment.options?.lm !== false) {
             compilerOptions.push("-lm");
         }
@@ -45,10 +48,8 @@ export class CPP extends Language {
                 mode: "rw",
             },
         ];
-        if (
-            this.execType === ExecType.Spj ||
-            this.execType === ExecType.Interactive
-        ) {
+        // default off
+        if (this.excutable.environment.options?.testlib === true) {
             bindMount.push({
                 source: getConfig().language.testlib,
                 dest: path.join(this.compileDir, "testlib.h"),
