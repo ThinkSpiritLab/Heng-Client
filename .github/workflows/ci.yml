@@ -24,6 +24,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
 
+    - run: npm update -g npm
     - run: npm install
     - run: npm run ci-eslint
 
@@ -48,6 +49,7 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
-    
+          
+    - run: npm update -g npm
     - run: npm install
     - run: npm run ci-format
