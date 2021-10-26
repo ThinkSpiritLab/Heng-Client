@@ -74,7 +74,7 @@ export const InteractiveGuessNumber = generateInteractiveSelfTest(
     usrCode,
     {},
     interactorCode,
-    {},
+    { testlib: true },
     [
         {
             type: "direct",

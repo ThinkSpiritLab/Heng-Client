@@ -38,6 +38,7 @@ export class JS extends Language {
                         mode: "ro",
                     },
                 ],
+                symlink: [{ source: "/proc/self/fd/0", dest: "/dev/stdin" }],
             },
         };
     }

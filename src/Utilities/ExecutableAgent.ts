@@ -5,7 +5,6 @@ import fs from "fs";
 import { ExecType, Language } from "../Spawn/Language/decl";
 import { FileAgent } from "./File";
 import {
-    JailBindMountOption,
     JailedChildProcess,
     JailResult,
     jailSpawn,
@@ -200,13 +199,6 @@ export class ExecutableAgent {
                     uid: getConfig().judger.uid,
                     gid: getConfig().judger.gid,
                 };
-                let bindMount: JailBindMountOption[] = [];
-                if (languageRunOption.jailSpawnOption?.bindMount) {
-                    bindMount = [
-                        ...languageRunOption.jailSpawnOption.bindMount,
-                        ...bindMount,
-                    ];
-                }
 
                 const jailSpawnOption: JailSpawnOption = {
                     timelimit:
@@ -222,7 +214,8 @@ export class ExecutableAgent {
                         languageRunOption.jailSpawnOption?.filelimit ??
                         this.excutable.limit.compiler.output,
                     tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
-                    bindMount,
+                    bindMount: languageRunOption.jailSpawnOption?.bindMount,
+                    symlink: languageRunOption.jailSpawnOption?.symlink,
                 };
 
                 const subProc = jailSpawn(
@@ -306,13 +299,7 @@ export class ExecutableAgent {
                 uid: getConfig().judger.uid,
                 gid: getConfig().judger.gid,
             };
-            let bindMount: JailBindMountOption[] = [];
-            if (languageRunOption.jailSpawnOption?.bindMount) {
-                bindMount = [
-                    ...languageRunOption.jailSpawnOption.bindMount,
-                    ...bindMount,
-                ];
-            }
+
             const jailSpawnOption: JailSpawnOption = {
                 timelimit:
                     languageRunOption.jailSpawnOption?.timelimit ??
@@ -327,7 +314,8 @@ export class ExecutableAgent {
                     languageRunOption.jailSpawnOption?.filelimit ??
                     this.excutable.limit.runtime.output,
                 tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
-                bindMount,
+                bindMount: languageRunOption.jailSpawnOption?.bindMount,
+                symlink: languageRunOption.jailSpawnOption?.symlink,
             };
 
             const subProc = jailSpawn(

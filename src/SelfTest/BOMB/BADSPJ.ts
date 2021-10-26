@@ -36,7 +36,7 @@ export const BOMBBADSPJ = generateSpjSelfTest(
     usrCode,
     {},
     spjCode,
-    {},
+    { testlib: true },
     [
         {
             type: "direct",

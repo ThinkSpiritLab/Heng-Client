@@ -50,7 +50,7 @@ export const SpjEPS = generateSpjSelfTest(
     usrCode,
     {},
     spjCode,
-    {},
+    { testlib: true },
     [
         {
             type: "direct",

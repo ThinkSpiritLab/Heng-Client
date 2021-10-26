@@ -49,7 +49,7 @@ export const SpjAC = generateSpjSelfTest(
     usrCode,
     {},
     spjCode,
-    {},
+    { testlib: true },
     [
         {
             type: "direct",

@@ -12,6 +12,11 @@ export interface JailBindMountOption {
     mode: "ro" | "rw";
 }
 
+export interface JailSymlinkOption {
+    source: string;
+    dest: string;
+}
+
 export interface JailTmpfsMountOption {
     dest: string;
     size: number;
@@ -20,6 +25,7 @@ export interface JailTmpfsMountOption {
 export interface JailSpawnOption {
     tmpfsMount?: JailTmpfsMountOption[];
     bindMount?: JailBindMountOption[];
+    symlink?: JailSymlinkOption[];
     timelimit?: number; // ms default 600ms
     memorylimit?: number; // Byte default 512MB
     pidlimit?: number; // default 0->max
@@ -99,7 +105,7 @@ export function useJail(
                 }
             }
 
-            if (jailOption.bindMount != undefined) {
+            if (jailOption.bindMount !== undefined) {
                 for (const mountPoint of jailOption.bindMount) {
                     let choice = "";
                     if (mountPoint.mode === "ro") {
@@ -114,7 +120,13 @@ export function useJail(
                         param = mountPoint.source;
                     }
 
-                    jailArgs.push(choice, path.resolve(param));
+                    jailArgs.push(choice, param);
+                }
+            }
+
+            if (jailOption.symlink !== undefined) {
+                for (const sym of jailOption.symlink) {
+                    jailArgs.push("-s", `${sym.source}:${sym.dest}`);
                 }
             }
 
@@ -127,7 +139,7 @@ export function useJail(
                 jailArgs.push("--rlimit_cpu", "soft");
             }
 
-            if (jailOption.memorylimit != undefined) {
+            if (jailOption.memorylimit !== undefined) {
                 jailOption.memorylimit <= 0 &&
                     logger.warn(
                         "jailOption.memorylimit <= 0. You'd better know what you're doing."
@@ -139,7 +151,7 @@ export function useJail(
                 jailArgs.push("--rlimit_as", "soft");
             }
 
-            if (jailOption.pidlimit != undefined) {
+            if (jailOption.pidlimit !== undefined) {
                 jailOption.pidlimit <= 0 &&
                     logger.warn(
                         "jailOption.pidlimit <= 0. You'd better know what you're doing."
@@ -151,7 +163,7 @@ export function useJail(
             }
             jailArgs.push("--cgroup_cpu_ms_per_sec", "1000");
 
-            if (jailOption.filelimit != undefined) {
+            if (jailOption.filelimit !== undefined) {
                 jailOption.filelimit <= 0 &&
                     logger.warn(
                         "jailOption.filelimit <= 0. You'd better know what you're doing."
