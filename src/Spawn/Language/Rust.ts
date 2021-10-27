@@ -32,12 +32,14 @@ export class Rust extends Language {
             jailSpawnOption: {
                 bindMount: [
                     {
-                        source: "/tmp",
-                        mode: "rw",
-                    },
-                    {
                         source: this.compileDir,
                         mode: "rw",
+                    },
+                ],
+                tmpfsMount: [
+                    {
+                        dest: "/tmp",
+                        size: 128 * 1024 * 1024, // 128M
                     },
                 ],
             },
