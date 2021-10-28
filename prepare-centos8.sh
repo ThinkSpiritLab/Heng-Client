@@ -4,6 +4,7 @@ if [ $UID -ne 0 ]; then
 fi
 
 HCDIR=`dirname $(readlink -f "$0")`
+export GIT_SSL_NO_VERIFY=true
 
 dnf update --assumeyes
 
