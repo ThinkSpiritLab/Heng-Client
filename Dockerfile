@@ -1,5 +1,8 @@
 FROM centos:8
 WORKDIR /hc
 COPY . .
-RUN bash ./prepare-ubuntu20.sh
+RUN bash ./prepare-centos8.sh \
+    && dnf clean all \
+    && rm -rf /var/cache/yum \
+    && rm -rf /var/cache/dnf
 CMD ["node", "dist/index.js"]
