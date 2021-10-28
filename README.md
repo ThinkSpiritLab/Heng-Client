@@ -56,3 +56,146 @@
 要添加评测类型，先实现其对应的 `JudgeAgent` 然后在 `JudgeFactory` 中添加对应的 `case` 。
 
 `getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
+
+> spj 返回值汇总
+
+```cpp
+#ifndef OK_EXIT_CODE
+#   ifdef CONTESTER
+#       define OK_EXIT_CODE 0xAC
+#   else
+#       define OK_EXIT_CODE 0
+#   endif
+#endif
+
+#ifndef WA_EXIT_CODE
+#   ifdef EJUDGE
+#       define WA_EXIT_CODE 5
+#   elif defined(CONTESTER)
+#       define WA_EXIT_CODE 0xAB
+#   else
+#       define WA_EXIT_CODE 1
+#   endif
+#endif
+
+#ifndef PE_EXIT_CODE
+#   ifdef EJUDGE
+#       define PE_EXIT_CODE 4
+#   elif defined(CONTESTER)
+#       define PE_EXIT_CODE 0xAA
+#   else
+#       define PE_EXIT_CODE 2
+#   endif
+#endif
+
+#ifndef FAIL_EXIT_CODE
+#   ifdef EJUDGE
+#       define FAIL_EXIT_CODE 6
+#   elif defined(CONTESTER)
+#       define FAIL_EXIT_CODE 0xA3
+#   else
+#       define FAIL_EXIT_CODE 3
+#   endif
+#endif
+
+#ifndef DIRT_EXIT_CODE
+#   ifdef EJUDGE
+#       define DIRT_EXIT_CODE 6
+#   else
+#       define DIRT_EXIT_CODE 4
+#   endif
+#endif
+
+#ifndef POINTS_EXIT_CODE
+#   define POINTS_EXIT_CODE 7
+#endif
+
+#ifndef UNEXPECTED_EOF_EXIT_CODE
+#   define UNEXPECTED_EOF_EXIT_CODE 8
+#endif
+
+#ifndef PC_BASE_EXIT_CODE
+#   ifdef TESTSYS
+#       define PC_BASE_EXIT_CODE 50
+#   else
+#       define PC_BASE_EXIT_CODE 0
+#   endif
+#endif
+
+int resultExitCode(TResult r) {
+    if (r == _ok)
+        return OK_EXIT_CODE;
+    if (r == _wa)
+        return WA_EXIT_CODE;
+    if (r == _pe)
+        return PE_EXIT_CODE;
+    if (r == _fail)
+        return FAIL_EXIT_CODE;
+    if (r == _dirt)
+        return DIRT_EXIT_CODE;
+    if (r == _points)
+        return POINTS_EXIT_CODE;
+    if (r == _unexpected_eof)
+#ifdef ENABLE_UNEXPECTED_EOF
+        return UNEXPECTED_EOF_EXIT_CODE;
+#else
+        return PE_EXIT_CODE;
+#endif
+    if (r >= _partially)
+        return PC_BASE_EXIT_CODE + (r - _partially);
+    return FAIL_EXIT_CODE;
+}
+
+
+switch (result) {
+    case _ok:
+        errorName = "ok ";
+        quitscrS(LightGreen, errorName);
+        break;
+    case _wa:
+        errorName = "wrong answer ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _pe:
+        errorName = "wrong output format ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _fail:
+        errorName = "FAIL ";
+        quitscrS(LightRed, errorName);
+        break;
+    case _dirt:
+        errorName = "wrong output format ";
+        quitscrS(LightCyan, errorName);
+        result = _pe;
+        break;
+    case _points:
+        errorName = "points ";
+        quitscrS(LightYellow, errorName);
+        break;
+    case _unexpected_eof:
+        errorName = "unexpected eof ";
+        quitscrS(LightCyan, errorName);
+        break;
+    default:
+        if (result >= _partially) {
+            errorName = format("partially correct (%d) ", pctype);
+            isPartial = true;
+            quitscrS(LightYellow, errorName);
+        } else
+            quit(_fail, "What is the code ??? ");
+```
+
+> 其他平台编译参数汇总
+
+luogu：https://www.luogu.com.cn/discuss/86673
+
+codeforces(may be old)：https://codeforces.com/blog/entry/79
+
+loj：https://github.com/syzoj/syzoj-ng-judge/tree/master/src/languages
+
+lojv3：https://github.com/syzoj/judge-v3/tree/master/src/languages
+
+uoj：https://github.com/UniversalOJ/UOJ-System/blob/230738b770022cc6b882c42b67b82d7b29b82003/judger/uoj_judger/include/uoj_judger.h#L1137
+
+pta: https://github.com/pintia/ljudge/tree/master/etc/ljudge

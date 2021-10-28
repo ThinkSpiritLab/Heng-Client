@@ -1,36 +1,36 @@
 [controller]
-host = "http://localhost:8000/"
-SecrectKey = "0xffffffff"
+host = "http://localhost:8000"
 AccessKey = "ox00000000"
+SecrectKey = "0xffffffff"
 [self]
-judgeCapability = 1000
+judgeCapability = 4
 name = "TestJudger"
 version = "0.0.1"
-[hc]
-path = "/usr/local/bin/hc"
 [nsjail]
 path = "/usr/bin/nsjail"
 configFile = "./jailConfig.cfg"
 [language]
 c = "/usr/bin/gcc"
 cpp = "/usr/bin/g++"
+testlib = "/testlib.h"
 python = "/usr/bin/python3"
 java = "/usr/bin/java"
 javac = "/usr/bin/javac"
+cat = "/usr/bin/cat"
+node = "/usr/bin/node"
+pascal = "/usr/bin/fpc"
+ojcmp = "/usr/bin/ojcmp"
+rustc = "/usr/bin/rustc"
 [judger]
+noSelfTestError = false
+tmpdirBase = "/tmp/Heng_Client"
 timeRatioTolerance = 5
-cmp = '/usr/bin/ojcmp'
-uid = 1000
-gid = 1000
-[[judger.testcases]]
-src = "./selfTest/src.cpp"
-language = "cpp"
-timeExpected = 1000
-[[judger.testcases]]
-src = "./selfTest/Main.java"
-language = "java"
-timeExpected = 1000
-[[judger.testcases]]
-src = "./selfTest/src.py"
-language = "py3"
-timeExpected = 2000
+defaultPidLimit = 64
+defaultTimeRatio = 1
+selfTestRound = 5
+uid = 1999
+gid = 1999
+cacheUsr = false
+cacheSpj = true
+cacheInteractor = true
+remoteFileCacheBytes = 536870912

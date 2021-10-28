@@ -1,93 +1,85 @@
-// nsjail -C ../../Heng-Client/jailConfig.cfg  --cwd $(pwd) -B $(pwd) -- $(which  hc) -m 2  --bin $(which java) --args -Xss256k -Xms1m -Xmx1m Main
-import { getConfig } from "../../Config";
-import { ConfiguredLanguage, Language } from ".";
-import {
-    BasicSpawnOption,
-    JailSpawnOption,
-    loggedSpawn,
-    MeteredChildProcess,
-} from "..";
-import { useJail } from "../Jail";
-import { spawn } from "child_process";
-import { useMeter } from "../Meter";
 import path from "path";
+import { getConfig } from "../../Config";
+import { RunOption, Language, LanguageConfigureOption } from "./decl";
 
-export function javaExtraArg(
-    jailOption: JailSpawnOption,
-    args: { [key: string]: string | number | boolean } | undefined
-): string[] {
-    const javaOption: string[] = [];
-    if (jailOption.memorylimit !== undefined) {
-        javaOption.push(
-            args?.stackSize ? `-Xss${args.stackSize}k` : "-Xss256k",
-            `-Xms${Math.ceil(jailOption.memorylimit / 4)}m`,
-            `-Xmx${jailOption.memorylimit}m`
-        );
+export class Java extends Language {
+    private className = "Main";
+    private src = "Main.java";
+    private bin = "Main.class";
+
+    constructor(option: LanguageConfigureOption) {
+        super(option);
+        if (
+            this.excutable.environment.options?.className &&
+            typeof this.excutable.environment.options?.className === "string"
+        ) {
+            this.className = this.excutable.environment.options?.className;
+            this.src = this.excutable.environment.options?.className + ".java";
+            this.bin = this.excutable.environment.options?.className + ".class";
+        }
     }
-    return javaOption;
-}
 
-export const JAVA: Language = function (javaargs) {
-    const java = getConfig().language.java;
-    const javac = getConfig().language.javac;
-    return new ConfiguredLanguage(
-        function (
-            src: string, //path
-            output: string, //path
-            options: BasicSpawnOption,
-            jailOption: JailSpawnOption
-        ): MeteredChildProcess {
-            if (jailOption.pidlimit !== undefined && jailOption.pidlimit < 32) {
-                throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
-            }
-            const javaOption: string[] = [];
-            javaOption.push(...javaExtraArg(jailOption, javaargs));
-            javaOption.push("-sourcepath", options.cwd ?? path.dirname(src));
-            javaOption.push(src);
-            return useMeter(jailOption)(
-                useJail({
-                    mount: jailOption.mount,
-                    timelimit:
-                        jailOption.timelimit !== undefined
-                            ? jailOption.timelimit * 2
-                            : undefined,
-                    pidlimit:
-                        jailOption.pidlimit !== undefined
-                            ? jailOption.pidlimit + 2
-                            : undefined,
-                    filelimit: jailOption.filelimit,
-                })(loggedSpawn(spawn))
-            )(javac, javaOption, options);
-        },
-        function (
-            command: string,
-            args: string[],
-            options: BasicSpawnOption,
-            jailOption: JailSpawnOption
-        ): MeteredChildProcess {
-            if (jailOption.pidlimit !== undefined && jailOption.pidlimit < 32) {
-                throw `Too narrow pidlimit ${jailOption.pidlimit} for Java`;
-            }
-            const javaOption: string[] = [];
-            javaOption.push(...javaExtraArg(jailOption, javaargs));
-            javaOption.push("-classpath", options.cwd ?? path.dirname(command));
-            javaOption.push(path.basename(command, path.extname(command)));
-            return useMeter(jailOption)(
-                useJail({
-                    mount: jailOption.mount,
-                    timelimit:
-                        jailOption.timelimit !== undefined
-                            ? jailOption.timelimit * 2
-                            : undefined,
-                    pidlimit:
-                        jailOption.pidlimit !== undefined
-                            ? jailOption.pidlimit + 2
-                            : undefined,
-                    filelimit: jailOption.filelimit,
-                })(loggedSpawn(spawn))
-            )(java, javaOption, options);
-        },
-        `${javaargs?.className ?? "Main"}.java`,
-        `${javaargs?.className ?? "Main"}.class`
-    );
-};
+    get compileCacheable(): boolean {
+        return true;
+    }
+
+    get srcFileName(): string {
+        return this.src;
+    }
+
+    compileOptionGenerator(): RunOption {
+        const args: string[] = [];
+        args.push("-encoding", "UTF-8");
+        args.push("-sourcepath", this.compileDir);
+        args.push(path.join(this.compileDir, this.src));
+        return {
+            skip: false,
+            command: getConfig().language.javac,
+            args: args,
+            jailSpawnOption: {
+                bindMount: [
+                    {
+                        source: this.compileDir,
+                        mode: "rw",
+                    },
+                ],
+            },
+        };
+    }
+
+    get compiledFiles(): string[] {
+        return [path.join(this.compileDir, this.bin)];
+    }
+
+    execOptionGenerator(): RunOption {
+        const binPath = path.join(this.compileDir, this.bin);
+        const args: string[] = [];
+        args.push(
+            this.excutable.environment.options?.stackSize
+                ? `-Xss${this.excutable.environment.options.stackSize}k`
+                : "-Xss256k",
+            `-Xms${Math.ceil(
+                (this.excutable.limit.runtime.memory * 1.5) / 1024 / 1024 / 4
+            )}m`,
+            `-Xmx${Math.ceil(
+                (this.excutable.limit.runtime.memory * 1.5) / 1024 / 1024
+            )}m`
+        );
+        args.push("-classpath", this.compileDir);
+        args.push(this.className);
+        return {
+            skip: false,
+            command: getConfig().language.java,
+            args: args,
+            jailSpawnOption: {
+                bindMount: [
+                    {
+                        source: binPath,
+                        mode: "ro",
+                    },
+                ],
+                memorylimit: this.excutable.limit.runtime.memory * 2,
+            },
+        };
+    }
+}

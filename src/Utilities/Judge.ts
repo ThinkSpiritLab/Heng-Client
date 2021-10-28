@@ -3,804 +3,833 @@ import {
     JudgeCaseResult,
     JudgeResult,
     JudgeResultKind,
+    JudgeState,
     JudgeType,
+    TestCase,
+    TestPolicy,
 } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import path from "path";
-import * as fs from "fs";
+import fs from "fs";
+import os from "os";
 import { getLogger } from "log4js";
-import { JudgeFactoryConfig } from "../Config";
-import { ConfiguredLanguage, getLanguage } from "../Spawn/Language";
-import { FileAgent, readStream, waitForOpen } from "./File";
-import { jailMeterSpawn } from "../Spawn";
-import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
-import { StdioType } from "src/Spawn/BasicSpawn";
+import { getConfig } from "../Config";
+import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
+import { Tests } from "../SelfTest";
+import { Readable } from "stream";
+import { EmptyJailResult, JailResult } from "../Spawn/Jail";
+import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
+import { ExecType } from "../Spawn/Language/decl";
+import { range } from "lodash";
+import { Controller } from "src/controller";
+import { stat } from "./Statistics";
+import * as crypto from "crypto";
+import { FileHandle } from "fs/promises";
 
-function languageFromExcutable(excutable: Executable): ConfiguredLanguage {
-    return getLanguage(excutable.environment.language)(
-        excutable.environment.options
-    );
-}
+const UsrCompileResultTransformer = {
+    mle: JudgeResultKind.CompileMemoryLimitExceeded,
+    tle: JudgeResultKind.CompileTimeLimitExceeded,
+    ole: JudgeResultKind.CompileFileLimitExceeded,
+    ce: JudgeResultKind.CompileError,
+};
+const OtherCompileResultTransformer = {
+    mle: JudgeResultKind.SystemCompileError,
+    tle: JudgeResultKind.SystemCompileError,
+    ole: JudgeResultKind.SystemCompileError,
+    ce: JudgeResultKind.SystemCompileError,
+};
 
-export class ExecutableAgent {
-    compiled = false;
-    configuredLanguage: ConfiguredLanguage;
-    constructor(
-        readonly excutable: Executable,
-        private fileAgent: FileAgent,
-        readonly name: string,
-        readonly cwdPrefix: string,
-        private uid: number,
-        private gid: number
-    ) {
-        this.configuredLanguage = languageFromExcutable(excutable);
-        fileAgent.add(
-            `${name}:src`,
-            excutable.source,
-            path.join(cwdPrefix, this.configuredLanguage.sourceFileName)
-        );
-    }
-
-    needCompile(): boolean {
-        return (
-            this.configuredLanguage.compileGenerator !== null && //compile is needed
-            !this.compiled
-        ); //not compiled
-    }
-
-    async compile(): Promise<MeterResult | void> {
-        const srcpath = await this.fileAgent.getPath(`${this.name}:src`);
-        if (
-            this.needCompile() &&
-            this.configuredLanguage.compileGenerator !== null
-        ) {
-            const compileLogPath = path.resolve(
-                this.fileAgent.dir,
-                this.cwdPrefix,
-                "compile.log"
-            );
-            await fs.promises.mkdir(path.dirname(compileLogPath), {
-                recursive: true,
-            });
-            const compileLogFileStream = fs.createWriteStream(compileLogPath);
-            await waitForOpen(compileLogFileStream);
-            this.fileAgent.register(`${this.name}:compile-log`, compileLogPath);
-            const compileProcess = this.configuredLanguage.compileGenerator(
-                srcpath,
-                path.resolve(
-                    this.fileAgent.dir,
-                    this.cwdPrefix,
-                    this.configuredLanguage.compiledFileName
-                ),
-                {
-                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
-                    stdio: ["pipe", compileLogFileStream, compileLogFileStream],
-                    uid: this.uid,
-                    gid: this.gid,
-                },
-                {
-                    timelimit: this.excutable.limit.compiler.cpuTime,
-                    memorylimit: this.excutable.limit.compiler.memory,
-                    filelimit: Math.max(
-                        this.excutable.limit.compiler.output,
-                        this.excutable.limit.compiler.message
-                    ),
-                    mount: [
-                        {
-                            path: path.resolve(
-                                this.fileAgent.dir,
-                                this.cwdPrefix
-                            ),
-                            mode: "rw",
-                        },
-                    ],
-                }
-            );
-            this.compiled = true;
-            return await compileProcess.result;
-        } else {
-            return;
-        }
-    }
-
-    exec(stdio: StdioType): MeteredChildProcess {
-        if (this.needCompile()) {
-            throw "Excutable not compiled";
-        } else {
-            const excutablePath = path.resolve(
-                this.fileAgent.dir,
-                this.cwdPrefix,
-                this.configuredLanguage.compiledFileName
-            );
-            const excuter =
-                this.configuredLanguage.excuteGenerator ?? jailMeterSpawn;
-            return excuter(
-                excutablePath,
-                [],
-                {
-                    cwd: path.resolve(this.fileAgent.dir, this.cwdPrefix),
-                    stdio,
-                    uid: this.uid,
-                    gid: this.gid,
-                },
-                {
-                    timelimit: this.excutable.limit.runtime.cpuTime,
-                    memorylimit: this.excutable.limit.runtime.memory,
-                    filelimit: this.excutable.limit.runtime.output,
-                    mount: [{ path: excutablePath, mode: "ro" }],
-                }
-            );
-        }
-    }
-}
+const signalToString: Record<number, string> = {
+    2: "SIGINT",
+    4: "非法指令",
+    6: "异常终止",
+    8: "错误算术运算",
+    11: "非法内存访问（分段错误）",
+    15: "SIGTERM",
+};
 
 export abstract class JudgeAgent {
-    protected excutables: Executable[] = [];
+    protected ExecutableAgents: ExecutableAgent[] = [];
     protected fileAgent: FileAgent;
     protected logger = getLogger("JudgeAgent");
+    protected Initialized = 0;
+    protected extra: {
+        user?: {
+            compileMessage?: string;
+            compileTime?: number;
+        };
+        spj?: {
+            compileMessage?: string;
+            compileTime?: number;
+        };
+        interactor?: {
+            compileMessage?: string;
+            compileTime?: number;
+        };
+    } = {};
+
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        readonly throttle: Throttle,
-        protected uid: number,
-        protected gid: number
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        this.excutables.push(judge.judge.user);
         this.fileAgent = new FileAgent(
-            path.join("Heng-Client", judge.id),
-            judge.data ?? null,
-            this.uid,
-            this.gid
+            path.join("workspace", judge.id),
+            judge.data ?? null
         );
-        if (judge.dynamicFiles !== undefined) {
-            judge.dynamicFiles.forEach((file) => {
+    }
+
+    async init(): Promise<void> {
+        await this.fileAgent.init();
+        if (this.judge.dynamicFiles !== undefined) {
+            this.judge.dynamicFiles.forEach((file) => {
                 if (file.type === "remote") {
                     this.fileAgent.add(file.name, file.file);
                 }
             });
         }
+        this.Initialized++;
     }
 
-    getExtra = async (): Promise<{
-        user?:
-            | {
-                  compileMessage?: string | undefined;
-                  compileTime?: number | undefined; // ms
-              }
-            | undefined;
-        spj?:
-            | {
-                  compileMessage?: string | undefined;
-                  compileTime?: number | undefined; // ms
-              }
-            | undefined;
-        interactor?:
-            | {
-                  compileMessage?: string | undefined;
-                  compileTime?: number | undefined;
-              }
-            | undefined;
-    }> => ({});
-    async compileUsr(): Promise<
-        [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
-        const userExecutableAgent = new ExecutableAgent(
-            this.judge.judge.user,
-            this.fileAgent,
-            "usr",
-            "usr",
-            this.uid,
-            this.gid
-        );
-        const compileResult = await this.throttle.withThrottle(() =>
-            userExecutableAgent.compile()
-        );
-        if (compileResult !== undefined) {
-            this.getExtra = async () => ({
-                user: {
-                    compileTime: compileResult.time.usr,
-                    compileMessage: fs
-                        .readFileSync(
-                            await this.fileAgent.getPath("usr:compile-log")
-                        )
-                        .toString(),
-                },
+    protected checkInit(): void {
+        if (this.Initialized !== 1) {
+            throw new Error("Don't forget to call init or init multiple times");
+        }
+    }
+
+    protected async updateStatus(judgeState: JudgeState): Promise<void> {
+        if (this.controller) {
+            await this.controller.do("UpdateJudges", {
+                id: this.judge.id,
+                state: judgeState,
             });
-            if (
-                compileResult.memory >
-                this.judge.judge.user.limit.compiler.memory
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind:
-                                    JudgeResultKind.CompileMemoryLimitExceeded,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (
-                compileResult.time.real >
-                this.judge.judge.user.limit.compiler.cpuTime
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.CompileTimeLimitExceeded,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal === 25) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.CompileFileLimitExceeded,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.CompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
+        }
+    }
+
+    protected async runJudge(
+        judgeFunction: (testCase: TestCase) => Promise<JudgeCaseResult>
+    ): Promise<JudgeCaseResult[]> {
+        const judgeCaseResults: JudgeCaseResult[] = [];
+        if (this.judge.test) {
+            for (const testCase of this.judge.test.cases) {
+                const caseResult = await judgeFunction(testCase);
+                judgeCaseResults.push(caseResult);
+                if (
+                    caseResult.kind !== JudgeResultKind.Accepted &&
+                    this.judge.test.policy !== TestPolicy.All
+                ) {
+                    break;
+                }
             }
         }
-        return [undefined, userExecutableAgent];
+        while (judgeCaseResults.length < (this.judge.test?.cases.length ?? 1)) {
+            judgeCaseResults.push({
+                kind: JudgeResultKind.Unjudged,
+                time: 0,
+                memory: 0,
+            });
+        }
+        return judgeCaseResults;
     }
 
-    abstract getResult(): Promise<JudgeResult>;
+    protected transformTime(rawTime: number): number {
+        return Math.ceil(rawTime * this.timeRatio + this.timeIntercept);
+    }
+
+    protected async compileAndFillExtra(
+        execType: ExecType,
+        executable: Executable,
+        transformer: {
+            mle: JudgeResultKind;
+            tle: JudgeResultKind;
+            ole: JudgeResultKind;
+            ce: JudgeResultKind;
+        }
+    ): Promise<[ExecutableAgent, JudgeResult | undefined]> {
+        this.checkInit();
+        const executableAgent = new ExecutableAgent(execType, executable);
+        this.ExecutableAgents.push(executableAgent);
+        await executableAgent.init();
+        const compileResult = await this.throttle.withThrottle(() => {
+            return executableAgent.compile();
+        });
+        if (compileResult !== undefined) {
+            const exteaInfo = {
+                compileTime: this.transformTime(compileResult.time.usr),
+                compileMessage: await readStream(
+                    fs.createReadStream(
+                        await executableAgent.fileAgent.getPath(CompileLogName),
+                        {
+                            encoding: "utf-8",
+                            end: Math.min(
+                                executable.limit.compiler.message,
+                                10 * 1024
+                            ),
+                        }
+                    ),
+                    -1
+                ),
+            };
+            if (execType === ExecType.Usr) {
+                this.extra.user = exteaInfo;
+            } else if (execType === ExecType.Spj) {
+                this.extra.spj = exteaInfo;
+            } else if (execType === ExecType.Interactive) {
+                this.extra.interactor = exteaInfo;
+            }
+            let compileJudgeType: JudgeResultKind | undefined = undefined;
+            if (compileResult.signal === 25) {
+                compileJudgeType = transformer.ole;
+            } else if (
+                compileResult.time.usr > executable.limit.compiler.cpuTime ||
+                (compileResult.time.real > executable.limit.compiler.cpuTime &&
+                    compileResult.returnCode === -1 &&
+                    compileResult.signal === 9)
+            ) {
+                compileJudgeType = transformer.tle;
+            } else if (
+                compileResult.memory >= executable.limit.compiler.memory
+            ) {
+                compileJudgeType = transformer.mle;
+            } else if (
+                compileResult.signal !== -1 ||
+                compileResult.returnCode !== 0
+            ) {
+                compileJudgeType = transformer.ce;
+            }
+            let judgeResult: JudgeResult | undefined = undefined;
+            if (compileJudgeType !== undefined) {
+                const e: JudgeCaseResult = {
+                    kind: compileJudgeType,
+                    time: 0,
+                    memory: 0,
+                };
+                judgeResult = {
+                    cases: range(this.judge.test?.cases.length ?? 1).map(
+                        () => e
+                    ),
+                    extra: this.extra,
+                };
+            }
+            return [executableAgent, judgeResult];
+        } else {
+            return [executableAgent, undefined];
+        }
+    }
+
+    protected abstract getResult(): Promise<JudgeResult>;
 
     async getResultNoException(): Promise<JudgeResult> {
+        // this.checkInit();
         try {
-            return await this.getResult();
-        } catch (e) {
-            this.logger.fatal(e);
+            stat.tick(this.judge.id);
+            await this.init();
+            const ret = await this.getResult();
+            await this.clean();
+            stat.finish(this.judge.id);
+            return ret;
+        } catch (err) {
+            this.logger.fatal(err);
+            await this.clean().catch((error) => {
+                this.logger.fatal(error);
+            });
+            stat.finish(this.judge.id);
+            const e = {
+                kind: JudgeResultKind.SystemError,
+                time: 0,
+                memory: 0,
+                extraMessage: String(err),
+            };
             return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                        extraMessage: e.toString(),
-                    },
-                ],
+                cases: range(this.judge.test?.cases.length ?? 1).map(() => e),
             };
         }
     }
 
-    generateResult(
-        userResult: MeterResult,
-        userExec: Executable,
-        sysResult: MeterResult,
-        sysExec: Executable,
-        sysJudge: string
-    ): JudgeCaseResult {
-        sysJudge = sysJudge.trim();
+    protected preDetect(
+        userResult: JailResult,
+        userExec: Executable
+    ): JudgeResultKind | undefined {
+        if (userResult.signal === 25) {
+            return JudgeResultKind.OutpuLimitExceeded;
+        } else if (
+            userResult.time.usr > userExec.limit.runtime.cpuTime ||
+            (userResult.time.real > userExec.limit.runtime.cpuTime &&
+                userResult.returnCode === -1 &&
+                userResult.signal === 9)
+        ) {
+            return JudgeResultKind.TimeLimitExceeded;
+        } else if (userResult.memory >= userExec.limit.runtime.memory) {
+            return JudgeResultKind.MemoryLimitExceeded;
+        } else if (userResult.signal !== -1 || userResult.returnCode !== 0) {
+            return JudgeResultKind.RuntimeError;
+        }
+        return undefined;
+    }
+
+    protected generateCaseResult({
+        userResult,
+        userExec,
+        sysResult,
+        sysExec,
+        // userErr,
+        sysOut,
+        sysErr,
+    }: {
+        userResult: JailResult;
+        userExec: Executable;
+        sysResult: JailResult;
+        sysExec: Executable;
+        userErr: string;
+        sysOut: string;
+        sysErr: string;
+    }): JudgeCaseResult {
+        this.checkInit();
+        sysOut = sysOut.trim();
+        sysErr = sysErr.trim();
+        let sysJudge = "";
+        if (sysOut) {
+            sysJudge += sysOut;
+        }
+        if (sysErr) {
+            sysJudge += sysErr;
+        }
+        const sysSummary = sysJudge.slice(0, 4).toLocaleLowerCase();
+        const kind = ((): JudgeResultKind => {
+            if (userResult.signal === 25) {
+                return JudgeResultKind.OutpuLimitExceeded;
+            } else if (
+                userResult.time.usr > userExec.limit.runtime.cpuTime ||
+                (userResult.time.real > userExec.limit.runtime.cpuTime &&
+                    userResult.returnCode === -1 &&
+                    userResult.signal === 9)
+            ) {
+                return JudgeResultKind.TimeLimitExceeded;
+            } else if (userResult.memory >= userExec.limit.runtime.memory) {
+                return JudgeResultKind.MemoryLimitExceeded;
+            } else if (
+                userResult.signal !== -1 ||
+                userResult.returnCode !== 0
+            ) {
+                sysJudge += signalToString[userResult.signal] ?? "";
+                return JudgeResultKind.RuntimeError;
+            } else if (sysResult.signal === 25) {
+                return JudgeResultKind.SystemOutpuLimitExceeded;
+            } else if (
+                sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
+                (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
+                    sysResult.returnCode === -1 &&
+                    sysResult.signal === 9)
+            ) {
+                return JudgeResultKind.SystemTimeLimitExceeded;
+            } else if (sysResult.memory > sysExec.limit.runtime.memory) {
+                return JudgeResultKind.SystemMemoryLimitExceeded;
+            } else if (
+                sysResult.signal !== -1 ||
+                !range(9).includes(sysResult.returnCode)
+            ) {
+                return JudgeResultKind.SystemRuntimeError;
+            } else if (
+                (sysSummary.startsWith("ac") || sysSummary.startsWith("ok")) &&
+                sysResult.returnCode === 0
+            ) {
+                return JudgeResultKind.Accepted;
+            } else if (
+                sysSummary.startsWith("pe") &&
+                sysResult.returnCode === 2
+            ) {
+                return JudgeResultKind.PresentationError;
+            } else {
+                return JudgeResultKind.WrongAnswer;
+            }
+        })();
+        const rawTime = userResult.time.usr;
+        // sleep(inf);
+        // codeforces: Idleness limit exceeded, time: 0ms
+        // luogu: TLE, time: 1ms
+        // if (kind === JudgeResultKind.TimeLimitExceeded) {
+        //     if (!(userResult.time.usr > userExec.limit.runtime.cpuTime))
+        //         rawTime = userResult.time.real;
+        // }
         return {
-            kind: (() => {
-                if (userResult.signal === 25) {
-                    return JudgeResultKind.OutpuLimitExceeded;
-                } else if (
-                    userResult.time.usr > userExec.limit.runtime.cpuTime ||
-                    userResult.time.real > userExec.limit.runtime.cpuTime * 1.5
-                ) {
-                    return JudgeResultKind.TimeLimitExceeded;
-                } else if (userResult.memory > userExec.limit.runtime.memory) {
-                    return JudgeResultKind.MemoryLimitExceeded;
-                } else if (
-                    userResult.signal !== -1 ||
-                    userResult.returnCode !== 0
-                ) {
-                    return JudgeResultKind.RuntimeError;
-                } else if (sysResult.signal === 25) {
-                    return JudgeResultKind.SystemOutpuLimitExceeded;
-                } else if (
-                    sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
-                    sysResult.time.real > sysExec.limit.runtime.cpuTime * 1.5
-                ) {
-                    return JudgeResultKind.SystemTimeLimitExceeded;
-                } else if (sysResult.memory > sysExec.limit.runtime.memory) {
-                    return JudgeResultKind.SystemMemoryLimitExceeded;
-                } else if (
-                    sysResult.signal !== -1 ||
-                    sysResult.returnCode !== 0
-                ) {
-                    return JudgeResultKind.SystemRuntimeError;
-                } else if (sysJudge === "AC") {
-                    return JudgeResultKind.Accepted;
-                } else if (sysJudge === "WA") {
-                    return JudgeResultKind.WrongAnswer;
-                } else {
-                    getLogger("generateResult").fatal(
-                        `Judger says:${sysJudge}`
-                    );
-                    return JudgeResultKind.SystemError;
-                }
-            })(),
-            time: userResult.time.usr * this.timeRatio + this.timeIntercept,
+            kind,
+            time: this.transformTime(rawTime),
             memory: userResult.memory,
+            extraMessage: sysJudge,
         };
     }
+
     async clean(): Promise<void> {
+        for (const executableAgent of this.ExecutableAgents) {
+            await executableAgent.clean();
+        }
         await this.fileAgent.clean();
     }
-    // abstract getState(): JudgeStatus;
 }
 
 export class NormalJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number,
-        private cmp: string
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
-        if (judge.judge.type !== JudgeType.Normal) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Normal})`;
-        }
+        super(judge, timeRatio, timeIntercept, throttle, controller);
     }
 
-    async getResult(): Promise<JudgeResult> {
-        const [compileResult, userExecutableAgent] = await this.compileUsr();
-        if (compileResult !== undefined) {
-            return compileResult;
-        } else if (userExecutableAgent !== undefined) {
-            const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, stdPath] = await Promise.all([
-                    this.fileAgent.getStream(value.input),
-                    this.fileAgent.getPath(value.output),
-                ]);
-                return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        // inputStream,
-                        "pipe",
-                        "pipe",
-                        "pipe",
-                    ]);
-                    if (userProcess.stdin) {
-                        inputStream.pipe(userProcess.stdin);
-                    }
-                    const compProcess = jailMeterSpawn(
-                        this.cmp,
-                        ["--std", stdPath],
-                        { stdio: [userProcess.stdout, "pipe", "pipe"] },
-                        {
-                            timelimit: this.judge.judge.user.limit.runtime
-                                .cpuTime,
-                            memorylimit: this.judge.judge.user.limit.runtime
-                                .memory,
-                            filelimit: this.judge.judge.user.limit.runtime
-                                .output,
-                            mount: [{ path: stdPath, mode: "ro" }],
-                        }
-                    );
-                    const [userResult, cmpResult, cmpOut] = await Promise.all([
-                        userProcess.result,
-                        compProcess.result,
-                        compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
-                            : "",
-                    ]);
-                    return this.generateResult(
-                        userResult,
-                        this.judge.judge.user,
-                        cmpResult,
-                        this.judge.judge.user,
-                        cmpOut
-                    );
-                });
-            });
-
-            return {
-                cases: await Promise.all(result ?? []),
-                extra: await this.getExtra(),
-            };
-        } else {
-            return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                        extraMessage: "Unknow Compile Failed",
-                    },
-                ],
-            };
+    protected async getResult(): Promise<JudgeResult> {
+        this.checkInit();
+        if (this.judge.judge.type !== JudgeType.Normal) {
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Normal})`
+            );
         }
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
+        const [userExecutableAgent, judgeResult1] =
+            await this.compileAndFillExtra(
+                ExecType.Usr,
+                this.judge.judge.user,
+                UsrCompileResultTransformer
+            );
+        if (judgeResult1 !== undefined) {
+            return judgeResult1;
+        }
+        const cmpExec: Executable = {
+            source: {
+                hashsum:
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                type: "direct",
+                content: "",
+            },
+            environment: {
+                language: "cmp",
+                system: "Linux",
+                arch: "x64",
+                options: {},
+            },
+            limit: this.judge.judge.user.limit,
+        };
+        const [cmpExecutableAgent, judgeResult2] =
+            await this.compileAndFillExtra(
+                ExecType.System,
+                cmpExec,
+                OtherCompileResultTransformer
+            );
+        if (judgeResult2 !== undefined) {
+            return judgeResult2;
+        }
+
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
+            const userOutputFilePath = path.join(
+                this.fileAgent.dir,
+                crypto.randomBytes(32).toString("hex")
+            );
+            let stdInputFH: FileHandle | undefined = undefined;
+            let userOutputFH_W: FileHandle | undefined = undefined;
+            let userOutputFH_R: FileHandle | undefined = undefined;
+            let stdOutputFH: FileHandle | undefined = undefined;
+
+            try {
+                [stdInputFH, userOutputFH_W] = await Promise.all([
+                    this.fileAgent.getFileHandler(testCase.input),
+                    fs.promises.open(userOutputFilePath, "w", 0o700),
+                ]);
+                const [userResult, userErr] = await this.throttle.withThrottle(
+                    async () => {
+                        if (
+                            stdInputFH === undefined ||
+                            userOutputFH_W === undefined
+                        )
+                            throw new Error("Unreachable code");
+                        const userProcess = await userExecutableAgent.exec(
+                            undefined,
+                            [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
+                        );
+                        return await Promise.all([
+                            userProcess.result,
+                            userProcess.stderr !== null
+                                ? readStream(userProcess.stderr, 1024)
+                                : "",
+                        ]);
+                    }
+                );
+                await stdInputFH.close(), await userOutputFH_W.close();
+
+                if (
+                    this.preDetect(userResult, this.judge.judge.user) !==
+                    undefined
+                ) {
+                    return this.generateCaseResult({
+                        userResult: userResult,
+                        userExec: this.judge.judge.user,
+                        sysResult: EmptyJailResult,
+                        sysExec: cmpExec,
+                        userErr: userErr,
+                        sysOut: "",
+                        sysErr: "",
+                    });
+                }
+
+                [userOutputFH_R, stdOutputFH] = await Promise.all([
+                    fs.promises.open(userOutputFilePath, "r", 0o700),
+                    this.fileAgent.getFileHandler(testCase.output),
+                ]);
+                const [cmpResult, cmpOut, cmpErr] =
+                    await this.throttle.withThrottle(async () => {
+                        if (
+                            userOutputFH_R === undefined ||
+                            stdOutputFH === undefined
+                        )
+                            throw new Error("Unreachable code");
+                        const compProcess = await cmpExecutableAgent.exec(
+                            undefined,
+                            [userOutputFH_R.fd, "pipe", "pipe", stdOutputFH.fd]
+                        );
+                        const r = await Promise.all([
+                            compProcess.result,
+                            compProcess.stdout !== null
+                                ? readStream(compProcess.stdout, 1024)
+                                : "",
+                            compProcess.stderr !== null
+                                ? readStream(compProcess.stderr, 1024)
+                                : "",
+                        ]);
+                        compProcess.stdout !== null &&
+                            compProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
+                    });
+                await userOutputFH_R.close(), await stdOutputFH.close();
+
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: cmpExec,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
+                });
+            } finally {
+                stdInputFH && (await stdInputFH.close());
+                userOutputFH_W && (await userOutputFH_W.close());
+                userOutputFH_R && (await userOutputFH_R.close());
+                stdOutputFH && (await stdOutputFH.close());
+            }
+        });
+
+        return {
+            cases: caseResults,
+            extra: this.extra,
+        };
     }
 }
 
 export class SpecialJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
-        if (judge.judge.type !== JudgeType.Special) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Special})`;
-        }
+        super(judge, timeRatio, timeIntercept, throttle, controller);
     }
-    async compileSpj(): Promise<
-        [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
-        if (this.judge.judge.type != JudgeType.Special) {
-            throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`;
+
+    protected async getResult(): Promise<JudgeResult> {
+        this.checkInit();
+        if (this.judge.judge.type !== JudgeType.Special) {
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`
+            );
         }
-        const userExecutableAgent = new ExecutableAgent(
-            this.judge.judge.spj,
-            this.fileAgent,
-            "spj",
-            "spj",
-            this.uid,
-            this.gid
-        );
-        const compileResult = await this.throttle.withThrottle(
-            async () => await userExecutableAgent.compile()
-        );
-        if (compileResult !== undefined) {
-            const oldExtra = this.getExtra;
-            this.getExtra = async () => ({
-                spj: {
-                    compileTime: compileResult.time.usr,
-                    compileMessage: fs
-                        .readFileSync(
-                            await this.fileAgent.getPath("spj:compile-log")
-                        )
-                        .toString(),
-                },
-                user: (await oldExtra()).user,
-            });
-            if (
-                compileResult.memory >
-                this.judge.judge.user.limit.compiler.memory
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (
-                compileResult.time.real >
-                this.judge.judge.user.limit.compiler.cpuTime
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal === 25) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
+        const [userExecutableAgent, judgeResult1] =
+            await this.compileAndFillExtra(
+                ExecType.Usr,
+                this.judge.judge.user,
+                UsrCompileResultTransformer
+            );
+        if (judgeResult1 !== undefined) {
+            return judgeResult1;
         }
-        return [undefined, userExecutableAgent];
-    }
-    async getResult(): Promise<JudgeResult> {
-        const [compileResult, userExecutableAgent] = await this.compileUsr();
-        const [spjCompileResult, spjExecutableAgent] = await this.compileSpj();
-        if (compileResult !== undefined) {
-            return compileResult;
-        } else if (spjCompileResult !== undefined) {
-            return spjCompileResult;
-        } else if (
-            userExecutableAgent !== undefined &&
-            spjExecutableAgent !== undefined
-        ) {
-            const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [
-                    inputStream,
-                    inputStream2,
-                    stdStream,
-                ] = await Promise.all([
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.output),
+        const [spjExecutableAgent, judgeResult2] =
+            await this.compileAndFillExtra(
+                ExecType.Spj,
+                this.judge.judge.spj,
+                OtherCompileResultTransformer
+            );
+        if (judgeResult2 !== undefined) {
+            return judgeResult2;
+        }
+
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
+            if (this.judge.judge.type !== JudgeType.Special) {
+                throw new Error(
+                    `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`
+                );
+            }
+
+            const userOutputFilePath = path.join(
+                this.fileAgent.dir,
+                crypto.randomBytes(32).toString("hex")
+            );
+            let stdInputFH: FileHandle | undefined = undefined;
+            let stdInputFH2: FileHandle | undefined = undefined;
+            let userOutputFH_W: FileHandle | undefined = undefined;
+            let userOutputFH_R: FileHandle | undefined = undefined;
+            let stdOutputFH: FileHandle | undefined = undefined;
+
+            try {
+                [stdInputFH, userOutputFH_W] = await Promise.all([
+                    this.fileAgent.getFileHandler(testCase.input),
+                    fs.promises.open(userOutputFilePath, "w", 0o700),
                 ]);
-                return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        // "pipe",
-                        inputStream,
-                        "pipe",
-                        "pipe",
-                    ]);
+                const [userResult, userErr] = await this.throttle.withThrottle(
+                    async () => {
+                        if (
+                            stdInputFH === undefined ||
+                            userOutputFH_W === undefined
+                        )
+                            throw new Error("Unreachable code");
+                        const userProcess = await userExecutableAgent.exec(
+                            undefined,
+                            [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
+                        );
+                        return await Promise.all([
+                            userProcess.result,
+                            userProcess.stderr !== null
+                                ? readStream(userProcess.stderr, 1024)
+                                : "",
+                        ]);
+                    }
+                );
+                await stdInputFH.close(), await userOutputFH_W.close();
 
-                    const compProcess = spjExecutableAgent.exec([
-                        userProcess.stdout,
-                        "pipe",
-                        "pipe",
-                        inputStream2,
-                        stdStream,
-                    ]);
-                    // inputStream2.pipe(userProcess.stdio[2]as unknown as Writable)
-                    // stdStream.pipe(userProcess.stdio[3]as unknown as Writable)
-                    const [userResult, cmpResult, cmpOut] = await Promise.all([
-                        userProcess.result,
-                        compProcess.result,
-                        compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
-                            : "",
-                    ]);
-                    return this.generateResult(
-                        userResult,
-                        this.judge.judge.user,
-                        cmpResult,
-                        this.judge.judge.user,
-                        cmpOut
-                    );
+                if (
+                    this.preDetect(userResult, this.judge.judge.user) !==
+                    undefined
+                ) {
+                    return this.generateCaseResult({
+                        userResult: userResult,
+                        userExec: this.judge.judge.user,
+                        sysResult: EmptyJailResult,
+                        sysExec: this.judge.judge.spj,
+                        userErr: userErr,
+                        sysOut: "",
+                        sysErr: "",
+                    });
+                }
+
+                [userOutputFH_R, stdInputFH2, stdOutputFH] = await Promise.all([
+                    fs.promises.open(userOutputFilePath, "r", 0o700),
+                    this.fileAgent.getFileHandler(testCase.input),
+                    this.fileAgent.getFileHandler(testCase.output),
+                ]);
+                const [cmpResult, cmpOut, cmpErr] =
+                    await this.throttle.withThrottle(async () => {
+                        if (
+                            stdInputFH2 === undefined ||
+                            userOutputFH_R === undefined ||
+                            stdOutputFH === undefined
+                        )
+                            throw new Error("Unreachable code");
+                        const compProcess = await spjExecutableAgent.exec(
+                            undefined,
+                            [
+                                userOutputFH_R.fd,
+                                "pipe",
+                                "pipe",
+                                stdInputFH2.fd,
+                                stdOutputFH.fd,
+                            ]
+                        );
+                        const r = await Promise.all([
+                            compProcess.result,
+                            compProcess.stdout !== null
+                                ? readStream(compProcess.stdout, 1024)
+                                : "",
+                            compProcess.stderr !== null
+                                ? readStream(compProcess.stderr, 1024)
+                                : "",
+                        ]);
+                        compProcess.stdout !== null &&
+                            compProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
+                    });
+                await userOutputFH_R.close();
+                await stdInputFH2.close();
+                await stdOutputFH.close();
+
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: this.judge.judge.spj,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
                 });
-            });
+            } finally {
+                stdInputFH && (await stdInputFH.close());
+                userOutputFH_W && (await userOutputFH_W.close());
+                userOutputFH_R && (await userOutputFH_R.close());
+                stdInputFH2 && (await stdInputFH2.close());
+                stdOutputFH && (await stdOutputFH.close());
+            }
+        });
 
-            return {
-                cases: await Promise.all(result ?? []),
-                extra: await this.getExtra(),
-            };
-        } else {
-            return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                        extraMessage: "Unknow Compile Failed",
-                    },
-                ],
-            };
-        }
+        return {
+            cases: caseResults,
+            extra: this.extra,
+        };
     }
 }
 
 export class InteractiveJudgeAgent extends JudgeAgent {
     constructor(
-        public judge: CreateJudgeArgs,
-        public timeRatio: number,
-        public timeIntercept: number,
-        throttle: Throttle,
-        uid: number,
-        gid: number
+        protected readonly judge: CreateJudgeArgs,
+        protected readonly timeRatio: number,
+        protected readonly timeIntercept: number,
+        protected readonly throttle: Throttle,
+        protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, uid, gid);
-        if (judge.judge.type !== JudgeType.Interactive) {
-            throw `Wrong JudgeType ${judge.judge.type}(Should be ${JudgeType.Interactive})`;
-        }
+        super(judge, timeRatio, timeIntercept, throttle, controller);
     }
-    async compileInteractor(): Promise<
-        [JudgeResult, undefined] | [undefined, ExecutableAgent]
-    > {
-        if (this.judge.judge.type != JudgeType.Interactive) {
-            throw `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`;
+
+    protected async getResult(): Promise<JudgeResult> {
+        this.checkInit();
+        if (this.judge.judge.type !== JudgeType.Interactive) {
+            throw new Error(
+                `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`
+            );
         }
-        const interactorExecutableAgent = new ExecutableAgent(
-            this.judge.judge.interactor,
-            this.fileAgent,
-            "spj",
-            "spj",
-            this.uid,
-            this.gid
-        );
-        const compileResult = await this.throttle.withThrottle(() =>
-            interactorExecutableAgent.compile()
-        );
-        if (compileResult !== undefined) {
-            const oldExtra = this.getExtra;
-            this.getExtra = async () => ({
-                interactor: {
-                    compileTime: compileResult.time.usr,
-                    compileMessage: fs
-                        .readFileSync(
-                            await this.fileAgent.getPath(
-                                "interactor:compile-log"
-                            )
-                        )
-                        .toString(),
-                },
-                user: (await oldExtra()).user,
-            });
-            if (
-                compileResult.memory >
-                this.judge.judge.user.limit.compiler.memory
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (
-                compileResult.time.real >
-                this.judge.judge.user.limit.compiler.cpuTime
-            ) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal === 25) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
-            if (compileResult.signal !== -1 || compileResult.returnCode !== 0) {
-                return [
-                    {
-                        cases:
-                            this.judge.test?.cases.map(() => ({
-                                kind: JudgeResultKind.SystemCompileError,
-                                time: 0,
-                                memory: 0,
-                            })) ?? [],
-                        extra: await this.getExtra(),
-                    },
-                    undefined,
-                ];
-            }
+
+        this.updateStatus(JudgeState.Preparing);
+        stat.tick(this.judge.id);
+
+        const [userExecutableAgent, judgeResult1] =
+            await this.compileAndFillExtra(
+                ExecType.Usr,
+                this.judge.judge.user,
+                UsrCompileResultTransformer
+            );
+        if (judgeResult1 !== undefined) {
+            return judgeResult1;
         }
-        return [undefined, interactorExecutableAgent];
-    }
-    async getResult(): Promise<JudgeResult> {
-        const [compileResult, userExecutableAgent] = await this.compileUsr();
-        const [
-            spjCompileResult,
-            interactorExecutableAgent,
-        ] = await this.compileInteractor();
-        if (compileResult !== undefined) {
-            return compileResult;
-        } else if (spjCompileResult !== undefined) {
-            return spjCompileResult;
-        } else if (
-            userExecutableAgent !== undefined &&
-            interactorExecutableAgent !== undefined
-        ) {
-            const result = this.judge.test?.cases?.map?.(async (value) => {
-                const [inputStream, stdStream] = await Promise.all([
-                    this.fileAgent.getFd(value.input),
-                    this.fileAgent.getFd(value.output),
+        const [interactorExecutableAgent, judgeResult2] =
+            await this.compileAndFillExtra(
+                ExecType.Interactive,
+                this.judge.judge.interactor,
+                OtherCompileResultTransformer
+            );
+        if (judgeResult2 !== undefined) {
+            return judgeResult2;
+        }
+
+        this.updateStatus(JudgeState.Judging);
+        stat.tick(this.judge.id);
+
+        const caseResults = await this.runJudge(async (testCase) => {
+            if (this.judge.judge.type !== JudgeType.Interactive) {
+                throw new Error(
+                    `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`
+                );
+            }
+            let stdInputFH: FileHandle | undefined = undefined;
+            let stdOutputFH: FileHandle | undefined = undefined;
+            try {
+                [stdInputFH, stdOutputFH] = await Promise.all([
+                    this.fileAgent.getFileHandler(testCase.input),
+                    this.fileAgent.getFileHandler(testCase.output),
                 ]);
-                return this.throttle.withThrottle(async () => {
-                    const userProcess = userExecutableAgent.exec([
-                        inputStream,
-                        "pipe",
-                        "pipe",
-                    ]);
+                const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
+                    await this.throttle.withThrottle(async () => {
+                        if (
+                            stdInputFH === undefined ||
+                            stdOutputFH === undefined
+                        )
+                            throw new Error("Unreachable code");
+                        const userProcess = await userExecutableAgent.exec(
+                            undefined,
+                            ["pipe", "pipe", "ignore"]
+                        );
+                        const compProcess =
+                            await interactorExecutableAgent.exec(undefined, [
+                                userProcess.stdout,
+                                userProcess.stdin,
+                                "pipe",
+                                stdInputFH.fd,
+                                stdOutputFH.fd,
+                                "ignore",
+                            ]);
+                        const r = await Promise.all([
+                            userProcess.result,
+                            compProcess.result,
+                            userProcess.stderr !== null
+                                ? readStream(userProcess.stderr, 1024)
+                                : "",
+                            (compProcess.stdio as unknown as Readable[])[5]
+                                ? readStream(
+                                      (
+                                          compProcess.stdio as unknown as Readable[]
+                                      )[5],
+                                      1024
+                                  )
+                                : "",
+                            compProcess.stderr !== null
+                                ? readStream(compProcess.stderr, 1024)
+                                : "",
+                        ]);
+                        userProcess.stdin !== null &&
+                            userProcess.stdin.destroy();
+                        userProcess.stdout !== null &&
+                            userProcess.stdout.destroy();
+                        compProcess.stderr !== null &&
+                            compProcess.stderr.destroy();
+                        return r;
+                    });
+                await stdInputFH.close();
+                await stdOutputFH.close();
 
-                    const compProcess = interactorExecutableAgent.exec([
-                        userProcess.stdout,
-                        "pipe",
-                        "pipe",
-                        inputStream,
-                        stdStream,
-                        userProcess.stdin,
-                    ]);
-                    const [userResult, cmpResult, cmpOut] = await Promise.all([
-                        userProcess.result,
-                        compProcess.result,
-                        compProcess.stdout !== null
-                            ? readStream(compProcess.stdout)
-                            : "",
-                    ]);
-                    return this.generateResult(
-                        userResult,
-                        this.judge.judge.user,
-                        cmpResult,
-                        this.judge.judge.user,
-                        cmpOut
-                    );
+                return this.generateCaseResult({
+                    userResult: userResult,
+                    userExec: this.judge.judge.user,
+                    sysResult: cmpResult,
+                    sysExec: this.judge.judge.interactor,
+                    userErr: userErr,
+                    sysOut: cmpOut,
+                    sysErr: cmpErr,
                 });
-            });
+            } finally {
+                stdInputFH && (await stdInputFH.close());
+                stdOutputFH && (await stdOutputFH.close());
+            }
+        });
 
-            return {
-                cases: await Promise.all(result ?? []),
-                extra: await this.getExtra(),
-            };
-        } else {
-            return {
-                cases: [
-                    {
-                        kind: JudgeResultKind.SystemError,
-                        time: 0,
-                        memory: 0,
-                        extraMessage: "Unknow Compile Failed",
-                    },
-                ],
-            };
-        }
+        return {
+            cases: caseResults,
+            extra: this.extra,
+        };
     }
 }
 
@@ -808,161 +837,217 @@ export class JudgeFactory {
     constructor(
         readonly timeRatio: number,
         readonly timeIntercept: number,
-        readonly cmp: string,
         readonly throttle: Throttle,
-        readonly uid: number,
-        readonly gid: number
+        public controller?: Controller
     ) {}
 
-    getJudgerAgent(judge: CreateJudgeArgs): JudgeAgent {
-        switch (judge.judge.type) {
+    getJudgerAgent(judgeInfo: CreateJudgeArgs): JudgeAgent {
+        judgeInfo.judge.user.limit.compiler.cpuTime = Math.ceil(
+            judgeInfo.judge.user.limit.compiler.cpuTime / this.timeRatio
+        );
+        judgeInfo.judge.user.limit.runtime.cpuTime = Math.ceil(
+            judgeInfo.judge.user.limit.runtime.cpuTime / this.timeRatio
+        );
+        switch (judgeInfo.judge.type) {
             case JudgeType.Normal: {
                 return new NormalJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
-                    this.uid,
-                    this.gid,
-                    this.cmp
+                    this.controller
                 );
             }
             case JudgeType.Special: {
+                judgeInfo.judge.spj.limit.compiler.cpuTime = Math.ceil(
+                    judgeInfo.judge.spj.limit.compiler.cpuTime / this.timeRatio
+                );
+                judgeInfo.judge.spj.limit.runtime.cpuTime = Math.ceil(
+                    judgeInfo.judge.spj.limit.runtime.cpuTime / this.timeRatio
+                );
                 return new SpecialJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
-                    this.uid,
-                    this.gid
+                    this.controller
                 );
             }
             case JudgeType.Interactive: {
+                judgeInfo.judge.interactor.limit.compiler.cpuTime = Math.ceil(
+                    judgeInfo.judge.interactor.limit.compiler.cpuTime /
+                        this.timeRatio
+                );
+                judgeInfo.judge.interactor.limit.runtime.cpuTime = Math.ceil(
+                    judgeInfo.judge.interactor.limit.runtime.cpuTime /
+                        this.timeRatio
+                );
                 return new InteractiveJudgeAgent(
-                    judge,
+                    judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
                     this.throttle,
-                    this.uid,
-                    this.gid
+                    this.controller
                 );
             }
             default:
-                throw "Unkown JudgeType";
+                throw new Error("Unkown JudgeType");
         }
     }
 }
 
 export async function getJudgerFactory(
-    judgerConfig: JudgeFactoryConfig,
     throttle: Throttle
 ): Promise<JudgeFactory> {
     const logger = getLogger("JudgeFactoryFactory");
     logger.info("self test loaded");
     const timeIntercept = 0;
-    const result = (
+    let judgerFactory = new JudgeFactory(1, 0, throttle);
+
+    let costTime = 0,
+        expectedTime = 0;
+
+    logger.warn("start preheat");
+
+    // 预热
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
-            judgerConfig.testcases.map(async (testcase, index) => {
-                logger.info(`self test ${index} loaded`);
-                const fileAgent = new FileAgent(
-                    `${process.pid}selfTest${index}`,
-                    null,
-                    process.getuid(),
-                    process.getgid()
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
                 );
-                try {
-                    await fileAgent.ready;
-                    const language = getLanguage(testcase.language);
-                    const configuredLanguage = language({});
-                    let curExcutablePath = path.resolve(
-                        fileAgent.dir,
-                        configuredLanguage.sourceFileName
-                    );
-                    logger.info(`copying src for testcase ${index}`);
-                    await fs.promises.copyFile(
-                        path.resolve(testcase.src),
-                        curExcutablePath
-                    );
-                    logger.info(`copyed src for testcase ${index}`);
-                    if (configuredLanguage.compileGenerator !== null) {
-                        logger.info(`self test ${index} compiling`);
-                        const compileProcess = configuredLanguage.compileGenerator(
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.sourceFileName
-                            ),
-                            path.resolve(
-                                fileAgent.dir,
-                                configuredLanguage.compiledFileName
-                            ),
-                            { cwd: fileAgent.dir },
-                            {
-                                timelimit: 10000,
-                                mount: [{ path: fileAgent.dir, mode: "rw" }],
-                            }
-                        );
-                        const compileResult = await compileProcess.result;
-                        if (
-                            compileResult.returnCode !== 0 ||
-                            compileResult.signal !== -1
-                        ) {
-                            throw `Compile for testcase ${index} Failed`;
-                        }
-                        logger.info(`self test ${index} compiled`);
-                        curExcutablePath = path.resolve(
-                            fileAgent.dir,
-                            configuredLanguage.compiledFileName
-                        );
-                    }
-                    const testProc = (
-                        configuredLanguage.excuteGenerator ?? jailMeterSpawn
-                    )(
-                        curExcutablePath,
-                        testcase.args ?? [],
-                        {
-                            cwd: fileAgent.dir,
-                            stdio:
-                                testcase.input !== undefined
-                                    ? [fs.createReadStream(testcase.input)]
-                                    : undefined,
-                        },
-                        {
-                            timelimit:
-                                judgerConfig.timeRatioTolerance *
-                                2 *
-                                testcase.timeExpected,
-                            mount: [{ path: curExcutablePath, mode: "ro" }],
-                        }
-                    );
-                    if (testProc.stdout) {
-                        const testOutput = await readStream(testProc.stdout);
-                        logger.info(`TestProc ${index} says ${testOutput}`);
-                    }
-                    const testResult = await testProc.result;
+                const result = await judgeAgent.getResultNoException();
+                console.log(result);
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
                     if (
-                        testResult.returnCode !== 0 ||
-                        testResult.signal !== -1
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.noSelfTestError
                     ) {
-                        throw `TestProc for testcase ${index} Failed`;
+                        throw new Error(
+                            `Preheat judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
                     }
-                    logger.info(
-                        `Test case ${index} completed in ${testResult.time.real}`
-                    );
-                    return [testcase.timeExpected, testResult.time.real];
-                } finally {
-                    await fileAgent.clean();
-                }
+                });
             })
-        )
-    ).reduce((lop, rop) => [lop[0] + rop[0], lop[1] + rop[1]]);
-    const timeRatio = result[1] / result[0];
-    logger.info(`timeRatio is ${timeRatio}`);
-    return new JudgeFactory(
-        timeRatio,
-        timeIntercept,
-        judgerConfig.cmp,
-        throttle,
-        judgerConfig.uid,
-        judgerConfig.gid
+        );
+    }
+
+    logger.warn("start self test");
+
+    // 统计
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
+        await Promise.all(
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
+                );
+                const result = await judgeAgent.getResultNoException();
+                console.log(result);
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
+                    if (
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.noSelfTestError
+                    ) {
+                        throw new Error(
+                            `Self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
+                    }
+                    if (expectedResult.count) {
+                        costTime += c.time;
+                        expectedTime += expectedResult.expectedTime;
+                    }
+                });
+            })
+        );
+    }
+
+    let timeRatio = getConfig().judger.defaultTimeRatio;
+    const lastTimeRatioFileName = path.join(
+        os.tmpdir(),
+        "Heng_Client.timeratio"
     );
+    try {
+        const trStr = await fs.promises.readFile(lastTimeRatioFileName, {
+            encoding: "utf-8",
+        });
+        const lastTimeRatio = parseFloat(trStr);
+        timeRatio = lastTimeRatio;
+        logger.info(
+            `Succeed in loading last TimeRatio from ${lastTimeRatioFileName}`
+        );
+    } catch (error) {
+        logger.warn(
+            `Fail to load last TimeRatio from ${lastTimeRatioFileName}`
+        );
+    }
+    if (expectedTime && costTime) {
+        // reportTime = realTime * timeRatio
+        timeRatio = expectedTime / costTime;
+    }
+    logger.warn(`timeRatio is ${timeRatio}`);
+    logger.warn(
+        `timeRatioTolerance is ${getConfig().judger.timeRatioTolerance}`
+    );
+
+    if (
+        (timeRatio / 1.0 > getConfig().judger.timeRatioTolerance ||
+            1.0 / timeRatio > getConfig().judger.timeRatioTolerance) &&
+        !getConfig().judger.noSelfTestError
+    ) {
+        throw new Error("timeRatio exceeds timeRatioTolerance");
+    }
+
+    judgerFactory = new JudgeFactory(timeRatio, timeIntercept, throttle);
+
+    logger.warn("start test system stability");
+
+    // 校验
+    for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
+        await Promise.all(
+            Tests.map(async (test) => {
+                const judgeAgent = judgerFactory.getJudgerAgent(
+                    JSON.parse(JSON.stringify(test.task))
+                );
+                const result = await judgeAgent.getResultNoException();
+                console.log(result);
+                result.cases.forEach((c, idx) => {
+                    const expectedResult = test.expectedResult[idx];
+                    if (
+                        expectedResult.expectResultType !== c.kind &&
+                        !getConfig().judger.noSelfTestError
+                    ) {
+                        throw new Error(
+                            `Second round self test judge result type error, test round: ${round}, test: ${test.name}, case: ${idx}, expected: ${expectedResult.expectResultType}, get: ${c.kind}`
+                        );
+                    }
+                    if (expectedResult.count) {
+                        const diff = Math.abs(
+                            expectedResult.expectedTime - c.time
+                        );
+                        const percentage = diff / expectedResult.expectedTime;
+                        if (
+                            (diff > 200 || percentage > 0.15) &&
+                            !getConfig().judger.noSelfTestError
+                        ) {
+                            throw new Error(
+                                `Second round self test, system instable, test round: ${round}, test: ${test.name}, case: ${idx}, diff: ${diff}, percentage: ${percentage}`
+                            );
+                        }
+                    }
+                });
+            })
+        );
+    }
+    logger.warn(`timeRatio is ${timeRatio}`);
+    try {
+        await fs.promises.writeFile(lastTimeRatioFileName, String(timeRatio), {
+            mode: 0o700,
+        });
+        logger.info(`Succeed in writing TimeRatio to ${lastTimeRatioFileName}`);
+    } catch (error) {
+        logger.warn(`Fail to write TimeRatio to ${lastTimeRatioFileName}`);
+    }
+    return judgerFactory;
 }

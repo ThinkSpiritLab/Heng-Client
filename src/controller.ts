@@ -1,7 +1,6 @@
 import { getLogger } from "log4js";
-import { createHmac, randomInt } from "crypto";
-import { orderBy, toUpper } from "lodash";
-import Axios, { AxiosResponse } from "axios";
+import { createHmac, randomInt, createHash } from "crypto";
+import Axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import {
     ControllerMethod,
     JudgerMethod,
@@ -22,6 +21,11 @@ import WebSocket from "ws";
 import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 import { ControllerConfig } from "./Config";
 import { StatusReport } from "heng-protocol";
+import { EncryptParam, Sign } from "heng-sign-js";
+import { stat } from "./Utilities/Statistics";
+import moment from "moment";
+import https from "https";
+
 class Param {
     key!: string;
     val!: string;
@@ -61,10 +65,27 @@ export class Controller {
     >;
     static MaxNonce = 0xffff;
     _nonce = randomInt(Controller.MaxNonce);
+    sign = new Sign((param: EncryptParam) => {
+        if (param.algorithm === "SHA256") {
+            return createHash("sha256").update(param.data).digest("hex");
+        } else if (param.algorithm === "HmacSHA256") {
+            if (!param.key) {
+                throw new Error("no key provided");
+            }
+            return createHmac("sha256", param.key)
+                .update(param.data)
+                .digest("hex");
+        }
+        return "";
+    }, true);
     get nonce(): number {
         return this._nonce++;
     }
     logger = getLogger("Controller");
+    exitTimer: NodeJS.Timeout | undefined = undefined;
+    agent = new https.Agent({
+        rejectUnauthorized: false,
+    });
     constructor(config: ControllerConfig) {
         this.host = config.host;
         this.SecrectKey = config.SecrectKey;
@@ -89,20 +110,17 @@ export class Controller {
         if (this.statusReportTimer !== undefined) {
             this.stopReport();
         }
-        this.statusReportTimer = setInterval(async () => {
-            const reportFunction = this.judgerMethods.get("Report");
-            if (reportFunction !== undefined) {
-                this.do("ReportStatus", {
-                    collectTime: new Date().toISOString(),
-                    nextReportTime: new Date(
-                        new Date().valueOf() + interval
-                    ).toISOString(),
-                    report: (await reportFunction(undefined)) as StatusReport,
-                });
-            } else {
-                this.logger.warn("找不到状态获取回调，无法报告状态。");
-            }
-        }, interval);
+        const fn = async () => {
+            this.do("ReportStatus", {
+                collectTime: moment().format("YYYY-MM-DDTHH:mm:ssZ"),
+                nextReportTime: moment(Date.now() + interval).format(
+                    "YYYY-MM-DDTHH:mm:ssZ"
+                ),
+                report: stat.collect(),
+            });
+        };
+        this.statusReportTimer = setInterval(fn, interval);
+        fn();
     }
     stopReport(): void {
         if (this.statusReportTimer !== undefined) {
@@ -110,56 +128,9 @@ export class Controller {
             this.statusReportTimer = undefined;
         }
     }
-    sign(req: Req): void {
-        let params: Param[] = [];
-        let headers: Header[] = [];
-        for (const key in req.params) {
-            params.push({ key, val: req.params[key].toString() });
-        }
-        if (req.headers === undefined) {
-            req.headers = {};
-        }
-        req.headers["x-heng-nonce"] = this.nonce.toString();
-        req.headers["x-heng-timestamp"] = Date.now().toString();
-        req.headers["x-heng-accesskey"] = this.AccessKey;
-        for (const key in req.headers) {
-            if (key !== "x-heng-signature") {
-                headers.push({ key, val: req.headers[key].toString() });
-            }
-        }
-        if (req.body !== undefined) {
-            params.push({
-                key: "body",
-                val:
-                    typeof req.body === "string"
-                        ? req.body
-                        : JSON.stringify(req.body),
-            });
-        }
-        params = orderBy(params, "key");
-        headers = orderBy(headers, "key");
-        const reqStr = `${toUpper(req.method)}:${headers
-            .map((h) => h.toString())
-            .join("&")}:${req.path}?${params
-            .map((p) => p.toString())
-            .join("&")}`;
-        const signature = createHmac("sha256", this.SecrectKey)
-            .update(reqStr)
-            .digest("hex");
-        if (!req.headers) {
-            req.headers = {};
-        }
-        req.headers["x-heng-signature"] = signature;
-    }
-    async exec(req: Req): Promise<AxiosResponse<unknown>> {
-        return (await Axios.request({
-            url: `/v1${req.path}`,
-            method: req.method,
-            baseURL: this.host,
-            data: req.body,
-            params: req.params,
-            headers: req.headers,
-        })) as AxiosResponse<unknown>;
+    async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
+        req.httpsAgent = this.agent;
+        return (await Axios.request(req)) as AxiosResponse<unknown>;
     }
 
     async getToken(
@@ -168,18 +139,19 @@ export class Controller {
         name?: string,
         software?: string
     ): Promise<AcquireTokenOutput> {
-        const req = {
-            body: {
+        const req = this.sign.sign({
+            data: {
                 maxTaskCount,
                 coreCount,
                 name,
                 software,
             },
             params: {},
-            path: "/judger/token",
+            url: `${this.host}/v1/judger/token`,
             method: "post",
-        } as Req;
-        this.sign(req);
+            ak: this.AccessKey,
+            sk: this.SecrectKey,
+        });
         try {
             const res = (await this.exec(req)).data;
             return res as AcquireTokenOutput;
@@ -198,20 +170,19 @@ export class Controller {
         method: "Control",
         cb: (args: ControlArgs) => Promise<ConnectionSettings>
     ): Controller;
-    on(method: "Report", cb: (args: void) => Promise<StatusReport>): Controller;
     on(
-        method: JudgerMethod | "Report",
+        method: JudgerMethod,
         cb:
             | ((args: CreateJudgeArgs) => Promise<null>)
             | ((args: ExitArgs) => Promise<null>)
             | ((args: ControlArgs) => Promise<ConnectionSettings>)
             | ((args: void) => Promise<StatusReport>)
     ): Controller {
-        this.logger.info(`Method ${method} Registered`);
         this.judgerMethods.set(
             method,
             cb as (args: unknown) => Promise<unknown>
         );
+        this.logger.info(`Method ${method} Registered`);
         return this;
     }
 
@@ -230,7 +201,7 @@ export class Controller {
                 timer: setTimeout(() => {
                     this.messageCallbackMap.delete(nonce);
                     reject("Time out");
-                }, 10000),
+                }, 5000),
             });
             const msg = JSON.stringify({
                 type: "req",
@@ -273,14 +244,21 @@ export class Controller {
         if (method !== undefined) {
             return method(msg.body.args);
         } else {
-            throw `Method ${msg.body.method} doesn't exist or not inited.`;
+            throw new Error(
+                `Method ${msg.body.method} doesn't exist or not inited.`
+            );
         }
     }
 
     async connectWs(token: string): Promise<Controller> {
         return new Promise((resolve) => {
             this.ws = new WebSocket(
-                `${this.host}v1/judger/websocket?token=${token}`
+                `${this.host}/v1/judger/websocket?token=${token}`,
+                {
+                    agent: this.host.startsWith("https")
+                        ? this.agent
+                        : undefined,
+                }
             );
             this.ws.on("open", () => {
                 this.logger.info("Ws Opened");
@@ -290,6 +268,11 @@ export class Controller {
             this.ws.on("close", () => {
                 this.logger.fatal("Ws Closed");
                 this.stopReport();
+                if (this.exitTimer === undefined) {
+                    setTimeout(() => {
+                        process.exit(3);
+                    }, 2000);
+                }
             });
             this.ws.on("message", async (msg) => {
                 if (typeof msg === "string") {
@@ -313,7 +296,7 @@ export class Controller {
                                 seq: message.seq,
                                 time: new Date().toISOString(),
                                 body: {
-                                    error: { code: 500, message: e.toString() },
+                                    error: { code: 500, message: String(e) },
                                 },
                             };
                             this.ws.send(JSON.stringify(res));

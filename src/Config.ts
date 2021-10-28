@@ -1,22 +1,18 @@
 import * as TOML from "@iarna/toml";
 import { Type, plainToClass } from "class-transformer";
 import {
-    ArrayMaxSize,
-    ArrayMinSize,
-    ArrayNotEmpty,
-    IsArray,
+    IsBoolean,
     IsInt,
     IsNotEmpty,
     IsNumber,
     IsOptional,
     IsPositive,
     IsString,
-    Max,
     Min,
     ValidateNested,
     validateSync,
 } from "class-validator";
-import * as fs from "fs";
+import fs from "fs";
 import { getLogger } from "log4js";
 const logger = getLogger("ConfigService");
 const configToml = fs.readFileSync("config.toml").toString();
@@ -29,6 +25,9 @@ export class LanguageConfig {
     cpp!: string;
     @IsString()
     @IsNotEmpty()
+    testlib!: string;
+    @IsString()
+    @IsNotEmpty()
     python!: string;
     @IsString()
     @IsNotEmpty()
@@ -36,6 +35,21 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     javac!: string;
+    @IsString()
+    @IsNotEmpty()
+    cat!: string;
+    @IsString()
+    @IsNotEmpty()
+    node!: string;
+    @IsString()
+    @IsNotEmpty()
+    pascal!: string;
+    @IsString()
+    @IsNotEmpty()
+    ojcmp!: string;
+    @IsString()
+    @IsNotEmpty()
+    rustc!: string;
 }
 export class JailConfig {
     @IsString()
@@ -44,11 +58,6 @@ export class JailConfig {
     @IsString()
     @IsNotEmpty()
     configFile!: string;
-}
-class MeterConfig {
-    @IsString()
-    @IsNotEmpty()
-    path!: string;
 }
 export class ControllerConfig {
     @IsString()
@@ -63,7 +72,6 @@ export class ControllerConfig {
 }
 export class SelfConfig {
     @IsInt()
-    @IsNotEmpty()
     @IsPositive()
     judgeCapability!: number;
     @IsString()
@@ -76,52 +84,39 @@ export class SelfConfig {
     @IsOptional()
     software?: string;
 }
-
-export class JudgeFactoryTestCase {
-    @IsString()
-    @IsNotEmpty()
-    src!: string;
-    // @IsString()
-    // @IsNotEmpty()
-    // cwd!: string;
-    @ValidateNested()
-    @IsString()
-    @IsOptional()
-    @Type(() => String)
-    args?: string[];
-    @IsString()
-    @IsNotEmpty()
-    language!: string;
-    @IsString()
-    @IsOptional()
-    input?: string;
-    @IsInt()
-    @Max(40000)
-    @Min(1)
-    timeExpected!: number;//ms
-}
 export class JudgeFactoryConfig {
+    @IsBoolean()
+    noSelfTestError!: boolean;
+    @IsString()
     @IsNotEmpty()
-    @IsArray()
-    @ValidateNested()
-    @ArrayNotEmpty()
-    @ArrayMinSize(2)
-    @ArrayMaxSize(20)
-    @Type(() => JudgeFactoryTestCase)
-    testcases!: JudgeFactoryTestCase[];
+    tmpdirBase!: string;
     @IsNumber()
-    @IsNotEmpty()
     @IsPositive()
     timeRatioTolerance!: number;
-    @IsString()
-    @IsNotEmpty()
-    cmp!: string;
+    @IsInt()
+    @IsPositive()
+    defaultPidLimit!: number;
+    @IsNumber()
+    @IsPositive()
+    defaultTimeRatio!: number;
+    @IsInt()
+    @Min(0)
+    selfTestRound!: number;
     @IsInt()
     @Min(1000)
     uid!: number;
     @IsInt()
     @Min(1000)
     gid!: number;
+    @IsBoolean()
+    cacheUsr!: boolean;
+    @IsBoolean()
+    cacheSpj!: boolean;
+    @IsBoolean()
+    cacheInteractor!: boolean;
+    @IsInt()
+    @IsPositive()
+    remoteFileCacheBytes!: number;
 }
 export class Config {
     @ValidateNested()
@@ -140,10 +135,6 @@ export class Config {
     @IsNotEmpty()
     @Type(() => JailConfig)
     nsjail!: JailConfig;
-    @ValidateNested()
-    @IsNotEmpty()
-    @Type(() => MeterConfig)
-    hc!: MeterConfig;
     @ValidateNested()
     @IsNotEmpty()
     @Type(() => JudgeFactoryConfig)
@@ -214,9 +205,9 @@ export function getConfig(): Config {
         config = plainToClass(Config, rawConfig);
         // logger.fatal(JSON.stringify(rawConfig));
         // logger.fatal(JSON.stringify(config));
-        if (!tryValidate((config as unknown) as Record<string, unknown>)) {
+        if (!tryValidate(config as unknown as Record<string, unknown>)) {
             config = undefined;
-            throw "Failed to get Config,Please check configToml";
+            throw new Error("Failed to get Config,Please check configToml");
         }
         logger.info("Loaded Config from file");
     }
