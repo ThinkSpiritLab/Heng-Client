@@ -34,12 +34,12 @@ dnf module --assumeyes install nodejs:14
 
 export RUSTUP_DIST_SERVER=https://mirror.sjtu.edu.cn/rust-static
 export RUSTUP_UPDATE_ROOT=https://mirror.sjtu.edu.cn/rust-static/rustup
-curl https://sh.rustup.rs -sSf | sh -s -- --profile default -y && source ~/.cargo/env
+curl https://cdn.jsdelivr.net/gh/rust-lang-nursery/rustup.rs/rustup-init.sh -sSf | sh -s -- --profile default -y && source ~/.cargo/env
 
 source /etc/profile
 
-npm install -g npm
-npm install -g cnpm && source /etc/profile
+npm install -g npm --registry=https://registry.npm.taobao.org
+npm i -g cnpm --registry=https://registry.npm.taobao.org && source /etc/profile
 
 git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp.git ~/ojcmp \
 && cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin
