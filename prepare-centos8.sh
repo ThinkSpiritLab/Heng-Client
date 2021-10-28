@@ -7,8 +7,7 @@ HCDIR=`dirname $(readlink -f "$0")`
 
 dnf update --assumeyes
 
-dnf install --enablerepo=PowerTools --assumeyes \
-autoconf \
+pkgs="autoconf \
 bison \
 flex \
 gcc \
@@ -27,7 +26,9 @@ git \
 wget \
 java-1.8.0-openjdk \
 java-1.8.0-openjdk-devel \
-python3
+python3"
+
+dnf install --enablerepo=PowerTools --assumeyes $pkgs || dnf install --enablerepo=powertools --assumeyes $pkgs
 
 dnf module --assumeyes install nodejs:14
 
