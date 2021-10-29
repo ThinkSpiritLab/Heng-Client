@@ -12,6 +12,8 @@
 
 ### Docker
 
+Host的内核版本需大于 4.6 （支持cgroup_namespaces）
+
 ```
 dnf install --assumeyes yum-utils device-mapper-persistent-data lvm2
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
