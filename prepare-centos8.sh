@@ -71,7 +71,7 @@ git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/Thin
 git clone -b real_usr_time_kill --depth=1 --single-branch https://github.com.cnpmjs.org/flaryer/nsjail.git ~/nsjail \
 && cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail
 
-cp ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
+cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
 
 cp $HCDIR/Tools/testlib.h /testlib.h
 
