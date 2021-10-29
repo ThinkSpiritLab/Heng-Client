@@ -1,19 +1,61 @@
 # 众衡
 
-本系统是为ThinkSpirit实验室的下一代在线评测系统设计的评测机系统的评测端。专职负责运行用户程序并得出判定结论。
+本系统是为 ThinkSpirit 实验室的下一代在线评测系统设计的评测机系统的评测端。专职负责运行用户程序并得出判定结论。
 
-系统的详细结构参见[协议仓库](https://github.com/ThinkSpiritLab/Heng-Protocol), 参考的评测机实现在 [Heng-Controler](https://github.com/ThinkSpiritLab/heng-controller)
+系统的详细结构参见[协议仓库](https://github.com/ThinkSpiritLab/Heng-Protocol), 参考的控制端实现在 [Heng-Controler](https://github.com/ThinkSpiritLab/heng-controller)
 
 本仓库的 `Docker` 镜像（语言环境已封装）见 [https://hub.docker.com/r/thinkspiritlab/heng-client](https://hub.docker.com/r/thinkspiritlab/heng-client)
+
+## 部署
+
+对于 ubuntu，无论是否使用 docker，都不能跳过[这个步骤](https://blog.csdn.net/SUKI547/article/details/112328873)。
+
+### Docker
+
+```
+dnf install --assumeyes yum-utils device-mapper-persistent-data lvm2
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+dnf install --assumeyes docker-ce
+systemctl start docker
+systemctl enable docker
+docker pull thinkspiritlab/heng-client:latest
+docker run --cgroupns private --privileged -it -v $(pwd)/config.toml:/hc/config.toml thinkspiritlab/heng-client
+# docker run --cgroupns private --privileged -d --restart=always -v $(pwd)/config.toml:/hc/config.toml thinkspiritlab/heng-client
+```
+
+### CentOS8
+
+```bash
+cd ~
+dnf install git -y
+git clone https://github.com/ThinkSpiritLab/Heng-Client.git
+cd ./Heng-Client
+bash prepare-centos8.sh
+cp config.example.toml config.toml
+npm run start # pm2 start ./dist/index.js --name judger
+```
+
+### Ubuntu20.04
+
+```bash
+sudo -i
+cd ~
+apt update
+apt install git -y
+git clone https://github.com/ThinkSpiritLab/Heng-Client.git
+cd ./Heng-Client
+bash prepare-ubuntu20.sh
+cp config.example.toml config.toml
+npm run start # pm2 start ./dist/index.js --name judger
+```
 
 ## 依赖
 
 ### 沙盒部分
 
-本系统依赖 `nsjail` 和 `Heng-Core` 作为沙盒内核。
-需要在配置文件中指定对应路径。
+本系统依赖魔改 `nsjail` 作为沙盒内核。需要在配置文件中指定对应路径。
 
-它们的仓库分别是 [https://github.com/google/nsjail](https://github.com/google/nsjail) 和 [https://github.com/ThinkSpiritLab/Heng-Core](https://github.com/ThinkSpiritLab/Heng-Core)
+它的仓库是 [https://github.com/flaryer/nsjail/tree/real_usr_time_kill](https://github.com/flaryer/nsjail/tree/real_usr_time_kill)。
 
 ### 语言
 
@@ -29,7 +71,7 @@
 
 #### 沙盒运行支持
 
-分为 `Meter` 和 `Jail` 两部分，分别对应 `Heng-Core` 和 `nsjail` 的调用逻辑。
+使用魔改 `nsjail`。
 
 #### 语言支持
 
@@ -45,19 +87,21 @@
 
 在 `src/controller.ts` 中实现了控制端相关逻辑。
 
-调用时，实例化一个 `Controller` 对象，注册各类评测机方法后获取token并开启连接。
+调用时，实例化一个 `Controller` 对象，注册各类评测机方法后获取 token 并开启连接。
 
 #### 评测
 
-不同的评测类型被封装在 `JudgeAgent` 的子类中。
+仅通过 `ExecutableAgent` 调用外部程序，`ExecutableAgent` 有编译和运行功能；`ExecutableAgent` 传入可执行对象 `Executable`（包括代码、语言、限制），根据不同语言调用相应 `Language`。编译或运行时可提供输入输出流，`ExecutableAgent` 询问 `Language` 编译参数或运行参数，并作一些合并，然后执行。
 
-而 `JudgeFactory` 是 `JudgeAgent` 的工厂类。
+对于 `Normal` 和 `Spj`，用户程序的输出被重定向到文件，随后被提供给结果判断程序；对于 `Interactive`，`user` 和 `interactor` 同时运行，双方的输入输出被 pipe 到另一方，由于管道缓冲区有容量限制，写满后写程序阻塞，要避免大量输入输出、避免 `interactor` 过慢、避免 `interactor` 时限小于 `user`。
 
-要添加评测类型，先实现其对应的 `JudgeAgent` 然后在 `JudgeFactory` 中添加对应的 `case` 。
+对于 `Normal` 和 `Spj`，用户程序没有正常结束运行时，跳过执行结果判断程序。
 
-`getJudgerFactory` 负责在生成 `JudgeFactory` 前进行自测以确定修正参数。
+可能无法检测 `OutpuLimitExceeded`。
 
-> spj 返回值汇总
+## 其他
+
+### spj 返回值及输出结果汇总
 
 ```cpp
 #ifndef OK_EXIT_CODE
@@ -186,7 +230,7 @@ switch (result) {
             quit(_fail, "What is the code ??? ");
 ```
 
-> 其他平台编译参数汇总
+### 其他平台编译参数汇总
 
 luogu：https://www.luogu.com.cn/discuss/86673
 
@@ -199,3 +243,8 @@ lojv3：https://github.com/syzoj/judge-v3/tree/master/src/languages
 uoj：https://github.com/UniversalOJ/UOJ-System/blob/230738b770022cc6b882c42b67b82d7b29b82003/judger/uoj_judger/include/uoj_judger.h#L1137
 
 pta: https://github.com/pintia/ljudge/tree/master/etc/ljudge
+
+
+### todo
+
+- spj cache LRU

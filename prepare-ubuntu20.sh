@@ -8,7 +8,7 @@ export GIT_SSL_NO_VERIFY=true
 
 apt update
 apt -y upgrade
-curl -sL https://deb.nodesource.com/setup_14.x | sudo bash - && 
+curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
 
 pkgs="autoconf \
 bison \
