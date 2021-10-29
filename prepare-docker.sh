@@ -34,10 +34,10 @@ source /etc/profile
 npm install -g npm
 
 git clone -b v0.4.0 --depth=1 --single-branch https://github.com/ThinkSpiritLab/ojcmp.git ~/ojcmp \
-&& cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin && rm -rf ~/ojcmp && cd ~
+&& cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin && cd ~
 
 git clone -b real_usr_time_kill --depth=1 --single-branch https://github.com/flaryer/nsjail.git ~/nsjail \
-&& cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail && rm -rf ~/nsjail && cd ~
+&& cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail && cd ~
 
 cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
 
@@ -46,9 +46,11 @@ cp $HCDIR/Tools/testlib.h /testlib.h
 cd $HCDIR && npm install && npm run build && cd ~
 
 dnf clean all
-
+rm -rf /var/cache/yum
+rm -rf /var/cache/dnf
+rm -rf ~/ojcmp
+rm -rf ~/nsjail
 rm -rf ~/.cargo
 rm -rf ~/.rustup/
 rm -rf /usr/local/rustup/share/doc
-
-npm cache clean -force
+npm cache clean --force
