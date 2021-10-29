@@ -8,5 +8,6 @@ RUN bash ./prepare-centos8.sh \
     && rm -rf ~/ojcmp \
     && rm -rf ~/nsjail \
     && rm -rf /usr/local/rustup/share/doc \
+    && rm -rf ~/.rustup \
     && npm cache clean --force
 CMD ["node", "dist/index.js"]
