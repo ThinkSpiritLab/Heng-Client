@@ -3,6 +3,7 @@ node_modules
 built
 dist
 .vscode
+.git
 config.json
 config.toml
 *.log
