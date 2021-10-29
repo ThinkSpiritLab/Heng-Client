@@ -5,5 +5,7 @@ RUN bash ./prepare-centos8.sh \
     && dnf clean all \
     && rm -rf /var/cache/yum \
     && rm -rf /var/cache/dnf \
+    && rm -rf ~/ojcmp \
+    && rm -rf ~/nsjail \
     && npm cache clean --force
 CMD ["node", "dist/index.js"]
