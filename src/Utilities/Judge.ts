@@ -1024,11 +1024,11 @@ export async function getJudgerFactory(
                     }
                     if (expectedResult.count) {
                         const diff = Math.abs(
-                            expectedResult.expectedTime - c.time
+                            expectedResult.expectedTime / timeRatio - c.time
                         );
                         const percentage = diff / expectedResult.expectedTime;
                         if (
-                            (diff > 200 || percentage > 0.15) &&
+                            percentage > 0.15 &&
                             !getConfig().judger.noSelfTestError
                         ) {
                             throw new Error(
