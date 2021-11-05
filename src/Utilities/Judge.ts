@@ -157,8 +157,10 @@ export abstract class JudgeAgent {
             return executableAgent.compile();
         });
         if (compileResult !== undefined) {
+            const compileSumTime =
+                compileResult.time.sys + compileResult.time.usr;
             const exteaInfo = {
-                compileTime: this.transformTime(compileResult.time.usr),
+                compileTime: this.transformTime(compileSumTime),
                 compileMessage: await readStream(
                     fs.createReadStream(
                         await executableAgent.fileAgent.getPath(CompileLogName),
@@ -184,7 +186,7 @@ export abstract class JudgeAgent {
             if (compileResult.signal === 25) {
                 compileJudgeType = transformer.ole;
             } else if (
-                compileResult.time.usr > executable.limit.compiler.cpuTime ||
+                compileSumTime > executable.limit.compiler.cpuTime ||
                 (compileResult.time.real > executable.limit.compiler.cpuTime &&
                     compileResult.returnCode === -1 &&
                     compileResult.signal === 9)
@@ -298,11 +300,13 @@ export abstract class JudgeAgent {
             sysJudge += sysErr;
         }
         const sysSummary = sysJudge.slice(0, 4).toLocaleLowerCase();
+        const userRunSumTime = userResult.time.usr + userResult.time.sys;
+        const sysRunSumTime = sysResult.time.usr + sysResult.time.sys;
         const kind = ((): JudgeResultKind => {
             if (userResult.signal === 25) {
                 return JudgeResultKind.OutpuLimitExceeded;
             } else if (
-                userResult.time.usr > userExec.limit.runtime.cpuTime ||
+                userRunSumTime > userExec.limit.runtime.cpuTime ||
                 (userResult.time.real > userExec.limit.runtime.cpuTime &&
                     userResult.returnCode === -1 &&
                     userResult.signal === 9)
@@ -319,7 +323,7 @@ export abstract class JudgeAgent {
             } else if (sysResult.signal === 25) {
                 return JudgeResultKind.SystemOutpuLimitExceeded;
             } else if (
-                sysResult.time.usr > sysExec.limit.runtime.cpuTime ||
+                sysRunSumTime > sysExec.limit.runtime.cpuTime ||
                 (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
                     sysResult.returnCode === -1 &&
                     sysResult.signal === 9)
@@ -346,7 +350,7 @@ export abstract class JudgeAgent {
                 return JudgeResultKind.WrongAnswer;
             }
         })();
-        const rawTime = userResult.time.usr;
+        const rawTime = userRunSumTime;
         // sleep(inf);
         // codeforces: Idleness limit exceeded, time: 0ms
         // luogu: TLE, time: 1ms
