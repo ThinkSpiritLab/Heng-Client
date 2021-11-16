@@ -29,7 +29,7 @@ export class Rust extends Language {
             skip: false,
             command: getConfig().language.rustc,
             args: compilerOptions,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: this.compileDir,
@@ -55,7 +55,7 @@ export class Rust extends Language {
         return {
             skip: false,
             command: binPath,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

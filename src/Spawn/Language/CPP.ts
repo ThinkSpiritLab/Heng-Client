@@ -60,7 +60,7 @@ export class CPP extends Language {
             skip: false,
             command: getConfig().language.cpp,
             args: compilerOptions,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: bindMount,
             },
         };
@@ -75,8 +75,7 @@ export class CPP extends Language {
         return {
             skip: false,
             command: binPath,
-            spawnOption: {},
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

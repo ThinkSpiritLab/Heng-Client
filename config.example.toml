@@ -9,6 +9,8 @@ version = "0.0.1"
 [nsjail]
 path = "/usr/bin/nsjail"
 configFile = "./jailConfig.cfg"
+[hc]
+path = "/usr/local/bin/hc"
 [language]
 c = "/usr/bin/gcc"
 cpp = "/usr/bin/g++"

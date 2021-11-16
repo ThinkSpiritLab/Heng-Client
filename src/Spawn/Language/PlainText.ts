@@ -33,7 +33,7 @@ export class PlainText extends Language {
             skip: false,
             command: getConfig().language.cat,
             args: [binPath],
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

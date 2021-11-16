@@ -31,7 +31,7 @@ export class Python extends Language {
             skip: false,
             command: getConfig().language.python,
             args: [binPath],
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

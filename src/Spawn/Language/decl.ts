@@ -1,5 +1,5 @@
 import { Executable } from "heng-protocol";
-import { JailSpawnOption } from "../Jail";
+import { HengSpawnOption } from "..";
 
 export enum ExecType {
     System = "system",
@@ -14,18 +14,14 @@ export const ExecTypeArray = [
     ExecType.Interactive,
 ];
 
-// Extract from BasicSpawnOption and JailSpawnOption and spawn's args
+// Extract from HengSpawnOption
 export type RunOption =
     | { skip: true }
     | {
           skip: false;
           command: string;
           args?: string[];
-          spawnOption?: {
-              cwd?: string;
-              env?: { [key: string]: string };
-          };
-          jailSpawnOption?: JailSpawnOption;
+          spawnOption?: HengSpawnOption;
       };
 
 export interface LanguageConfigureOption {

@@ -4,17 +4,13 @@ import path from "path";
 import fs from "fs";
 import { ExecType, Language } from "../Spawn/Language/decl";
 import { FileAgent } from "./File";
-import {
-    JailedChildProcess,
-    JailResult,
-    jailSpawn,
-    JailSpawnOption,
-} from "../Spawn/Jail";
 import { getConfig } from "../Config";
-import { BasicSpawnOption, CompleteStdioOptions } from "../Spawn/BasicSpawn";
+import { CompleteStdioOptions } from "../Spawn/BasicSpawn";
 import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
 import { FileHandle } from "fs/promises";
+import { hengSpawn, HengSpawnOption } from "../Spawn";
+import { MeteredChildProcess, MeterResult } from "src/Spawn/Meter";
 
 const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";
@@ -144,7 +140,7 @@ export class ExecutableAgent {
         args?: string[],
         stdio?: CompleteStdioOptions,
         cwd?: string
-    ): Promise<JailResult | void> {
+    ): Promise<MeterResult | void> {
         this.checkInit();
         await this.fileAgent.getPath(SourceCodeName);
         const languageRunOption =
@@ -189,7 +185,7 @@ export class ExecutableAgent {
                 }
                 stdio[1] = compileLogFileFH.fd;
                 stdio[2] = compileLogFileFH.fd;
-                const spawnOption: BasicSpawnOption = {
+                const spawnOption: HengSpawnOption = {
                     cwd:
                         languageRunOption.spawnOption?.cwd ??
                         cwd ??
@@ -198,33 +194,25 @@ export class ExecutableAgent {
                     stdio: stdio,
                     uid: getConfig().judger.uid,
                     gid: getConfig().judger.gid,
-                };
-
-                const jailSpawnOption: JailSpawnOption = {
-                    timelimit:
-                        languageRunOption.jailSpawnOption?.timelimit ??
+                    timeLimit:
+                        languageRunOption.spawnOption?.timeLimit ??
                         this.excutable.limit.compiler.cpuTime,
-                    memorylimit:
-                        languageRunOption.jailSpawnOption?.memorylimit ??
+                    memoryLimit:
+                        languageRunOption.spawnOption?.memoryLimit ??
                         this.excutable.limit.compiler.memory,
-                    pidlimit:
-                        languageRunOption.jailSpawnOption?.pidlimit ??
+                    pidLimit:
+                        languageRunOption.spawnOption?.pidLimit ??
                         getConfig().judger.defaultPidLimit,
-                    filelimit:
-                        languageRunOption.jailSpawnOption?.filelimit ??
+                    fileLimit:
+                        languageRunOption.spawnOption?.fileLimit ??
                         this.excutable.limit.compiler.output,
-                    tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
-                    bindMount: languageRunOption.jailSpawnOption?.bindMount,
-                    symlink: languageRunOption.jailSpawnOption?.symlink,
+                    tmpfsMount: languageRunOption.spawnOption?.tmpfsMount,
+                    bindMount: languageRunOption.spawnOption?.bindMount,
+                    symlink: languageRunOption.spawnOption?.symlink,
                 };
 
-                const subProc = jailSpawn(
-                    command,
-                    args,
-                    spawnOption,
-                    jailSpawnOption
-                );
-                const jailResult = await subProc.result;
+                const subProc = hengSpawn(command, args, spawnOption);
+                const procResult = await subProc.result;
                 await compileLogFileFH.close();
 
                 this.fileAgent.register(CompileLogName, CompileLogName);
@@ -234,7 +222,7 @@ export class ExecutableAgent {
                         await fs.promises.access(file);
                     }
                 } catch (error) {
-                    jailResult.returnCode = jailResult.returnCode || 1;
+                    procResult.returnCode = procResult.returnCode || 1;
                 }
 
                 const compileStatisticPath = path.resolve(
@@ -243,7 +231,7 @@ export class ExecutableAgent {
                 );
                 await fs.promises.writeFile(
                     compileStatisticPath,
-                    JSON.stringify(jailResult),
+                    JSON.stringify(procResult),
                     { mode: 0o700 }
                 );
                 this.fileAgent.register(
@@ -252,7 +240,7 @@ export class ExecutableAgent {
                 );
                 this.compiled = true;
                 this.signCompileCache();
-                return jailResult;
+                return procResult;
             } finally {
                 compileLogFileFH && (await compileLogFileFH.close());
             }
@@ -272,7 +260,7 @@ export class ExecutableAgent {
         cwd?: string,
         stdio?: CompleteStdioOptions,
         args?: string[]
-    ): Promise<JailedChildProcess> {
+    ): Promise<MeteredChildProcess> {
         this.checkInit();
         const languageRunOption = this.configuredLanguage.execOptionGenerator();
         if (languageRunOption.skip) {
@@ -289,7 +277,7 @@ export class ExecutableAgent {
                 args = [...languageRunOption.args, ...args];
             }
 
-            const spawnOption: BasicSpawnOption = {
+            const spawnOption: HengSpawnOption = {
                 cwd:
                     languageRunOption.spawnOption?.cwd ??
                     cwd ??
@@ -298,32 +286,24 @@ export class ExecutableAgent {
                 stdio: stdio,
                 uid: getConfig().judger.uid,
                 gid: getConfig().judger.gid,
-            };
-
-            const jailSpawnOption: JailSpawnOption = {
-                timelimit:
-                    languageRunOption.jailSpawnOption?.timelimit ??
+                timeLimit:
+                    languageRunOption.spawnOption?.timeLimit ??
                     this.excutable.limit.runtime.cpuTime,
-                memorylimit:
-                    languageRunOption.jailSpawnOption?.memorylimit ??
+                memoryLimit:
+                    languageRunOption.spawnOption?.memoryLimit ??
                     this.excutable.limit.runtime.memory,
-                pidlimit:
-                    languageRunOption.jailSpawnOption?.pidlimit ??
+                pidLimit:
+                    languageRunOption.spawnOption?.pidLimit ??
                     getConfig().judger.defaultPidLimit,
-                filelimit:
-                    languageRunOption.jailSpawnOption?.filelimit ??
+                fileLimit:
+                    languageRunOption.spawnOption?.fileLimit ??
                     this.excutable.limit.runtime.output,
-                tmpfsMount: languageRunOption.jailSpawnOption?.tmpfsMount,
-                bindMount: languageRunOption.jailSpawnOption?.bindMount,
-                symlink: languageRunOption.jailSpawnOption?.symlink,
+                tmpfsMount: languageRunOption.spawnOption?.tmpfsMount,
+                bindMount: languageRunOption.spawnOption?.bindMount,
+                symlink: languageRunOption.spawnOption?.symlink,
             };
 
-            const subProc = jailSpawn(
-                command,
-                args,
-                spawnOption,
-                jailSpawnOption
-            );
+            const subProc = hengSpawn(command, args, spawnOption);
             return subProc;
         }
     }
