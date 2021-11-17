@@ -1,5 +1,4 @@
 import { ChildProcess } from "child_process";
-import { getLogger } from "log4js";
 import path from "path";
 import { getConfig } from "../Config";
 
@@ -24,6 +23,7 @@ export interface JailUGidMapOption {
     outside: number;
     count: number;
 }
+export type RlimitString = "max" | "hard" | "def" | "soft" | "inf";
 
 export interface JailSpawnOption {
     // mount
@@ -33,17 +33,17 @@ export interface JailSpawnOption {
     uidMap?: JailUGidMapOption[];
     gidMap?: JailUGidMapOption[];
 
+    timeLimit?: number; // s default inf
+
     // rlimit
-    timeLimit?: number; // s default 600s
-    memoryLimit?: number; // M default 4096MB
-    fileLimit?: number; // M default 1MB
+    rlimitCPU?: number | RlimitString; // s default 600s
+    rlimitAS?: number | RlimitString; // M default 4096MB
+    rlimitFSIZE?: number | RlimitString; // M default 1MB
 
     cwd?: string;
     env?: { [key: string]: string };
     passFd?: number[];
 }
-
-const logger = getLogger("JailSpawn");
 
 export function useJail(
     jailOption: JailSpawnOption
@@ -118,34 +118,40 @@ export function useJail(
             }
 
             if (jailOption.timeLimit !== undefined) {
-                jailOption.timeLimit <= 0 &&
-                    logger.warn(
-                        "jailOption.timeLimit <= 0. You'd better know what you're doing."
-                    );
                 jailArgs.push("-t", Math.ceil(jailOption.timeLimit).toString());
-                jailArgs.push("--rlimit_cpu", "soft");
             }
 
-            if (jailOption.memoryLimit !== undefined) {
-                jailOption.memoryLimit <= 0 &&
-                    logger.warn(
-                        "jailOption.memoryLimit <= 0. You'd better know what you're doing."
+            if (jailOption.rlimitCPU !== undefined) {
+                if (typeof jailOption.rlimitCPU === "number") {
+                    jailArgs.push(
+                        "--rlimit_cpu",
+                        Math.ceil(jailOption.rlimitCPU).toString()
                     );
-                jailArgs.push(
-                    "--rlimit_as",
-                    Math.ceil(jailOption.memoryLimit).toString()
-                );
+                } else {
+                    jailArgs.push("--rlimit_cpu", jailOption.rlimitCPU);
+                }
             }
 
-            if (jailOption.fileLimit !== undefined) {
-                jailOption.fileLimit <= 0 &&
-                    logger.warn(
-                        "jailOption.fileLimit <= 0. You'd better know what you're doing."
+            if (jailOption.rlimitAS !== undefined) {
+                if (typeof jailOption.rlimitAS === "number") {
+                    jailArgs.push(
+                        "--rlimit_as",
+                        Math.ceil(jailOption.rlimitAS).toString()
                     );
-                jailArgs.push(
-                    "--rlimit_fsize",
-                    Math.ceil(jailOption.fileLimit).toString()
-                );
+                } else {
+                    jailArgs.push("--rlimit_as", jailOption.rlimitAS);
+                }
+            }
+
+            if (jailOption.rlimitFSIZE !== undefined) {
+                if (typeof jailOption.rlimitFSIZE === "number") {
+                    jailArgs.push(
+                        "--rlimit_fsize",
+                        Math.ceil(jailOption.rlimitFSIZE).toString()
+                    );
+                } else {
+                    jailArgs.push("--rlimit_fsize", jailOption.rlimitFSIZE);
+                }
             }
 
             if (jailOption.cwd) {

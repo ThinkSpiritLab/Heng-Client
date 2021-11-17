@@ -70,16 +70,18 @@ export function hengSpawn(
         options.timeLimit = Math.ceil(options.timeLimit * 1.2);
         meterOption.timeLimit = options.timeLimit;
         jailOption.timeLimit = Math.ceil((2 * options.timeLimit) / 1000);
+        jailOption.rlimitCPU = "soft";
     }
 
     if (options.memoryLimit) {
         meterOption.memoryLimit = options.memoryLimit;
+        // jailOption.rlimitAS = 4096;
     }
 
     meterOption.pidLimit = options.pidLimit;
 
     if (options.fileLimit) {
-        jailOption.fileLimit = Math.ceil(options.fileLimit / 1024 / 1024);
+        jailOption.rlimitFSIZE = Math.ceil(options.fileLimit / 1024 / 1024);
     }
 
     jailOption.cwd = options.cwd;

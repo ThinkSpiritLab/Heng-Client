@@ -62,11 +62,16 @@ async function main() {
         getConfig().judger.gid,
         1
     );
-    await fs.promises.mkdir("/sys/fs/cgroup/cpu/NSJAIL", { recursive: true });
-    await fs.promises.mkdir("/sys/fs/cgroup/memory/NSJAIL", {
+    await fs.promises.mkdir("/sys/fs/cgroup/cpu/hengCore", { recursive: true });
+    await fs.promises.mkdir("/sys/fs/cgroup/cpuacct/hengCore", {
         recursive: true,
     });
-    await fs.promises.mkdir("/sys/fs/cgroup/pids/NSJAIL", { recursive: true });
+    await fs.promises.mkdir("/sys/fs/cgroup/memory/hengCore", {
+        recursive: true,
+    });
+    await fs.promises.mkdir("/sys/fs/cgroup/pids/hengCore", {
+        recursive: true,
+    });
 
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(

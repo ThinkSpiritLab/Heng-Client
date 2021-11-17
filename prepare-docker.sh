@@ -53,6 +53,7 @@ rm -rf /var/cache/yum
 rm -rf /var/cache/dnf
 rm -rf ~/ojcmp
 rm -rf ~/nsjail
+rm -rf ~/Heng-Core
 rm -rf ~/.cargo
 rm -rf ~/.rustup/
 rm -rf /usr/local/rustup/share/doc
