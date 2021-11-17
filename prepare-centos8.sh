@@ -68,7 +68,7 @@ npm i -g cnpm --registry=https://registry.npm.taobao.org && source /etc/profile
 git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp.git ~/ojcmp \
 && cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin
 
-git clone -b real_usr_time_kill --depth=1 --single-branch https://github.com.cnpmjs.org/google/nsjail.git ~/nsjail \
+git clone --depth=1 --single-branch https://github.com.cnpmjs.org/google/nsjail.git ~/nsjail \
 && cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail
 
 git clone --depth=1 https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \

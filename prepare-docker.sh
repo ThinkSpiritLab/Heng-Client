@@ -36,7 +36,7 @@ npm install -g npm
 git clone -b v0.4.0 --depth=1 --single-branch https://github.com/ThinkSpiritLab/ojcmp.git ~/ojcmp \
 && cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin && cd ~
 
-git clone -b real_usr_time_kill --depth=1 --single-branch https://github.com/google/nsjail.git ~/nsjail \
+git clone --depth=1 --single-branch https://github.com/google/nsjail.git ~/nsjail \
 && cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail && cd ~
 
 git clone --depth=1 https://github.com/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \
