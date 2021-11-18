@@ -8,7 +8,7 @@
 
 ## 部署
 
-对于 ubuntu，无论是否使用 docker，都不能跳过[启用cgroup的memory子系统](https://blog.csdn.net/SUKI547/article/details/112328873)。
+推荐关闭宿主机的 Swap。
 
 ### Docker
 

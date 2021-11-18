@@ -76,5 +76,3 @@ cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local
 cp $HCDIR/Tools/testlib.h /testlib.h
 
 cd $HCDIR && cnpm install && npm run build
-
-echo -e "\033[5;31m Must see https://blog.csdn.net/SUKI547/article/details/112328873 \033[0m"
