@@ -66,8 +66,8 @@ export function hengSpawn(
     jailOption.symlink = options.symlink;
 
     if (options.timeLimit) {
-        options.timeLimit += 250;
         options.timeLimit = Math.ceil(options.timeLimit * 1.2);
+        options.timeLimit += 250;
         meterOption.timeLimit = options.timeLimit;
         jailOption.timeLimit = Math.ceil((2 * options.timeLimit) / 1000);
         jailOption.rlimitCPU = "soft";

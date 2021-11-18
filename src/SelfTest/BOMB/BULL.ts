@@ -13,19 +13,12 @@ int main(void) {
 }
 `;
 
-export const BOMBBULL = generateNormalSelfTest(
-    "BOMBBULL",
-    "c",
-    usrCode,
-    {},
-    [
-        {
-            type: "direct",
-            input,
-            output,
-            expectResultType: JudgeResultKind.OutpuLimitExceeded,
-            count: false,
-        },
-    ],
-    2000
-);
+export const BOMBBULL = generateNormalSelfTest("BOMBBULL", "c", usrCode, {}, [
+    {
+        type: "direct",
+        input,
+        output,
+        expectResultType: JudgeResultKind.OutpuLimitExceeded,
+        count: false,
+    },
+]);

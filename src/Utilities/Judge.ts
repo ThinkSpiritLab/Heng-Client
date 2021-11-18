@@ -186,16 +186,16 @@ export abstract class JudgeAgent {
             if (compileResult.signal === 25) {
                 compileJudgeType = transformer.ole;
             } else if (
+                compileResult.memory >= executable.limit.compiler.memory
+            ) {
+                compileJudgeType = transformer.mle;
+            } else if (
                 compileSumTime > executable.limit.compiler.cpuTime ||
                 (compileResult.time.real > executable.limit.compiler.cpuTime &&
                     compileResult.returnCode === -1 &&
                     compileResult.signal === 9)
             ) {
                 compileJudgeType = transformer.tle;
-            } else if (
-                compileResult.memory >= executable.limit.compiler.memory
-            ) {
-                compileJudgeType = transformer.mle;
             } else if (
                 compileResult.signal !== -1 ||
                 compileResult.returnCode !== 0
@@ -257,6 +257,8 @@ export abstract class JudgeAgent {
     ): JudgeResultKind | undefined {
         if (userResult.signal === 25) {
             return JudgeResultKind.OutpuLimitExceeded;
+        } else if (userResult.memory >= userExec.limit.runtime.memory) {
+            return JudgeResultKind.MemoryLimitExceeded;
         } else if (
             userResult.time.usr > userExec.limit.runtime.cpuTime ||
             (userResult.time.real > userExec.limit.runtime.cpuTime &&
@@ -264,8 +266,6 @@ export abstract class JudgeAgent {
                 userResult.signal === 9)
         ) {
             return JudgeResultKind.TimeLimitExceeded;
-        } else if (userResult.memory >= userExec.limit.runtime.memory) {
-            return JudgeResultKind.MemoryLimitExceeded;
         } else if (userResult.signal !== -1 || userResult.returnCode !== 0) {
             return JudgeResultKind.RuntimeError;
         }
@@ -305,6 +305,8 @@ export abstract class JudgeAgent {
         const kind = ((): JudgeResultKind => {
             if (userResult.signal === 25) {
                 return JudgeResultKind.OutpuLimitExceeded;
+            } else if (userResult.memory >= userExec.limit.runtime.memory) {
+                return JudgeResultKind.MemoryLimitExceeded;
             } else if (
                 userRunSumTime > userExec.limit.runtime.cpuTime ||
                 (userResult.time.real > userExec.limit.runtime.cpuTime &&
@@ -312,8 +314,6 @@ export abstract class JudgeAgent {
                     userResult.signal === 9)
             ) {
                 return JudgeResultKind.TimeLimitExceeded;
-            } else if (userResult.memory >= userExec.limit.runtime.memory) {
-                return JudgeResultKind.MemoryLimitExceeded;
             } else if (
                 userResult.signal !== -1 ||
                 userResult.returnCode !== 0
@@ -322,6 +322,8 @@ export abstract class JudgeAgent {
                 return JudgeResultKind.RuntimeError;
             } else if (sysResult.signal === 25) {
                 return JudgeResultKind.SystemOutpuLimitExceeded;
+            } else if (sysResult.memory > sysExec.limit.runtime.memory) {
+                return JudgeResultKind.SystemMemoryLimitExceeded;
             } else if (
                 sysRunSumTime > sysExec.limit.runtime.cpuTime ||
                 (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
@@ -329,8 +331,6 @@ export abstract class JudgeAgent {
                     sysResult.signal === 9)
             ) {
                 return JudgeResultKind.SystemTimeLimitExceeded;
-            } else if (sysResult.memory > sysExec.limit.runtime.memory) {
-                return JudgeResultKind.SystemMemoryLimitExceeded;
             } else if (
                 sysResult.signal !== -1 ||
                 !range(9).includes(sysResult.returnCode)

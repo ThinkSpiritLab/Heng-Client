@@ -39,7 +39,7 @@ git clone -b v0.4.0 --depth=1 --single-branch https://github.com/ThinkSpiritLab/
 git clone --depth=1 --single-branch https://github.com/google/nsjail.git ~/nsjail \
 && cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail && cd ~
 
-git clone --depth=1 https://github.com/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \
+git clone --depth=1 --single-branch https://github.com/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \
 && cd ~/Heng-Core && make && cp ~/Heng-Core/hc /usr/bin/hc && cd ~
 
 cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
