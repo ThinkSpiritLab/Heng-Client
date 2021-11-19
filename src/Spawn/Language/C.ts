@@ -45,7 +45,7 @@ export class C extends Language {
             skip: false,
             command: getConfig().language.c,
             args: compilerOptions,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: this.compileDir,
@@ -65,7 +65,7 @@ export class C extends Language {
         return {
             skip: false,
             command: binPath,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

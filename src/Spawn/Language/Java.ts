@@ -36,7 +36,7 @@ export class Java extends Language {
             skip: false,
             command: getConfig().language.javac,
             args: args,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: this.compileDir,
@@ -71,14 +71,14 @@ export class Java extends Language {
             skip: false,
             command: getConfig().language.java,
             args: args,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,
                         mode: "ro",
                     },
                 ],
-                memorylimit: this.excutable.limit.runtime.memory * 2,
+                memoryLimit: this.excutable.limit.runtime.memory * 2,
             },
         };
     }

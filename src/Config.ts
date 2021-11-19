@@ -59,6 +59,11 @@ export class JailConfig {
     @IsNotEmpty()
     configFile!: string;
 }
+export class MeterConfig {
+    @IsString()
+    @IsNotEmpty()
+    path!: string;
+}
 export class ControllerConfig {
     @IsString()
     @IsNotEmpty()
@@ -135,6 +140,10 @@ export class Config {
     @IsNotEmpty()
     @Type(() => JailConfig)
     nsjail!: JailConfig;
+    @ValidateNested()
+    @IsNotEmpty()
+    @Type(() => MeterConfig)
+    hc!: MeterConfig;
     @ValidateNested()
     @IsNotEmpty()
     @Type(() => JudgeFactoryConfig)

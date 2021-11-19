@@ -8,7 +8,7 @@
 
 ## 部署
 
-对于 ubuntu，无论是否使用 docker，都不能跳过[启用cgroup的memory子系统](https://blog.csdn.net/SUKI547/article/details/112328873)。
+推荐关闭宿主机的 Swap。
 
 ### Docker
 
@@ -55,9 +55,9 @@ npm run start # pm2 start ./dist/index.js --name judger
 
 ### 沙盒部分
 
-本系统依赖魔改 `nsjail` 作为沙盒内核。需要在配置文件中指定对应路径。
+本系统依赖 `nsjail` 和 `Heng-Core` 作为沙盒内核。需要在配置文件中指定对应路径。
 
-它的仓库是 [https://github.com/flaryer/nsjail/tree/real_usr_time_kill](https://github.com/flaryer/nsjail/tree/real_usr_time_kill)。
+它的仓库是 <https://github.com/google/nsjail> 和 <https://github.com/ThinkSpiritLab/Heng-Core>。
 
 ### 语言
 
@@ -73,7 +73,7 @@ npm run start # pm2 start ./dist/index.js --name judger
 
 #### 沙盒运行支持
 
-使用魔改 `nsjail`。
+使用 `nsjail` 和 `Heng-Core`。
 
 #### 语言支持
 
@@ -99,7 +99,6 @@ npm run start # pm2 start ./dist/index.js --name judger
 
 对于 `Normal` 和 `Spj`，用户程序没有正常结束运行时，跳过执行结果判断程序。
 
-可能无法检测 `OutpuLimitExceeded`。
 
 ## 其他
 

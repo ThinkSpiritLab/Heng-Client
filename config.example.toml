@@ -1,5 +1,5 @@
 [controller]
-host = "http://localhost:8000"
+host = "http://localhost:8000/c"
 AccessKey = "ox00000000"
 SecrectKey = "0xffffffff"
 [self]
@@ -9,6 +9,8 @@ version = "0.0.1"
 [nsjail]
 path = "/usr/bin/nsjail"
 configFile = "./jailConfig.cfg"
+[hc]
+path = "/usr/bin/hc"
 [language]
 c = "/usr/bin/gcc"
 cpp = "/usr/bin/g++"

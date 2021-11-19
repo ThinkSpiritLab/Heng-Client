@@ -18,7 +18,6 @@ import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
 import { Readable } from "stream";
-import { EmptyJailResult, JailResult } from "../Spawn/Jail";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
 import { ExecType } from "../Spawn/Language/decl";
 import { range } from "lodash";
@@ -26,6 +25,7 @@ import { Controller } from "src/controller";
 import { stat } from "./Statistics";
 import * as crypto from "crypto";
 import { FileHandle } from "fs/promises";
+import { EmptyMeterResult, MeterResult } from "../Spawn/Meter";
 
 const UsrCompileResultTransformer = {
     mle: JudgeResultKind.CompileMemoryLimitExceeded,
@@ -252,7 +252,7 @@ export abstract class JudgeAgent {
     }
 
     protected preDetect(
-        userResult: JailResult,
+        userResult: MeterResult,
         userExec: Executable
     ): JudgeResultKind | undefined {
         if (userResult.signal === 25) {
@@ -281,9 +281,9 @@ export abstract class JudgeAgent {
         sysOut,
         sysErr,
     }: {
-        userResult: JailResult;
+        userResult: MeterResult;
         userExec: Executable;
-        sysResult: JailResult;
+        sysResult: MeterResult;
         sysExec: Executable;
         userErr: string;
         sysOut: string;
@@ -476,7 +476,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                     return this.generateCaseResult({
                         userResult: userResult,
                         userExec: this.judge.judge.user,
-                        sysResult: EmptyJailResult,
+                        sysResult: EmptyMeterResult,
                         sysExec: cmpExec,
                         userErr: userErr,
                         sysOut: "",
@@ -634,7 +634,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
                     return this.generateCaseResult({
                         userResult: userResult,
                         userExec: this.judge.judge.user,
-                        sysResult: EmptyJailResult,
+                        sysResult: EmptyMeterResult,
                         sysExec: this.judge.judge.spj,
                         userErr: userErr,
                         sysOut: "",
@@ -917,9 +917,11 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const judgeAgent = judgerFactory.getJudgerAgent(
-                    JSON.parse(JSON.stringify(test.task))
+                const _test: CreateJudgeArgs = JSON.parse(
+                    JSON.stringify(test.task)
                 );
+                _test.id = crypto.randomBytes(32).toString("hex");
+                const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
                 result.cases.forEach((c, idx) => {
@@ -943,9 +945,11 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const judgeAgent = judgerFactory.getJudgerAgent(
-                    JSON.parse(JSON.stringify(test.task))
+                const _test: CreateJudgeArgs = JSON.parse(
+                    JSON.stringify(test.task)
                 );
+                _test.id = crypto.randomBytes(32).toString("hex");
+                const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
                 result.cases.forEach((c, idx) => {
@@ -1011,9 +1015,11 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const judgeAgent = judgerFactory.getJudgerAgent(
-                    JSON.parse(JSON.stringify(test.task))
+                const _test: CreateJudgeArgs = JSON.parse(
+                    JSON.stringify(test.task)
                 );
+                _test.id = crypto.randomBytes(32).toString("hex");
+                const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
                 result.cases.forEach((c, idx) => {

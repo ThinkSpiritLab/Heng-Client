@@ -32,7 +32,7 @@ export class Pascal extends Language {
             skip: false,
             command: getConfig().language.pascal,
             args: compilerOptions,
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: this.compileDir,
@@ -52,8 +52,7 @@ export class Pascal extends Language {
         return {
             skip: false,
             command: binPath,
-            spawnOption: {},
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

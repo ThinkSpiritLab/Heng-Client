@@ -31,7 +31,7 @@ export class JS extends Language {
             skip: false,
             command: getConfig().language.node,
             args: [binPath],
-            jailSpawnOption: {
+            spawnOption: {
                 bindMount: [
                     {
                         source: binPath,

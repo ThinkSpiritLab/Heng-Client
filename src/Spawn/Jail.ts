@@ -1,10 +1,6 @@
-import { ChildProcess, spawn } from "child_process";
-import { getLogger } from "log4js";
+import { ChildProcess } from "child_process";
 import path from "path";
-import { Readable } from "stream";
-import { loggedSpawn } from ".";
 import { getConfig } from "../Config";
-import { BasicSpawnOption } from "./BasicSpawn";
 
 export interface JailBindMountOption {
     source: string;
@@ -22,74 +18,47 @@ export interface JailTmpfsMountOption {
     size: number;
 }
 
+export interface JailUGidMapOption {
+    inside: number;
+    outside: number;
+    count: number;
+}
+export type RlimitString = "max" | "hard" | "def" | "soft" | "inf";
+
 export interface JailSpawnOption {
+    // mount
     tmpfsMount?: JailTmpfsMountOption[];
     bindMount?: JailBindMountOption[];
     symlink?: JailSymlinkOption[];
-    timelimit?: number; // ms default 600ms
-    memorylimit?: number; // Byte default 512MB
-    pidlimit?: number; // default 0->max
-    filelimit?: number; // Byte default 1MB
+    uidMap?: JailUGidMapOption[];
+    gidMap?: JailUGidMapOption[];
+
+    timeLimit?: number; // s default inf
+
+    // rlimit
+    rlimitCPU?: number | RlimitString; // s default 600s
+    rlimitAS?: number | RlimitString; // M default 4096MB
+    rlimitFSIZE?: number | RlimitString; // M default 1MB
+
+    cwd?: string;
+    env?: { [key: string]: string };
+    passFd?: number[];
 }
-
-export interface JailResult {
-    memory: number; //bytes
-    returnCode: number;
-    signal: number;
-    time: {
-        real: number; //ms
-        sys: number; //ms
-        usr: number; //ms
-    };
-}
-
-export const EmptyJailResult: JailResult = {
-    memory: 0,
-    returnCode: 0,
-    signal: -1,
-    time: {
-        real: 0,
-        usr: 0,
-        sys: 0,
-    },
-};
-
-export interface JailedChildProcess extends ChildProcess {
-    outFd: number;
-    result: Promise<JailResult>;
-}
-
-const logger = getLogger("JailSpawn");
 
 export function useJail(
     jailOption: JailSpawnOption
 ): (
-    spawnFunction: (
-        command: string,
-        args: string[],
-        options: BasicSpawnOption
-    ) => ChildProcess
-) => (
-    command: string,
-    args: string[],
-    options: BasicSpawnOption
-) => JailedChildProcess {
-    const jailConfig = getConfig().nsjail;
+    spawnFunction: (command: string, args: string[]) => ChildProcess
+) => (command: string, args: string[]) => ChildProcess {
     return function (
-        spawnFunction: (
-            command: string,
-            args: string[],
-            options: BasicSpawnOption
-        ) => ChildProcess
+        spawnFunction: (command: string, args: string[]) => ChildProcess
     ) {
-        return function (
-            command: string,
-            args: string[],
-            options: BasicSpawnOption
-        ): JailedChildProcess {
+        return function (command: string, args: string[]): ChildProcess {
+            const jailConfig = getConfig().nsjail;
             if (!jailConfig.path) {
                 throw new Error("Jail not configured");
             }
+
             const jailArgs: string[] = [];
 
             if (jailConfig.configFile) {
@@ -130,147 +99,83 @@ export function useJail(
                 }
             }
 
-            if (jailOption.timelimit !== undefined) {
-                jailOption.timelimit <= 0 &&
-                    logger.warn(
-                        "jailOption.timelimit <= 0. You'd better know what you're doing."
+            if (jailOption.uidMap) {
+                jailOption.uidMap.forEach((item) => {
+                    jailArgs.push(
+                        "-u",
+                        `${item.inside}:${item.outside}:${item.count}`
                     );
-                jailArgs.push("-t", Math.ceil(jailOption.timelimit).toString());
-                jailArgs.push("--rlimit_cpu", "soft");
+                });
             }
 
-            if (jailOption.memorylimit !== undefined) {
-                jailOption.memorylimit <= 0 &&
-                    logger.warn(
-                        "jailOption.memorylimit <= 0. You'd better know what you're doing."
+            if (jailOption.gidMap) {
+                jailOption.gidMap.forEach((item) => {
+                    jailArgs.push(
+                        "-g",
+                        `${item.inside}:${item.outside}:${item.count}`
                     );
-                jailArgs.push(
-                    "--cgroup_mem_max",
-                    Math.ceil(jailOption.memorylimit).toString()
-                );
-                jailArgs.push("--rlimit_as", "soft");
+                });
             }
 
-            if (jailOption.pidlimit !== undefined) {
-                jailOption.pidlimit <= 0 &&
-                    logger.warn(
-                        "jailOption.pidlimit <= 0. You'd better know what you're doing."
-                    );
-                jailArgs.push(
-                    "--cgroup_pids_max",
-                    Math.ceil(jailOption.pidlimit).toString()
-                );
-            }
-            jailArgs.push("--cgroup_cpu_ms_per_sec", "1000");
-
-            if (jailOption.filelimit !== undefined) {
-                jailOption.filelimit <= 0 &&
-                    logger.warn(
-                        "jailOption.filelimit <= 0. You'd better know what you're doing."
-                    );
-                jailArgs.push(
-                    "--rlimit_fsize",
-                    Math.ceil(jailOption.filelimit / 1024 / 1024).toString()
-                );
+            if (jailOption.timeLimit !== undefined) {
+                jailArgs.push("-t", Math.ceil(jailOption.timeLimit).toString());
             }
 
-            if (options.cwd) {
-                jailArgs.push("--cwd", path.resolve(options.cwd));
-                options.cwd = undefined;
-            }
-            if (options.uid !== undefined) {
-                options.uid <= 0 &&
-                    logger.warn(
-                        "options.uid <= 0. You'd better know what you're doing."
+            if (jailOption.rlimitCPU !== undefined) {
+                if (typeof jailOption.rlimitCPU === "number") {
+                    jailArgs.push(
+                        "--rlimit_cpu",
+                        Math.ceil(jailOption.rlimitCPU).toString()
                     );
-                jailArgs.push("-u", `${options.uid}:${options.uid}:1`);
-                options.uid = undefined;
-            }
-            if (options.gid !== undefined) {
-                options.gid <= 0 &&
-                    logger.warn(
-                        "options.gid <= 0. You'd better know what you're doing."
-                    );
-                jailArgs.push("-g", `${options.gid}:${options.gid}:1`);
-                options.gid = undefined;
-            }
-
-            if (options.env !== undefined) {
-                for (const name in options.env) {
-                    jailArgs.push("-E", `${name}=${options.env[name]}`);
+                } else {
+                    jailArgs.push("--rlimit_cpu", jailOption.rlimitCPU);
                 }
-                options.env = undefined;
             }
 
-            if (typeof options.stdio === "string") {
-                options.stdio = [options.stdio, options.stdio, options.stdio];
+            if (jailOption.rlimitAS !== undefined) {
+                if (typeof jailOption.rlimitAS === "number") {
+                    jailArgs.push(
+                        "--rlimit_as",
+                        Math.ceil(jailOption.rlimitAS).toString()
+                    );
+                } else {
+                    jailArgs.push("--rlimit_as", jailOption.rlimitAS);
+                }
             }
-            if (options.stdio === undefined) {
-                options.stdio = ["pipe", "pipe", "pipe"];
+
+            if (jailOption.rlimitFSIZE !== undefined) {
+                if (typeof jailOption.rlimitFSIZE === "number") {
+                    jailArgs.push(
+                        "--rlimit_fsize",
+                        Math.ceil(jailOption.rlimitFSIZE).toString()
+                    );
+                } else {
+                    jailArgs.push("--rlimit_fsize", jailOption.rlimitFSIZE);
+                }
             }
-            const outFd = Math.max(3, options.stdio.length);
-            if (options.stdio) {
-                options.stdio.forEach((value, index) =>
-                    jailArgs.push("--pass_fd", index.toString())
+
+            if (jailOption.cwd) {
+                jailArgs.push("--cwd", path.resolve(jailOption.cwd));
+            }
+
+            if (jailOption.env !== undefined) {
+                for (const name in jailOption.env) {
+                    jailArgs.push("-E", `${name}=${jailOption.env[name]}`);
+                }
+            }
+
+            if (jailOption.passFd !== undefined) {
+                jailOption.passFd.forEach((value) =>
+                    jailArgs.push("--pass_fd", value.toString())
                 );
             }
-            options.stdio[outFd] = "pipe";
-            jailArgs.push("-f", outFd.toString());
 
             // jailArgs.push("--nice_level", "0");
 
             jailArgs.push("--", command, ...args);
 
-            const subProcess = spawnFunction(
-                jailConfig.path,
-                jailArgs,
-                options
-            ) as JailedChildProcess;
-            subProcess.on("close", () => {
-                // let FileHandle do it
-                // options.stdio?.forEach((io) => {
-                //     if (typeof io === "number") {
-                //         fs.close(io, () => undefined);
-                //     }
-                // });
-            });
-            Object.assign(subProcess, {
-                outFd,
-                result: new Promise((resolve, reject) => {
-                    subProcess.on("error", (err) => {
-                        reject(err);
-                    });
-                    let resultStr = "";
-                    const resultStream: Readable = subProcess.stdio[
-                        outFd
-                    ] as Readable;
-                    resultStream.setEncoding("utf-8");
-                    resultStream.on("error", (err) => {
-                        reject(err);
-                    });
-                    resultStream.on("data", (chunk) => (resultStr += chunk));
-                    resultStream.on("end", () => {
-                        try {
-                            logger.info(
-                                `Command : ${command} Result : ${resultStr}`
-                            );
-                            resolve(JSON.parse(resultStr));
-                        } catch (e) {
-                            reject(e);
-                        }
-                    });
-                }),
-            });
+            const subProcess = spawnFunction(jailConfig.path, jailArgs);
             return subProcess;
         };
     };
-}
-
-export function jailSpawn(
-    command: string,
-    args: string[],
-    option: BasicSpawnOption,
-    jailOption: JailSpawnOption
-): JailedChildProcess {
-    return useJail(jailOption)(loggedSpawn(spawn))(command, args, option);
 }

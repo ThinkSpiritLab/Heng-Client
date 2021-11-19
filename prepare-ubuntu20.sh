@@ -64,14 +64,15 @@ npm i -g cnpm --registry=https://registry.npm.taobao.org && source /etc/profile
 git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp.git ~/ojcmp \
 && cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin
 
-git clone -b real_usr_time_kill --depth=1 --single-branch https://github.com.cnpmjs.org/flaryer/nsjail.git ~/nsjail \
+git clone --depth=1 --single-branch https://github.com.cnpmjs.org/google/nsjail.git ~/nsjail \
 && sed -i '/    .set_tid = 0,\|	    .set_tid_size = 0,\|	    .cgroup = 0,/d' ~/nsjail/subproc.cc \
 && cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail
+
+git clone --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \
+&& cd ~/Heng-Core && make && cp ~/Heng-Core/hc /usr/bin/hc && cd ~
 
 cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
 
 cp $HCDIR/Tools/testlib.h /testlib.h
 
 cd $HCDIR && cnpm install && npm run build
-
-echo -e "\033[5;31m Must see https://blog.csdn.net/SUKI547/article/details/112328873 \033[0m"
