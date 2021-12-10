@@ -12,6 +12,7 @@ import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
 import { ExitArgs } from "heng-protocol/internal-protocol/ws";
 import { stat } from "./Utilities/Statistics";
+import version from "./version";
 
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
@@ -29,6 +30,7 @@ async function main() {
     });
     const logger = getLogger("main");
     logger.info("Lunched");
+    logger.info(version);
     try {
         getConfig();
     } catch (e) {
@@ -136,7 +138,7 @@ async function main() {
         config.judgeCapability,
         os.cpus().length,
         config.name,
-        config.version
+        version
     );
     logger.info(`Token is ${token.token}`);
     await controller.connectWs(token.token);
