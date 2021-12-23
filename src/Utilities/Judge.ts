@@ -255,10 +255,11 @@ export abstract class JudgeAgent {
         userResult: MeterResult,
         userExec: Executable
     ): JudgeResultKind | undefined {
+        const userRunSumTime = userResult.time.usr + userResult.time.sys;
         if (userResult.signal === 25) {
             return JudgeResultKind.OutpuLimitExceeded;
         } else if (
-            userResult.time.usr > userExec.limit.runtime.cpuTime ||
+            userRunSumTime > userExec.limit.runtime.cpuTime ||
             (userResult.time.real > userExec.limit.runtime.cpuTime &&
                 userResult.returnCode === -1 &&
                 userResult.signal === 9)

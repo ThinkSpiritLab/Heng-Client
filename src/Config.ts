@@ -83,9 +83,6 @@ export class SelfConfig {
     @IsNotEmpty()
     name!: string;
     @IsString()
-    @IsNotEmpty()
-    version!: string;
-    @IsString()
     @IsOptional()
     software?: string;
 }

@@ -6,6 +6,7 @@ import { BOMBCTLE } from "./CTLE";
 import { BOMBFORKBOMB } from "./FORKBOMB";
 import { KILLTIMER } from "./KILLTIMER";
 import { BOMBSPJTLE } from "./SPJTLE";
+import { BOOMSTACK } from "./STACK";
 
 export const BOMB = [
     BOMBCOLE,
@@ -16,4 +17,5 @@ export const BOMB = [
     BOMBSPJTLE,
     BOMBBULL,
     KILLTIMER,
+    BOOMSTACK,
 ];

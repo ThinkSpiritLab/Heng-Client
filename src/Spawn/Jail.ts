@@ -39,6 +39,7 @@ export interface JailSpawnOption {
     rlimitCPU?: number | RlimitString; // s default 600s
     rlimitAS?: number | RlimitString; // M default 4096MB
     rlimitFSIZE?: number | RlimitString; // M default 1MB
+    rlimitSTACK?: number | RlimitString; // M default soft
 
     cwd?: string;
     env?: { [key: string]: string };
@@ -151,6 +152,17 @@ export function useJail(
                     );
                 } else {
                     jailArgs.push("--rlimit_fsize", jailOption.rlimitFSIZE);
+                }
+            }
+
+            if (jailOption.rlimitSTACK !== undefined) {
+                if (typeof jailOption.rlimitSTACK === "number") {
+                    jailArgs.push(
+                        "--rlimit_stack",
+                        Math.ceil(jailOption.rlimitSTACK).toString()
+                    );
+                } else {
+                    jailArgs.push("--rlimit_stack", jailOption.rlimitSTACK);
                 }
             }
 

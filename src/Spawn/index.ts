@@ -90,6 +90,7 @@ export function hengSpawn(
     if (options.fileLimit) {
         jailOption.rlimitFSIZE = Math.ceil(options.fileLimit / 1024 / 1024);
     }
+    jailOption.rlimitSTACK = 64;
 
     jailOption.cwd = options.cwd;
 
