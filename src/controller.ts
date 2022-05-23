@@ -65,7 +65,7 @@ export class Controller {
     }
     logger = getLogger("Controller");
     exitTimer: NodeJS.Timeout | undefined = undefined;
-    agent = new https.Agent({
+    httpsAgent = new https.Agent({
         rejectUnauthorized: false,
     });
     constructor(config: ControllerConfig) {
@@ -111,7 +111,7 @@ export class Controller {
         }
     }
     async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
-        req.httpsAgent = this.agent;
+        req.httpsAgent = this.httpsAgent;
         return (await Axios.request(req)) as AxiosResponse<unknown>;
     }
 
@@ -238,7 +238,7 @@ export class Controller {
                 `${this.host}/v1/judger/websocket?token=${token}`,
                 {
                     agent: this.host.startsWith("https")
-                        ? this.agent
+                        ? this.httpsAgent
                         : undefined,
                 }
             );

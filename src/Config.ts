@@ -15,7 +15,7 @@ import {
 import fs from "fs";
 import { getLogger } from "log4js";
 const logger = getLogger("ConfigService");
-const configToml = fs.readFileSync("config.toml").toString();
+const configToml = fs.readFileSync("config/config.toml").toString();
 export class LanguageConfig {
     @IsString()
     @IsNotEmpty()

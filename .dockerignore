@@ -4,8 +4,8 @@ built
 dist
 .vscode
 .git
-config.json
-config.toml
+config/config.json
+config/config.toml
 *.log
 *.out
 *.o
