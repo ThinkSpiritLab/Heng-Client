@@ -2,8 +2,8 @@ node_modules
 built
 dist
 .vscode
-config.json
-config.toml
+config/config.json
+config/config.toml
 *.log
 *.out
 *.o

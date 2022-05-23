@@ -17,12 +17,13 @@ Host的内核版本需大于 4.6 （支持cgroup_namespaces）
 ```
 dnf install --assumeyes yum-utils device-mapper-persistent-data lvm2
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+# yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
 dnf install --assumeyes docker-ce
 systemctl start docker
 systemctl enable docker
 docker pull thinkspiritlab/heng-client:latest
-docker run --cgroupns private --privileged -it -v $(pwd)/config.toml:/hc/config.toml thinkspiritlab/heng-client
-# docker run --cgroupns private --privileged -d --restart=always -v $(pwd)/config.toml:/hc/config.toml thinkspiritlab/heng-client
+docker run --cgroupns private --privileged -it -v $(pwd)/config.toml:/hc/config/config.toml thinkspiritlab/heng-client
+# docker run --cgroupns private --privileged -d --restart=always -v $(pwd)/config.toml:/hc/config/config.toml thinkspiritlab/heng-client
 ```
 
 ### CentOS8
@@ -33,7 +34,7 @@ dnf install git -y
 git clone https://github.com/ThinkSpiritLab/Heng-Client.git
 cd ./Heng-Client
 bash prepare-centos8.sh
-cp config.example.toml config.toml
+cp config/config.example.toml config/config.toml
 npm run start # pm2 start ./dist/index.js --name judger
 ```
 
@@ -47,7 +48,7 @@ apt install git -y
 git clone https://github.com/ThinkSpiritLab/Heng-Client.git
 cd ./Heng-Client
 bash prepare-ubuntu20.sh
-cp config.example.toml config.toml
+cp config/config.example.toml config/config.toml
 npm run start # pm2 start ./dist/index.js --name judger
 ```
 
