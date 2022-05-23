@@ -1,9 +1,9 @@
-if [ $UID -ne 0 ]; then  
+if [ $UID -ne 0 ]; then
     echo Please run as root
     exit
 fi
 
-HCDIR=`dirname $(readlink -f "$0")`
+HCDIR=$(dirname $(readlink -f "$0"))
 export GIT_SSL_NO_VERIFY=true
 
 apt update
@@ -55,23 +55,23 @@ registry = "https://mirrors.sjtug.sjtu.edu.cn/git/crates.io-index"
 # rustcc 社区
 [source.rustcc]
 registry = "git://crates.rustcc.cn/crates.io-index"
-' > ~/.cargo/config
+' >~/.cargo/config
 source /etc/profile
 
 npm install -g npm --registry=https://registry.npm.taobao.org
 npm i -g cnpm --registry=https://registry.npm.taobao.org && source /etc/profile
 
-git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp.git ~/ojcmp \
-&& cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin
+git clone -b v0.4.0 --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/ojcmp.git ~/ojcmp &&
+    cd ~/ojcmp && cargo build --release && cp target/release/ojcmp /usr/bin
 
-git clone --depth=1 --single-branch https://github.com.cnpmjs.org/google/nsjail.git ~/nsjail \
-&& sed -i '/    .set_tid = 0,\|	    .set_tid_size = 0,\|	    .cgroup = 0,/d' ~/nsjail/subproc.cc \
-&& cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail
+git clone --depth=1 --single-branch https://github.com.cnpmjs.org/google/nsjail.git ~/nsjail &&
+    sed -i '/    .set_tid = 0,\|	    .set_tid_size = 0,\|	    .cgroup = 0,/d' ~/nsjail/subproc.cc &&
+    cd ~/nsjail && make && cp ~/nsjail/nsjail /usr/bin/nsjail
 
-git clone --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git ~/Heng-Core \
-&& cd ~/Heng-Core && make && cp ~/Heng-Core/hc /usr/bin/hc && cd ~
+git clone --depth=1 --single-branch https://github.com.cnpmjs.org/ThinkSpiritLab/Heng-Core.git ~/Heng-Core &&
+    cd ~/Heng-Core && make && cp ~/Heng-Core/hc /usr/bin/hc && cd ~
 
-cp -r ~/.rustup/toolchains/`ls ~/.rustup/toolchains/ | grep "stable"` /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
+cp -r ~/.rustup/toolchains/$(ls ~/.rustup/toolchains/ | grep "stable") /usr/local/rustup && ln -s /usr/local/rustup/bin/rustc /usr/bin/rustc
 
 cp $HCDIR/Tools/testlib.h /testlib.h
 
