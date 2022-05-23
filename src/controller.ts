@@ -26,24 +26,6 @@ import { stat } from "./Utilities/Statistics";
 import moment from "moment";
 import https from "https";
 
-class Param {
-    key!: string;
-    val!: string;
-    toString(): string {
-        return `${this.key}=${this.val}`;
-    }
-}
-
-type Header = Param;
-
-type Req = {
-    params: { [key: string]: string | number };
-    headers: { [key: string]: string | number };
-    body?: unknown;
-    path: string;
-    method: "put" | "post" | "get" | "delete";
-};
-
 export class Controller {
     host: string;
     SecrectKey: string;

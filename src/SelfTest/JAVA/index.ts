@@ -17,5 +17,5 @@ export const JAVA = [
     JavaRE,
     JavaCE,
     JavaOption,
-    JavaPackage
+    JavaPackage,
 ];

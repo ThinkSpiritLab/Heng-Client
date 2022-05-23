@@ -23,18 +23,12 @@ console.log(result);
 // });
 `;
 
-export const JsAC = generateNormalSelfTest(
-    "JsAC",
-    "js",
-    usrCode,
-    {},
-    [
-        {
-            type: "direct",
-            input,
-            output,
-            expectResultType: JudgeResultKind.Accepted,
-            count: false,
-        },
-    ]
-);
+export const JsAC = generateNormalSelfTest("JsAC", "js", usrCode, {}, [
+    {
+        type: "direct",
+        input,
+        output,
+        expectResultType: JudgeResultKind.Accepted,
+        count: false,
+    },
+]);

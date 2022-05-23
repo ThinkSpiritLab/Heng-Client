@@ -21,7 +21,7 @@ import { Readable } from "stream";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
 import { ExecType } from "../Spawn/Language/decl";
 import { range } from "lodash";
-import { Controller } from "src/controller";
+import { Controller } from "../controller";
 import { stat } from "./Statistics";
 import * as crypto from "crypto";
 import { FileHandle } from "fs/promises";

@@ -10,7 +10,7 @@ import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
 import { FileHandle } from "fs/promises";
 import { hengSpawn, HengSpawnOption } from "../Spawn";
-import { MeteredChildProcess, MeterResult } from "src/Spawn/Meter";
+import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
 
 const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";

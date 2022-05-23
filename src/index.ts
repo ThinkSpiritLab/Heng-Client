@@ -11,8 +11,8 @@ import path from "path";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
 import { ExitArgs } from "heng-protocol/internal-protocol/ws";
-import { stat } from "./Utilities/Statistics";
 import version from "./version";
+import { stat } from "./Utilities/Statistics";
 
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));
