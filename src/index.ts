@@ -21,7 +21,12 @@ async function wait(ms: number) {
 async function main() {
     configure({
         appenders: {
-            cheese: { type: "file", filename: "cheese.log" },
+            cheese: {
+                type: "file",
+                filename: "cheese.log",
+                maxLogSize: "10M",
+                backups: 5,
+            },
             console: { type: "console" },
         },
         categories: {
