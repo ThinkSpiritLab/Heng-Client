@@ -21,7 +21,7 @@ import WebSocket from "ws";
 import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
 import { ControllerConfig } from "./Config";
 import { StatusReport } from "heng-protocol";
-import { EncryptParam, Sign } from "heng-sign-js";
+import { Sign } from "heng-sign-js";
 import { stat } from "./Utilities/Statistics";
 import moment from "moment";
 import https from "https";
@@ -47,19 +47,19 @@ export class Controller {
     >;
     static MaxNonce = 0xffff;
     _nonce = randomInt(Controller.MaxNonce);
-    sign = new Sign((param: EncryptParam) => {
-        if (param.algorithm === "SHA256") {
-            return createHash("sha256").update(param.data).digest("hex");
-        } else if (param.algorithm === "HmacSHA256") {
-            if (!param.key) {
-                throw new Error("no key provided");
-            }
-            return createHmac("sha256", param.key)
-                .update(param.data)
-                .digest("hex");
-        }
-        return "";
-    }, true);
+    sign = new Sign(
+        {
+            SHA256(data: string): string {
+                return createHash("sha256").update(data).digest("hex");
+            },
+            HmacSHA256(key: string, data: string): string {
+                return createHmac("sha256", key).update(data).digest("hex");
+            },
+        },
+        undefined,
+        undefined,
+        true
+    );
     get nonce(): number {
         return this._nonce++;
     }
@@ -119,7 +119,8 @@ export class Controller {
         maxTaskCount: number,
         coreCount?: number,
         name?: string,
-        software?: string
+        software?: string,
+        timeRatio?: number
     ): Promise<AcquireTokenOutput> {
         const req = this.sign.sign({
             data: {
@@ -127,6 +128,7 @@ export class Controller {
                 coreCount,
                 name,
                 software,
+                timeRatio,
             },
             params: {},
             url: `${this.host}/v1/judger/token`,
