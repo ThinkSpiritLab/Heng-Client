@@ -138,7 +138,8 @@ async function main() {
         config.judgeCapability,
         os.cpus().length,
         config.name,
-        version
+        version,
+        judgerFactory.timeRatio
     );
     logger.info(`Token is ${token.token}`);
     await controller.connectWs(token.token);
