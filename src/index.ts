@@ -93,26 +93,57 @@ async function main() {
     controller.on("Exit", (args: ExitArgs) => {
         logger.warn(
             `控制端命令下线，原因：${args.reason ?? "无"}，重连等待时间：${
-                args?.reconnect?.delay ?? 0
+                args?.reconnect?.delay ?? "NaN"
             } ms`
         );
         pendingExit = 1;
-        exitInterval = setInterval(() => {
+        const handler = () => {
             const col = stat.collect();
             if (col.judge.total === col.judge.finished) {
-                controller.ws.close(1000, "控制端命令下线");
                 controller.exitTimer = setTimeout(() => {
                     process.exit(0);
-                }, args?.reconnect?.delay);
+                }, args?.reconnect?.delay ?? 200);
+                controller.ws.close(1000, "控制端命令下线");
                 clearInterval(exitInterval);
             }
-        }, 3000);
+        };
+        handler();
+        exitInterval = setInterval(handler, 3000);
         setTimeout(() => {
             controller.ws.close(1000, "控制端命令下线，但评测任务超时");
             process.exit(1);
         }, 300000);
         return Promise.resolve(null);
     });
+
+    const signalHandler = async (signal: NodeJS.Signals) => {
+        const msg = `收到信号 ${signal}，准备退出`;
+        logger.warn(msg);
+        await controller.do("Exit", { reason: msg });
+        pendingExit = 1;
+        const handler = () => {
+            const col = stat.collect();
+            if (col.judge.total === col.judge.finished) {
+                controller.exitTimer = setTimeout(() => {
+                    process.exit(0);
+                }, 200);
+                controller.ws.close(1000, msg);
+                clearInterval(exitInterval);
+            }
+        };
+        handler();
+        exitInterval = setInterval(handler, 3000);
+        setTimeout(() => {
+            controller.ws.close(
+                1000,
+                `收到信号 ${signal}，准备退出，但评测任务超时`
+            );
+            process.exit(2);
+        }, 9000);
+    };
+
+    process.on("SIGINT", signalHandler);
+    process.on("SIGTERM", signalHandler);
 
     controller.on("CreateJudge", (task) => {
         if (pendingExit) {
