@@ -408,6 +408,7 @@ export class NormalJudgeAgent extends JudgeAgent {
         if (judgeResult1 !== undefined) {
             return judgeResult1;
         }
+
         const cmpExec: Executable = {
             source: {
                 hashsum:
@@ -421,8 +422,13 @@ export class NormalJudgeAgent extends JudgeAgent {
                 arch: "x64",
                 options: {},
             },
-            limit: this.judge.judge.user.limit,
+            limit: { ...this.judge.judge.user.limit },
         };
+        cmpExec.limit.runtime.memory = Math.max(
+            cmpExec.limit.runtime.memory,
+            16 * 1024 * 1024
+        );
+
         const [cmpExecutableAgent, judgeResult2] =
             await this.compileAndFillExtra(
                 ExecType.System,
