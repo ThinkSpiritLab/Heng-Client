@@ -246,7 +246,9 @@ export abstract class JudgeAgent {
                 extraMessage: String(err),
             };
             return {
-                cases: range(this.judge.test?.cases.length ?? 1).map(() => e),
+                cases: range(
+                    Math.max(this.judge.test?.cases.length ?? 0, 1)
+                ).map(() => e),
             };
         }
     }
