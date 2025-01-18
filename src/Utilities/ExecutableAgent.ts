@@ -206,9 +206,6 @@ export class ExecutableAgent {
                     fileLimit:
                         languageRunOption.spawnOption?.fileLimit ??
                         this.excutable.limit.compiler.output,
-                    tmpfsMount: languageRunOption.spawnOption?.tmpfsMount,
-                    bindMount: languageRunOption.spawnOption?.bindMount,
-                    symlink: languageRunOption.spawnOption?.symlink,
                 };
 
                 const subProc = hengSpawn(command, args, spawnOption);
@@ -298,9 +295,6 @@ export class ExecutableAgent {
                 fileLimit:
                     languageRunOption.spawnOption?.fileLimit ??
                     this.excutable.limit.runtime.output,
-                tmpfsMount: languageRunOption.spawnOption?.tmpfsMount,
-                bindMount: languageRunOption.spawnOption?.bindMount,
-                symlink: languageRunOption.spawnOption?.symlink,
             };
 
             const subProc = hengSpawn(command, args, spawnOption);

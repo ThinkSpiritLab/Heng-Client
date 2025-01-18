@@ -1,24 +1,13 @@
 import { ChildProcess, spawn } from "child_process";
 import { getLogger } from "log4js";
-import { range } from "lodash";
 import { BasicSpawnOption, CompleteStdioOptions } from "./BasicSpawn";
-import {
-    JailBindMountOption,
-    JailSpawnOption,
-    JailSymlinkOption,
-    JailTmpfsMountOption,
-    useJail,
-} from "./Jail";
-import { MeteredChildProcess, MeterSpawnOption, useMeter } from "./Meter";
+import { MeteredChildProcess } from "./Meter";
+import { constants } from "os";
+import { getConfig } from "../Config";
 
 const logger = getLogger("JailMeterSpawn");
 
 export interface HengSpawnOption {
-    // mount
-    tmpfsMount?: JailTmpfsMountOption[]; // nsjail
-    bindMount?: JailBindMountOption[]; // nsjail
-    symlink?: JailSymlinkOption[]; // nsjail
-
     // limit
     timeLimit?: number; // ms, meter, nsjail -> 2 * timeLimit(to avoid timer killed, get SE)
     memoryLimit?: number; // byte, meter, nsjail -> 4096
@@ -57,76 +46,49 @@ export function hengSpawn(
     args: string[],
     options: HengSpawnOption
 ): MeteredChildProcess {
-    const meterOption: MeterSpawnOption = { meterFd: 5 };
-    const jailOption: JailSpawnOption = {};
-    const basicOption: BasicSpawnOption = {};
+    const basicOption: BasicSpawnOption = {
+        cwd: options.cwd,
+        shell: getConfig().language.shell,
+        // timeout: 1000,
+    };
 
-    jailOption.tmpfsMount = options.tmpfsMount;
-    jailOption.bindMount = options.bindMount;
-    jailOption.symlink = options.symlink;
-
-    if (options.timeLimit) {
-        /** @notice */
-        options.timeLimit = Math.ceil(options.timeLimit * 1.2);
-        options.timeLimit += 250;
-
-        meterOption.timeLimit = options.timeLimit;
-        jailOption.timeLimit = Math.ceil((2 * options.timeLimit) / 1000);
-        jailOption.rlimitCPU = "soft";
-    }
-
-    if (options.memoryLimit) {
-        /** @notice */
-        if (options.fileLimit) {
-            options.memoryLimit += options.fileLimit;
-        }
-
-        meterOption.memoryLimit = options.memoryLimit;
-        // jailOption.rlimitAS = 4096;
-    }
-
-    meterOption.pidLimit = options.pidLimit;
-
-    if (options.fileLimit) {
-        jailOption.rlimitFSIZE = Math.ceil(options.fileLimit / 1024 / 1024);
-    }
-    jailOption.rlimitSTACK = 64;
-
-    jailOption.cwd = options.cwd;
-
-    jailOption.env = options.env;
+    // if (options.timeLimit) {
+    //     basicOption.timeout = Math.ceil(options.timeLimit * 1.2) + 250;
+    // }
 
     if (options.stdio === undefined) {
         options.stdio = ["ignore", "ignore", "ignore"];
     }
     while (options.stdio.length < 3) options.stdio.push("ignore");
-    meterOption.meterFd = options.stdio.length;
     options.stdio.push("pipe");
-    jailOption.passFd = range(options.stdio.length);
     basicOption.stdio = options.stdio;
 
-    meterOption.uid = options.uid;
-    meterOption.gid = options.gid;
-    jailOption.uidMap = [];
-    jailOption.gidMap = [];
-    jailOption.uidMap?.push({ inside: 0, outside: 0, count: 1 });
-    jailOption.gidMap?.push({ inside: 0, outside: 0, count: 1 });
-    if (options.uid) {
-        jailOption.uidMap?.push({
-            inside: options.uid,
-            outside: options.uid,
-            count: 1,
-        });
-    }
-    if (options.gid) {
-        jailOption.gidMap?.push({
-            inside: options.gid,
-            outside: options.gid,
-            count: 1,
-        });
-    }
-
-    return useMeter(meterOption)(
-        useJail(jailOption)(loggedSpawn(optionSetedSpawn(spawn, basicOption)))
-    )(command, args);
+    const subProcess = loggedSpawn(optionSetedSpawn(spawn, basicOption))(
+        command,
+        args
+    );
+    return {
+        ...(subProcess as MeteredChildProcess),
+        result: new Promise((resolve, reject) => {
+            subProcess.on("exit", (code, signal) => {
+                let signalNumber = -1;
+                if (signal) {
+                    signalNumber = constants.signals[signal];
+                }
+                resolve({
+                    memory: 0,
+                    returnCode: code ?? 10,
+                    signal: signalNumber,
+                    time: {
+                        real: 0,
+                        sys: 0,
+                        usr: 0,
+                    },
+                });
+            });
+            subProcess.on("error", (err) => {
+                reject(err);
+            });
+        }),
+    };
 }

@@ -33,14 +33,6 @@ export class PlainText extends Language {
             skip: false,
             command: getConfig().language.cat,
             args: [binPath],
-            spawnOption: {
-                bindMount: [
-                    {
-                        source: binPath,
-                        mode: "ro",
-                    },
-                ],
-            },
         };
     }
 }

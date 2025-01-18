@@ -50,6 +50,18 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     rustc!: string;
+    @IsString()
+    @IsNotEmpty()
+    ise!: string;
+    @IsString()
+    @IsNotEmpty()
+    shell!: string; //TODO: string or boolean
+    @IsString()
+    @IsNotEmpty()
+    verilog!: string;
+    @IsString()
+    @IsNotEmpty()
+    vhdl!: string;
 }
 export class JailConfig {
     @IsString()

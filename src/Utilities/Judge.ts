@@ -159,19 +159,23 @@ export abstract class JudgeAgent {
         if (compileResult !== undefined) {
             const compileSumTime =
                 compileResult.time.sys + compileResult.time.usr;
+            const compileLog = await executableAgent.fileAgent.getPath(
+                CompileLogName
+            );
+            const compileLogSize = fs.statSync(compileLog).size;
             const exteaInfo = {
                 compileTime: this.transformTime(compileSumTime),
                 compileMessage: await readStream(
-                    fs.createReadStream(
-                        await executableAgent.fileAgent.getPath(CompileLogName),
-                        {
-                            encoding: "utf-8",
-                            end: Math.min(
+                    fs.createReadStream(compileLog, {
+                        encoding: "utf-8",
+                        start:
+                            compileLogSize -
+                            Math.min(
                                 executable.limit.compiler.message,
                                 10 * 1024
                             ),
-                        }
-                    ),
+                        end: compileLogSize - 1,
+                    }),
                     -1
                 ),
             };
@@ -408,6 +412,11 @@ export class NormalJudgeAgent extends JudgeAgent {
         if (judgeResult1 !== undefined) {
             return judgeResult1;
         }
+        // TODO: Not Implemented
+        return {
+            cases: [],
+            extra: this.extra,
+        };
 
         const cmpExec: Executable = {
             source: {
@@ -436,7 +445,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                 OtherCompileResultTransformer
             );
         if (judgeResult2 !== undefined) {
-            return judgeResult2;
+            return judgeResult2!;
         }
 
         this.updateStatus(JudgeState.Judging);

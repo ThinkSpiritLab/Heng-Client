@@ -6,7 +6,6 @@ import fs from "fs";
 import { getConfig } from "./Config";
 import { getJudgerFactory } from "./Utilities/Judge";
 import { Throttle } from "./Utilities/Throttle";
-import { getgid, getuid } from "process";
 import path from "path";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
@@ -42,9 +41,6 @@ async function main() {
         logger.fatal(e);
         await wait(2000);
         throw e;
-    }
-    if (getuid() || getgid()) {
-        throw new Error("Please run with root");
     }
     await fs.promises.rmdir(getConfig().judger.tmpdirBase, {
         recursive: true,

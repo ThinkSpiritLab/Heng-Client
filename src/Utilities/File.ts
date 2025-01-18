@@ -41,7 +41,7 @@ export async function chownR(
     gid: number,
     depth: number
 ): Promise<void> {
-    if (depth >= 4) {
+    if (depth >= 10) {
         throw new Error("too deep folder");
     }
     const curdir = await fs.promises.opendir(dirpath);
