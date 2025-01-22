@@ -39,6 +39,12 @@ const OtherCompileResultTransformer = {
     ole: JudgeResultKind.SystemCompileError,
     ce: JudgeResultKind.SystemCompileError,
 };
+const ProgramResultTransformer = {
+    mle: JudgeResultKind.SystemMemoryLimitExceeded,
+    tle: JudgeResultKind.SystemTimeLimitExceeded,
+    ole: JudgeResultKind.SystemOutpuLimitExceeded,
+    ce: JudgeResultKind.OutpuLimitExceeded,
+};
 
 const signalToString: Record<number, string> = {
     2: "SIGINT",
@@ -73,7 +79,8 @@ export abstract class JudgeAgent {
         protected readonly judge: CreateJudgeArgs,
         protected readonly timeRatio: number,
         protected readonly timeIntercept: number,
-        protected readonly throttle: Throttle,
+        protected readonly compileThrottle: Throttle,
+        protected readonly judgeThrottle: Throttle,
         protected readonly controller?: Controller
     ) {
         this.fileAgent = new FileAgent(
@@ -109,9 +116,104 @@ export abstract class JudgeAgent {
         }
     }
 
+    protected transformTime(rawTime: number): number {
+        return Math.ceil(rawTime * this.timeRatio + this.timeIntercept);
+    }
+
+    protected async fillExtra(
+        compileResult: MeterResult,
+        executableAgent: ExecutableAgent,
+        transformer: {
+            mle: JudgeResultKind;
+            tle: JudgeResultKind;
+            ole: JudgeResultKind;
+            ce: JudgeResultKind;
+        }
+    ): Promise<JudgeResult | undefined> {
+        const compileSumTime = compileResult.time.sys + compileResult.time.usr;
+        const compileLog = await executableAgent.fileAgent.getPath(
+            CompileLogName
+        );
+        const compileLogSize = fs.statSync(compileLog).size;
+        const exteaInfo = {
+            compileTime: this.transformTime(compileSumTime),
+            compileMessage: await readStream(
+                fs.createReadStream(compileLog, {
+                    encoding: "utf-8",
+                    start:
+                        compileLogSize -
+                        Math.min(
+                            executableAgent.executable.limit.compiler.message,
+                            10 * 1024
+                        ),
+                    end: compileLogSize - 1,
+                }),
+                -1
+            ),
+        };
+        if (executableAgent.execType === ExecType.Usr) {
+            this.extra.user = exteaInfo;
+        } else if (executableAgent.execType === ExecType.Spj) {
+            this.extra.spj = exteaInfo;
+        } else if (executableAgent.execType === ExecType.Interactive) {
+            this.extra.interactor = exteaInfo;
+        }
+        let compileJudgeType: JudgeResultKind | undefined = undefined;
+        if (compileResult.signal === 25) {
+            compileJudgeType = transformer.ole;
+        } else if (
+            compileSumTime >
+                executableAgent.executable.limit.compiler.cpuTime ||
+            (compileResult.time.real >
+                executableAgent.executable.limit.compiler.cpuTime &&
+                compileResult.returnCode === -1 &&
+                compileResult.signal === 9)
+        ) {
+            compileJudgeType = transformer.tle;
+        } else if (
+            compileResult.memory >=
+            executableAgent.executable.limit.compiler.memory
+        ) {
+            compileJudgeType = transformer.mle;
+        } else if (
+            compileResult.signal !== -1 ||
+            compileResult.returnCode !== 0
+        ) {
+            compileJudgeType = transformer.ce;
+        }
+        let runResult: JudgeResult | undefined = undefined;
+        if (compileJudgeType !== undefined) {
+            runResult = {
+                cases: range(this.judge.test?.cases.length ?? 1).map(() => {
+                    return {
+                        kind: compileJudgeType as JudgeResultKind,
+                        time: 0,
+                        memory: 0,
+                    };
+                }),
+                extra: this.extra,
+            };
+        }
+        return runResult;
+    }
+
     protected async runJudge(
+        executableAgent: ExecutableAgent,
         judgeFunction: (testCase: TestCase) => Promise<JudgeCaseResult>
     ): Promise<JudgeCaseResult[]> {
+        const programResult = await executableAgent.program();
+        let runResult: JudgeResult | undefined = undefined;
+        if (programResult !== undefined) {
+            runResult = await this.fillExtra(programResult, executableAgent, {
+                mle: JudgeResultKind.MemoryLimitExceeded,
+                tle: JudgeResultKind.TimeLimitExceeded,
+                ole: JudgeResultKind.OutpuLimitExceeded,
+                ce: JudgeResultKind.RuntimeError,
+            });
+        }
+        if (runResult !== undefined) {
+            return runResult.cases;
+        }
         const judgeCaseResults: JudgeCaseResult[] = [];
         if (this.judge.test) {
             for (const testCase of this.judge.test.cases) {
@@ -135,10 +237,6 @@ export abstract class JudgeAgent {
         return judgeCaseResults;
     }
 
-    protected transformTime(rawTime: number): number {
-        return Math.ceil(rawTime * this.timeRatio + this.timeIntercept);
-    }
-
     protected async compileAndFillExtra(
         execType: ExecType,
         executable: Executable,
@@ -153,74 +251,18 @@ export abstract class JudgeAgent {
         const executableAgent = new ExecutableAgent(execType, executable);
         this.ExecutableAgents.push(executableAgent);
         await executableAgent.init();
-        const compileResult = await this.throttle.withThrottle(() => {
-            return executableAgent.compile();
-        });
+        const compileResult = await this.compileThrottle.withThrottle(() =>
+            executableAgent.compile()
+        );
         if (compileResult !== undefined) {
-            const compileSumTime =
-                compileResult.time.sys + compileResult.time.usr;
-            const compileLog = await executableAgent.fileAgent.getPath(
-                CompileLogName
-            );
-            const compileLogSize = fs.statSync(compileLog).size;
-            const exteaInfo = {
-                compileTime: this.transformTime(compileSumTime),
-                compileMessage: await readStream(
-                    fs.createReadStream(compileLog, {
-                        encoding: "utf-8",
-                        start:
-                            compileLogSize -
-                            Math.min(
-                                executable.limit.compiler.message,
-                                10 * 1024
-                            ),
-                        end: compileLogSize - 1,
-                    }),
-                    -1
+            return [
+                executableAgent,
+                await this.fillExtra(
+                    compileResult,
+                    executableAgent,
+                    transformer
                 ),
-            };
-            if (execType === ExecType.Usr) {
-                this.extra.user = exteaInfo;
-            } else if (execType === ExecType.Spj) {
-                this.extra.spj = exteaInfo;
-            } else if (execType === ExecType.Interactive) {
-                this.extra.interactor = exteaInfo;
-            }
-            let compileJudgeType: JudgeResultKind | undefined = undefined;
-            if (compileResult.signal === 25) {
-                compileJudgeType = transformer.ole;
-            } else if (
-                compileSumTime > executable.limit.compiler.cpuTime ||
-                (compileResult.time.real > executable.limit.compiler.cpuTime &&
-                    compileResult.returnCode === -1 &&
-                    compileResult.signal === 9)
-            ) {
-                compileJudgeType = transformer.tle;
-            } else if (
-                compileResult.memory >= executable.limit.compiler.memory
-            ) {
-                compileJudgeType = transformer.mle;
-            } else if (
-                compileResult.signal !== -1 ||
-                compileResult.returnCode !== 0
-            ) {
-                compileJudgeType = transformer.ce;
-            }
-            let judgeResult: JudgeResult | undefined = undefined;
-            if (compileJudgeType !== undefined) {
-                const e: JudgeCaseResult = {
-                    kind: compileJudgeType,
-                    time: 0,
-                    memory: 0,
-                };
-                judgeResult = {
-                    cases: range(this.judge.test?.cases.length ?? 1).map(
-                        () => e
-                    ),
-                    extra: this.extra,
-                };
-            }
-            return [executableAgent, judgeResult];
+            ];
         } else {
             return [executableAgent, undefined];
         }
@@ -386,10 +428,18 @@ export class NormalJudgeAgent extends JudgeAgent {
         protected readonly judge: CreateJudgeArgs,
         protected readonly timeRatio: number,
         protected readonly timeIntercept: number,
-        protected readonly throttle: Throttle,
+        protected readonly compileThrottle: Throttle,
+        protected readonly judgeThrottle: Throttle,
         protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, controller);
+        super(
+            judge,
+            timeRatio,
+            timeIntercept,
+            compileThrottle,
+            compileThrottle,
+            controller
+        );
     }
 
     protected async getResult(): Promise<JudgeResult> {
@@ -403,153 +453,29 @@ export class NormalJudgeAgent extends JudgeAgent {
         this.updateStatus(JudgeState.Preparing);
         stat.tick(this.judge.id);
 
-        const [userExecutableAgent, judgeResult1] =
+        const [userExecutableAgent, judgeResult] =
             await this.compileAndFillExtra(
                 ExecType.Usr,
                 this.judge.judge.user,
                 UsrCompileResultTransformer
             );
-        if (judgeResult1 !== undefined) {
-            return judgeResult1;
-        }
-        // TODO: Not Implemented
-        return {
-            cases: [],
-            extra: this.extra,
-        };
-
-        const cmpExec: Executable = {
-            source: {
-                hashsum:
-                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                type: "direct",
-                content: "",
-            },
-            environment: {
-                language: "cmp",
-                system: "Linux",
-                arch: "x64",
-                options: {},
-            },
-            limit: { ...this.judge.judge.user.limit },
-        };
-        cmpExec.limit.runtime.memory = Math.max(
-            cmpExec.limit.runtime.memory,
-            16 * 1024 * 1024
-        );
-
-        const [cmpExecutableAgent, judgeResult2] =
-            await this.compileAndFillExtra(
-                ExecType.System,
-                cmpExec,
-                OtherCompileResultTransformer
-            );
-        if (judgeResult2 !== undefined) {
-            return judgeResult2!;
+        if (judgeResult !== undefined) {
+            return judgeResult;
         }
 
         this.updateStatus(JudgeState.Judging);
         stat.tick(this.judge.id);
 
-        const caseResults = await this.runJudge(async (testCase) => {
-            const userOutputFilePath = path.join(
-                this.fileAgent.dir,
-                crypto.randomBytes(32).toString("hex")
-            );
-            let stdInputFH: FileHandle | undefined = undefined;
-            let userOutputFH_W: FileHandle | undefined = undefined;
-            let userOutputFH_R: FileHandle | undefined = undefined;
-            let stdOutputFH: FileHandle | undefined = undefined;
-
-            try {
-                [stdInputFH, userOutputFH_W] = await Promise.all([
-                    this.fileAgent.getFileHandler(testCase.input),
-                    fs.promises.open(userOutputFilePath, "w", 0o700),
-                ]);
-                const [userResult, userErr] = await this.throttle.withThrottle(
-                    async () => {
-                        if (
-                            stdInputFH === undefined ||
-                            userOutputFH_W === undefined
-                        )
-                            throw new Error("Unreachable code");
-                        const userProcess = await userExecutableAgent.exec(
-                            undefined,
-                            [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
-                        );
-                        return await Promise.all([
-                            userProcess.result,
-                            userProcess.stderr !== null
-                                ? readStream(userProcess.stderr, 1024)
-                                : "",
-                        ]);
-                    }
-                );
-                await stdInputFH.close(), await userOutputFH_W.close();
-
-                if (
-                    this.preDetect(userResult, this.judge.judge.user) !==
-                    undefined
-                ) {
-                    return this.generateCaseResult({
-                        userResult: userResult,
-                        userExec: this.judge.judge.user,
-                        sysResult: EmptyMeterResult,
-                        sysExec: cmpExec,
-                        userErr: userErr,
-                        sysOut: "",
-                        sysErr: "",
-                    });
-                }
-
-                [userOutputFH_R, stdOutputFH] = await Promise.all([
-                    fs.promises.open(userOutputFilePath, "r", 0o700),
-                    this.fileAgent.getFileHandler(testCase.output),
-                ]);
-                const [cmpResult, cmpOut, cmpErr] =
-                    await this.throttle.withThrottle(async () => {
-                        if (
-                            userOutputFH_R === undefined ||
-                            stdOutputFH === undefined
-                        )
-                            throw new Error("Unreachable code");
-                        const compProcess = await cmpExecutableAgent.exec(
-                            undefined,
-                            [userOutputFH_R.fd, "pipe", "pipe", stdOutputFH.fd]
-                        );
-                        const r = await Promise.all([
-                            compProcess.result,
-                            compProcess.stdout !== null
-                                ? readStream(compProcess.stdout, 1024)
-                                : "",
-                            compProcess.stderr !== null
-                                ? readStream(compProcess.stderr, 1024)
-                                : "",
-                        ]);
-                        compProcess.stdout !== null &&
-                            compProcess.stdout.destroy();
-                        compProcess.stderr !== null &&
-                            compProcess.stderr.destroy();
-                        return r;
-                    });
-                await userOutputFH_R.close(), await stdOutputFH.close();
-
-                return this.generateCaseResult({
-                    userResult: userResult,
-                    userExec: this.judge.judge.user,
-                    sysResult: cmpResult,
-                    sysExec: cmpExec,
-                    userErr: userErr,
-                    sysOut: cmpOut,
-                    sysErr: cmpErr,
-                });
-            } finally {
-                stdInputFH && (await stdInputFH.close());
-                userOutputFH_W && (await userOutputFH_W.close());
-                userOutputFH_R && (await userOutputFH_R.close());
-                stdOutputFH && (await stdOutputFH.close());
+        const caseResults = await this.runJudge(
+            userExecutableAgent,
+            async (testCase) => {
+                return {
+                    kind: JudgeResultKind.OutpuLimitExceeded,
+                    time: 0,
+                    memory: 0,
+                };
             }
-        });
+        );
 
         return {
             cases: caseResults,
@@ -563,10 +489,17 @@ export class SpecialJudgeAgent extends JudgeAgent {
         protected readonly judge: CreateJudgeArgs,
         protected readonly timeRatio: number,
         protected readonly timeIntercept: number,
-        protected readonly throttle: Throttle,
+        protected readonly compileThrottle: Throttle,
         protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, controller);
+        super(
+            judge,
+            timeRatio,
+            timeIntercept,
+            compileThrottle,
+            compileThrottle,
+            controller
+        );
     }
 
     protected async getResult(): Promise<JudgeResult> {
@@ -602,123 +535,16 @@ export class SpecialJudgeAgent extends JudgeAgent {
         this.updateStatus(JudgeState.Judging);
         stat.tick(this.judge.id);
 
-        const caseResults = await this.runJudge(async (testCase) => {
-            if (this.judge.judge.type !== JudgeType.Special) {
-                throw new Error(
-                    `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Special})`
-                );
+        const caseResults = await this.runJudge(
+            userExecutableAgent,
+            async (testCase) => {
+                return {
+                    kind: JudgeResultKind.OutpuLimitExceeded,
+                    time: 0,
+                    memory: 0,
+                };
             }
-
-            const userOutputFilePath = path.join(
-                this.fileAgent.dir,
-                crypto.randomBytes(32).toString("hex")
-            );
-            let stdInputFH: FileHandle | undefined = undefined;
-            let stdInputFH2: FileHandle | undefined = undefined;
-            let userOutputFH_W: FileHandle | undefined = undefined;
-            let userOutputFH_R: FileHandle | undefined = undefined;
-            let stdOutputFH: FileHandle | undefined = undefined;
-
-            try {
-                [stdInputFH, userOutputFH_W] = await Promise.all([
-                    this.fileAgent.getFileHandler(testCase.input),
-                    fs.promises.open(userOutputFilePath, "w", 0o700),
-                ]);
-                const [userResult, userErr] = await this.throttle.withThrottle(
-                    async () => {
-                        if (
-                            stdInputFH === undefined ||
-                            userOutputFH_W === undefined
-                        )
-                            throw new Error("Unreachable code");
-                        const userProcess = await userExecutableAgent.exec(
-                            undefined,
-                            [stdInputFH.fd, userOutputFH_W.fd, "ignore"]
-                        );
-                        return await Promise.all([
-                            userProcess.result,
-                            userProcess.stderr !== null
-                                ? readStream(userProcess.stderr, 1024)
-                                : "",
-                        ]);
-                    }
-                );
-                await stdInputFH.close(), await userOutputFH_W.close();
-
-                if (
-                    this.preDetect(userResult, this.judge.judge.user) !==
-                    undefined
-                ) {
-                    return this.generateCaseResult({
-                        userResult: userResult,
-                        userExec: this.judge.judge.user,
-                        sysResult: EmptyMeterResult,
-                        sysExec: this.judge.judge.spj,
-                        userErr: userErr,
-                        sysOut: "",
-                        sysErr: "",
-                    });
-                }
-
-                [userOutputFH_R, stdInputFH2, stdOutputFH] = await Promise.all([
-                    fs.promises.open(userOutputFilePath, "r", 0o700),
-                    this.fileAgent.getFileHandler(testCase.input),
-                    this.fileAgent.getFileHandler(testCase.output),
-                ]);
-                const [cmpResult, cmpOut, cmpErr] =
-                    await this.throttle.withThrottle(async () => {
-                        if (
-                            stdInputFH2 === undefined ||
-                            userOutputFH_R === undefined ||
-                            stdOutputFH === undefined
-                        )
-                            throw new Error("Unreachable code");
-                        const compProcess = await spjExecutableAgent.exec(
-                            undefined,
-                            [
-                                userOutputFH_R.fd,
-                                "pipe",
-                                "pipe",
-                                stdInputFH2.fd,
-                                stdOutputFH.fd,
-                            ]
-                        );
-                        const r = await Promise.all([
-                            compProcess.result,
-                            compProcess.stdout !== null
-                                ? readStream(compProcess.stdout, 1024)
-                                : "",
-                            compProcess.stderr !== null
-                                ? readStream(compProcess.stderr, 1024)
-                                : "",
-                        ]);
-                        compProcess.stdout !== null &&
-                            compProcess.stdout.destroy();
-                        compProcess.stderr !== null &&
-                            compProcess.stderr.destroy();
-                        return r;
-                    });
-                await userOutputFH_R.close();
-                await stdInputFH2.close();
-                await stdOutputFH.close();
-
-                return this.generateCaseResult({
-                    userResult: userResult,
-                    userExec: this.judge.judge.user,
-                    sysResult: cmpResult,
-                    sysExec: this.judge.judge.spj,
-                    userErr: userErr,
-                    sysOut: cmpOut,
-                    sysErr: cmpErr,
-                });
-            } finally {
-                stdInputFH && (await stdInputFH.close());
-                userOutputFH_W && (await userOutputFH_W.close());
-                userOutputFH_R && (await userOutputFH_R.close());
-                stdInputFH2 && (await stdInputFH2.close());
-                stdOutputFH && (await stdOutputFH.close());
-            }
-        });
+        );
 
         return {
             cases: caseResults,
@@ -732,10 +558,17 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         protected readonly judge: CreateJudgeArgs,
         protected readonly timeRatio: number,
         protected readonly timeIntercept: number,
-        protected readonly throttle: Throttle,
+        protected readonly compileThrottle: Throttle,
         protected readonly controller?: Controller
     ) {
-        super(judge, timeRatio, timeIntercept, throttle, controller);
+        super(
+            judge,
+            timeRatio,
+            timeIntercept,
+            compileThrottle,
+            compileThrottle,
+            controller
+        );
     }
 
     protected async getResult(): Promise<JudgeResult> {
@@ -771,82 +604,16 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         this.updateStatus(JudgeState.Judging);
         stat.tick(this.judge.id);
 
-        const caseResults = await this.runJudge(async (testCase) => {
-            if (this.judge.judge.type !== JudgeType.Interactive) {
-                throw new Error(
-                    `Wrong JudgeType ${this.judge.judge.type}(Should be ${JudgeType.Interactive})`
-                );
+        const caseResults = await this.runJudge(
+            userExecutableAgent,
+            async (testCase) => {
+                return {
+                    kind: JudgeResultKind.OutpuLimitExceeded,
+                    time: 0,
+                    memory: 0,
+                };
             }
-            let stdInputFH: FileHandle | undefined = undefined;
-            let stdOutputFH: FileHandle | undefined = undefined;
-            try {
-                [stdInputFH, stdOutputFH] = await Promise.all([
-                    this.fileAgent.getFileHandler(testCase.input),
-                    this.fileAgent.getFileHandler(testCase.output),
-                ]);
-                const [userResult, cmpResult, userErr, cmpOut, cmpErr] =
-                    await this.throttle.withThrottle(async () => {
-                        if (
-                            stdInputFH === undefined ||
-                            stdOutputFH === undefined
-                        )
-                            throw new Error("Unreachable code");
-                        const userProcess = await userExecutableAgent.exec(
-                            undefined,
-                            ["pipe", "pipe", "ignore"]
-                        );
-                        const compProcess =
-                            await interactorExecutableAgent.exec(undefined, [
-                                userProcess.stdout,
-                                userProcess.stdin,
-                                "pipe",
-                                stdInputFH.fd,
-                                stdOutputFH.fd,
-                                "ignore",
-                            ]);
-                        const r = await Promise.all([
-                            userProcess.result,
-                            compProcess.result,
-                            userProcess.stderr !== null
-                                ? readStream(userProcess.stderr, 1024)
-                                : "",
-                            (compProcess.stdio as unknown as Readable[])[5]
-                                ? readStream(
-                                      (
-                                          compProcess.stdio as unknown as Readable[]
-                                      )[5],
-                                      1024
-                                  )
-                                : "",
-                            compProcess.stderr !== null
-                                ? readStream(compProcess.stderr, 1024)
-                                : "",
-                        ]);
-                        userProcess.stdin !== null &&
-                            userProcess.stdin.destroy();
-                        userProcess.stdout !== null &&
-                            userProcess.stdout.destroy();
-                        compProcess.stderr !== null &&
-                            compProcess.stderr.destroy();
-                        return r;
-                    });
-                await stdInputFH.close();
-                await stdOutputFH.close();
-
-                return this.generateCaseResult({
-                    userResult: userResult,
-                    userExec: this.judge.judge.user,
-                    sysResult: cmpResult,
-                    sysExec: this.judge.judge.interactor,
-                    userErr: userErr,
-                    sysOut: cmpOut,
-                    sysErr: cmpErr,
-                });
-            } finally {
-                stdInputFH && (await stdInputFH.close());
-                stdOutputFH && (await stdOutputFH.close());
-            }
-        });
+        );
 
         return {
             cases: caseResults,
@@ -859,7 +626,8 @@ export class JudgeFactory {
     constructor(
         readonly timeRatio: number,
         readonly timeIntercept: number,
-        readonly throttle: Throttle,
+        readonly compileThrottle: Throttle,
+        readonly judgeThrottle: Throttle,
         public controller?: Controller
     ) {}
 
@@ -876,7 +644,8 @@ export class JudgeFactory {
                     judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
+                    this.compileThrottle,
+                    this.judgeThrottle,
                     this.controller
                 );
             }
@@ -891,7 +660,7 @@ export class JudgeFactory {
                     judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
+                    this.compileThrottle,
                     this.controller
                 );
             }
@@ -908,7 +677,7 @@ export class JudgeFactory {
                     judgeInfo,
                     this.timeRatio,
                     this.timeIntercept,
-                    this.throttle,
+                    this.compileThrottle,
                     this.controller
                 );
             }
@@ -919,12 +688,13 @@ export class JudgeFactory {
 }
 
 export async function getJudgerFactory(
-    throttle: Throttle
+    compileThrottle: Throttle,
+    judgeThrottle: Throttle
 ): Promise<JudgeFactory> {
     const logger = getLogger("JudgeFactoryFactory");
     logger.info("self test loaded");
     const timeIntercept = 0;
-    let judgerFactory = new JudgeFactory(1, 0, throttle);
+    let judgerFactory = new JudgeFactory(1, 0, compileThrottle, judgeThrottle);
 
     let costTime = 0,
         expectedTime = 0;
@@ -1025,7 +795,12 @@ export async function getJudgerFactory(
         throw new Error("timeRatio exceeds timeRatioTolerance");
     }
 
-    judgerFactory = new JudgeFactory(timeRatio, timeIntercept, throttle);
+    judgerFactory = new JudgeFactory(
+        timeRatio,
+        timeIntercept,
+        compileThrottle,
+        judgeThrottle
+    );
 
     logger.warn("start test system stability");
 

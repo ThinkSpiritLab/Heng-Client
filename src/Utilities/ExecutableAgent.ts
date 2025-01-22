@@ -10,7 +10,7 @@ import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
 import { FileHandle } from "fs/promises";
 import { hengSpawn, HengSpawnOption } from "../Spawn";
-import { MeteredChildProcess, MeterResult } from "../Spawn/Meter";
+import { MeterResult } from "../Spawn/Meter";
 
 const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";
@@ -29,23 +29,23 @@ export class ExecutableAgent {
     protected logger = getLogger("ExecutableAgent");
 
     constructor(
-        private readonly execType: ExecType,
-        private readonly excutable: Executable
+        public readonly execType: ExecType,
+        public readonly executable: Executable
     ) {
         this.judgeHash = crypto
             .createHash("sha256")
             .update(
                 JSON.stringify({
                     execType,
-                    excutable,
+                    excutable: executable,
                 })
             )
             .digest("hex");
         this.configuredLanguage = getConfiguredLanguage(
-            this.excutable.environment.language,
+            this.executable.environment.language,
             {
                 execType: this.execType,
-                excutable: this.excutable,
+                excutable: this.executable,
                 compileDir: "",
             }
         );
@@ -105,7 +105,7 @@ export class ExecutableAgent {
             await this.fileAgent.init(false);
             this.fileAgent.add(
                 SourceCodeName,
-                this.excutable.source,
+                this.executable.source,
                 this.configuredLanguage.srcFileName
             );
         }
@@ -196,16 +196,16 @@ export class ExecutableAgent {
                     gid: getConfig().judger.gid,
                     timeLimit:
                         languageRunOption.spawnOption?.timeLimit ??
-                        this.excutable.limit.compiler.cpuTime,
+                        this.executable.limit.compiler.cpuTime,
                     memoryLimit:
                         languageRunOption.spawnOption?.memoryLimit ??
-                        this.excutable.limit.compiler.memory,
+                        this.executable.limit.compiler.memory,
                     pidLimit:
                         languageRunOption.spawnOption?.pidLimit ??
                         getConfig().judger.defaultPidLimit,
                     fileLimit:
                         languageRunOption.spawnOption?.fileLimit ??
-                        this.excutable.limit.compiler.output,
+                        this.executable.limit.compiler.output,
                 };
 
                 const subProc = hengSpawn(command, args, spawnOption);
@@ -253,15 +253,12 @@ export class ExecutableAgent {
      * @param cwd
      * @returns
      */
-    async exec(
-        cwd?: string,
-        stdio?: CompleteStdioOptions,
-        args?: string[]
-    ): Promise<MeteredChildProcess> {
+    async program(cwd?: string, stdio?: CompleteStdioOptions, args?: string[]) {
         this.checkInit();
-        const languageRunOption = this.configuredLanguage.execOptionGenerator();
+        const languageRunOption =
+            this.configuredLanguage.pragramOptionGenerator();
         if (languageRunOption.skip) {
-            throw new Error("Can't skip exec");
+            throw new Error("Can't skip pragram");
         }
         if (!this.compiled && !this.compileCached) {
             throw new Error("Please compile first");
@@ -285,20 +282,19 @@ export class ExecutableAgent {
                 gid: getConfig().judger.gid,
                 timeLimit:
                     languageRunOption.spawnOption?.timeLimit ??
-                    this.excutable.limit.runtime.cpuTime,
+                    this.executable.limit.runtime.cpuTime,
                 memoryLimit:
                     languageRunOption.spawnOption?.memoryLimit ??
-                    this.excutable.limit.runtime.memory,
+                    this.executable.limit.runtime.memory,
                 pidLimit:
                     languageRunOption.spawnOption?.pidLimit ??
                     getConfig().judger.defaultPidLimit,
                 fileLimit:
                     languageRunOption.spawnOption?.fileLimit ??
-                    this.excutable.limit.runtime.output,
+                    this.executable.limit.runtime.output,
             };
 
-            const subProc = hengSpawn(command, args, spawnOption);
-            return subProc;
+            return hengSpawn(command, args, spawnOption).result;
         }
     }
 

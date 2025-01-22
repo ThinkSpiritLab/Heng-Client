@@ -27,7 +27,7 @@ export class PlainText extends Language {
         return [];
     }
 
-    execOptionGenerator(): RunOption {
+    pragramOptionGenerator(): RunOption {
         const binPath = path.join(this.compileDir, this.src);
         return {
             skip: false,

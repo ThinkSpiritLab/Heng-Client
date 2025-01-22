@@ -43,5 +43,5 @@ export abstract class Language {
     abstract get srcFileName(): string;
     abstract get compiledFiles(): string[];
     abstract compileOptionGenerator(): RunOption;
-    abstract execOptionGenerator(): RunOption;
+    abstract pragramOptionGenerator(): RunOption;
 }

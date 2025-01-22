@@ -19,9 +19,11 @@ export class Verilog extends Language {
         };
     }
 
-    execOptionGenerator(): RunOption {
+    pragramOptionGenerator(): RunOption {
         return {
-            skip: true,
+            skip: false,
+            command: getConfig().language.impact,
+            args: ["-batch", "main.cmd"],
         };
     }
 

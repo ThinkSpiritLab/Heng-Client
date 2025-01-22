@@ -78,7 +78,8 @@ async function main() {
 
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(
-        new Throttle(config.judgeCapability)
+        new Throttle(config.judgeCapability),
+        new Throttle(1)
     );
     const controller = new Controller(getConfig().controller);
     judgerFactory.controller = controller;
