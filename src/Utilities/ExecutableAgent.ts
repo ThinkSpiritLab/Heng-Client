@@ -128,6 +128,86 @@ export class ExecutableAgent {
         }
     }
 
+    private async spawn(
+        languageOption: {
+            args?: string[];
+            command: string;
+            spawnOption?: HengSpawnOption;
+        },
+        runOption: {
+            args?: string[];
+            cwd?: string;
+            stdio?: CompleteStdioOptions;
+        }
+    ) {
+        let logFileFH: FileHandle | undefined = undefined;
+        try {
+            if (!runOption.args) {
+                runOption.args = [];
+            }
+            if (languageOption.args) {
+                runOption.args = [...languageOption.args, ...runOption.args];
+            }
+            const logPath = path.resolve(this.fileAgent.dir, CompileLogName);
+            logFileFH = await fs.promises.open(logPath, "w", 0o700);
+            if (runOption.stdio === undefined) {
+                runOption.stdio = ["ignore"];
+            }
+            runOption.stdio[1] = logFileFH.fd;
+            runOption.stdio[2] = logFileFH.fd;
+            const HengSpawnOption: HengSpawnOption = {
+                cwd:
+                    languageOption.spawnOption?.cwd ??
+                    runOption.cwd ??
+                    this.fileAgent.dir,
+                env: languageOption.spawnOption?.env,
+                stdio: runOption.stdio,
+                uid: getConfig().judger.uid,
+                gid: getConfig().judger.gid,
+                timeLimit:
+                    languageOption.spawnOption?.timeLimit ??
+                    this.executable.limit.compiler.cpuTime,
+                memoryLimit:
+                    languageOption.spawnOption?.memoryLimit ??
+                    this.executable.limit.compiler.memory,
+                pidLimit:
+                    languageOption.spawnOption?.pidLimit ??
+                    getConfig().judger.defaultPidLimit,
+                fileLimit:
+                    languageOption.spawnOption?.fileLimit ??
+                    this.executable.limit.compiler.output,
+            };
+            const subProc = hengSpawn(
+                languageOption.command,
+                runOption.args,
+                HengSpawnOption
+            );
+            const procResult = await subProc.result;
+            await logFileFH.close();
+            this.fileAgent.register(CompileLogName, CompileLogName);
+            try {
+                for (const file of this.configuredLanguage.compiledFiles) {
+                    await fs.promises.access(file);
+                }
+            } catch (error) {
+                procResult.returnCode = procResult.returnCode || 1;
+            }
+            const statisticPath = path.resolve(
+                this.fileAgent.dir,
+                CompileStatisticName
+            );
+            await fs.promises.writeFile(
+                statisticPath,
+                JSON.stringify(procResult),
+                { mode: 0o700 }
+            );
+            this.fileAgent.register(CompileStatisticName, CompileStatisticName);
+            return procResult;
+        } finally {
+            logFileFH && (await logFileFH.close());
+        }
+    }
+
     /**
      * You'd better not set args, stdio, cwd.
      * cwd is low priority.
@@ -158,85 +238,14 @@ export class ExecutableAgent {
                 await this.fileAgent.getString(CompileStatisticName)
             );
         } else {
-            let compileLogFileFH: FileHandle | undefined = undefined;
-            try {
-                const command = languageRunOption.command;
-                if (!args) {
-                    args = [];
-                }
-                if (languageRunOption.args) {
-                    args = [...languageRunOption.args, ...args];
-                }
-                const compileLogPath = path.resolve(
-                    this.fileAgent.dir,
-                    CompileLogName
-                );
-                compileLogFileFH = await fs.promises.open(
-                    compileLogPath,
-                    "w",
-                    0o700
-                );
-                if (stdio === undefined) {
-                    stdio = ["ignore", "pipe", "pipe"];
-                }
-                stdio[1] = compileLogFileFH.fd;
-                stdio[2] = compileLogFileFH.fd;
-                const spawnOption: HengSpawnOption = {
-                    cwd:
-                        languageRunOption.spawnOption?.cwd ??
-                        cwd ??
-                        this.fileAgent.dir,
-                    env: languageRunOption.spawnOption?.env,
-                    stdio: stdio,
-                    uid: getConfig().judger.uid,
-                    gid: getConfig().judger.gid,
-                    timeLimit:
-                        languageRunOption.spawnOption?.timeLimit ??
-                        this.executable.limit.compiler.cpuTime,
-                    memoryLimit:
-                        languageRunOption.spawnOption?.memoryLimit ??
-                        this.executable.limit.compiler.memory,
-                    pidLimit:
-                        languageRunOption.spawnOption?.pidLimit ??
-                        getConfig().judger.defaultPidLimit,
-                    fileLimit:
-                        languageRunOption.spawnOption?.fileLimit ??
-                        this.executable.limit.compiler.output,
-                };
-
-                const subProc = hengSpawn(command, args, spawnOption);
-                const procResult = await subProc.result;
-                await compileLogFileFH.close();
-
-                this.fileAgent.register(CompileLogName, CompileLogName);
-
-                try {
-                    for (const file of this.configuredLanguage.compiledFiles) {
-                        await fs.promises.access(file);
-                    }
-                } catch (error) {
-                    procResult.returnCode = procResult.returnCode || 1;
-                }
-
-                const compileStatisticPath = path.resolve(
-                    this.fileAgent.dir,
-                    CompileStatisticName
-                );
-                await fs.promises.writeFile(
-                    compileStatisticPath,
-                    JSON.stringify(procResult),
-                    { mode: 0o700 }
-                );
-                this.fileAgent.register(
-                    CompileStatisticName,
-                    CompileStatisticName
-                );
-                this.compiled = true;
-                this.signCompileCache();
-                return procResult;
-            } finally {
-                compileLogFileFH && (await compileLogFileFH.close());
-            }
+            const procResult = await this.spawn(languageRunOption, {
+                args,
+                cwd,
+                stdio,
+            });
+            this.compiled = true;
+            this.signCompileCache();
+            return procResult;
         }
     }
 
@@ -259,38 +268,12 @@ export class ExecutableAgent {
         if (!this.compiled && !this.compileCached) {
             throw new Error("Please compile first");
         } else {
-            const command = languageRunOption.command;
-            if (!args) {
-                args = [];
-            }
-            if (languageRunOption.args) {
-                args = [...languageRunOption.args, ...args];
-            }
-
-            const spawnOption: HengSpawnOption = {
-                cwd:
-                    languageRunOption.spawnOption?.cwd ??
-                    cwd ??
-                    this.fileAgent.dir,
-                env: languageRunOption.spawnOption?.env,
-                stdio: stdio,
-                uid: getConfig().judger.uid,
-                gid: getConfig().judger.gid,
-                timeLimit:
-                    languageRunOption.spawnOption?.timeLimit ??
-                    this.executable.limit.runtime.cpuTime,
-                memoryLimit:
-                    languageRunOption.spawnOption?.memoryLimit ??
-                    this.executable.limit.runtime.memory,
-                pidLimit:
-                    languageRunOption.spawnOption?.pidLimit ??
-                    getConfig().judger.defaultPidLimit,
-                fileLimit:
-                    languageRunOption.spawnOption?.fileLimit ??
-                    this.executable.limit.runtime.output,
-            };
-
-            return hengSpawn(command, args, spawnOption).result;
+            const procResult = await this.spawn(languageRunOption, {
+                args,
+                cwd,
+                stdio,
+            });
+            return procResult;
         }
     }
 

@@ -17,15 +17,13 @@ import { getConfig } from "../Config";
 import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
-import { Readable } from "stream";
 import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
 import { ExecType } from "../Spawn/Language/decl";
 import { range } from "lodash";
 import { Controller } from "../controller";
 import { stat } from "./Statistics";
 import * as crypto from "crypto";
-import { FileHandle } from "fs/promises";
-import { EmptyMeterResult, MeterResult } from "../Spawn/Meter";
+import { MeterResult } from "../Spawn/Meter";
 import { SerialPort } from "serialport";
 import { closePort } from "./Serial";
 
@@ -40,21 +38,6 @@ const OtherCompileResultTransformer = {
     tle: JudgeResultKind.SystemCompileError,
     ole: JudgeResultKind.SystemCompileError,
     ce: JudgeResultKind.SystemCompileError,
-};
-const ProgramResultTransformer = {
-    mle: JudgeResultKind.SystemMemoryLimitExceeded,
-    tle: JudgeResultKind.SystemTimeLimitExceeded,
-    ole: JudgeResultKind.SystemOutpuLimitExceeded,
-    ce: JudgeResultKind.OutpuLimitExceeded,
-};
-
-const signalToString: Record<number, string> = {
-    2: "SIGINT",
-    4: "非法指令",
-    6: "异常终止",
-    8: "错误算术运算",
-    11: "非法内存访问（分段错误）",
-    15: "SIGTERM",
 };
 
 export abstract class JudgeAgent {
@@ -221,11 +204,14 @@ export abstract class JudgeAgent {
         }
         const judgeCaseResults: JudgeCaseResult[] = [];
         if (this.judge.test) {
+            const judgeThrottle = new Throttle(1);
             for (const testCase of this.judge.test.cases) {
-                const caseResult = await judgeFunction(
-                    testCase,
-                    executableAgent.configuredLanguage.judgeTimeout
-                );
+                const caseResult = await judgeThrottle.withThrottle(() => {
+                    return judgeFunction(
+                        testCase,
+                        executableAgent.configuredLanguage.judgeTimeout
+                    );
+                });
                 judgeCaseResults.push(caseResult);
                 if (
                     caseResult.kind !== JudgeResultKind.Accepted &&
@@ -307,122 +293,6 @@ export abstract class JudgeAgent {
         }
     }
 
-    protected preDetect(
-        userResult: MeterResult,
-        userExec: Executable
-    ): JudgeResultKind | undefined {
-        const userRunSumTime = userResult.time.usr + userResult.time.sys;
-        if (userResult.signal === 25) {
-            return JudgeResultKind.OutpuLimitExceeded;
-        } else if (
-            userRunSumTime > userExec.limit.runtime.cpuTime ||
-            (userResult.time.real > userExec.limit.runtime.cpuTime &&
-                userResult.returnCode === -1 &&
-                userResult.signal === 9)
-        ) {
-            return JudgeResultKind.TimeLimitExceeded;
-        } else if (userResult.memory >= userExec.limit.runtime.memory) {
-            return JudgeResultKind.MemoryLimitExceeded;
-        } else if (userResult.signal !== -1 || userResult.returnCode !== 0) {
-            return JudgeResultKind.RuntimeError;
-        }
-        return undefined;
-    }
-
-    protected generateCaseResult({
-        userResult,
-        userExec,
-        sysResult,
-        sysExec,
-        // userErr,
-        sysOut,
-        sysErr,
-    }: {
-        userResult: MeterResult;
-        userExec: Executable;
-        sysResult: MeterResult;
-        sysExec: Executable;
-        userErr: string;
-        sysOut: string;
-        sysErr: string;
-    }): JudgeCaseResult {
-        this.checkInit();
-        sysOut = sysOut.trim();
-        sysErr = sysErr.trim();
-        let sysJudge = "";
-        if (sysOut) {
-            sysJudge += sysOut;
-        }
-        if (sysErr) {
-            sysJudge += sysErr;
-        }
-        const sysSummary = sysJudge.slice(0, 4).toLocaleLowerCase();
-        const userRunSumTime = userResult.time.usr + userResult.time.sys;
-        const sysRunSumTime = sysResult.time.usr + sysResult.time.sys;
-        const kind = ((): JudgeResultKind => {
-            if (userResult.signal === 25) {
-                return JudgeResultKind.OutpuLimitExceeded;
-            } else if (
-                userRunSumTime > userExec.limit.runtime.cpuTime ||
-                (userResult.time.real > userExec.limit.runtime.cpuTime &&
-                    userResult.returnCode === -1 &&
-                    userResult.signal === 9)
-            ) {
-                return JudgeResultKind.TimeLimitExceeded;
-            } else if (userResult.memory >= userExec.limit.runtime.memory) {
-                return JudgeResultKind.MemoryLimitExceeded;
-            } else if (
-                userResult.signal !== -1 ||
-                userResult.returnCode !== 0
-            ) {
-                sysJudge += signalToString[userResult.signal] ?? "";
-                return JudgeResultKind.RuntimeError;
-            } else if (sysResult.signal === 25) {
-                return JudgeResultKind.SystemOutpuLimitExceeded;
-            } else if (
-                sysRunSumTime > sysExec.limit.runtime.cpuTime ||
-                (sysResult.time.real > sysExec.limit.runtime.cpuTime &&
-                    sysResult.returnCode === -1 &&
-                    sysResult.signal === 9)
-            ) {
-                return JudgeResultKind.SystemTimeLimitExceeded;
-            } else if (sysResult.memory > sysExec.limit.runtime.memory) {
-                return JudgeResultKind.SystemMemoryLimitExceeded;
-            } else if (
-                sysResult.signal !== -1 ||
-                !range(9).includes(sysResult.returnCode)
-            ) {
-                return JudgeResultKind.SystemRuntimeError;
-            } else if (
-                (sysSummary.startsWith("ac") || sysSummary.startsWith("ok")) &&
-                sysResult.returnCode === 0
-            ) {
-                return JudgeResultKind.Accepted;
-            } else if (
-                sysSummary.startsWith("pe") &&
-                sysResult.returnCode === 2
-            ) {
-                return JudgeResultKind.PresentationError;
-            } else {
-                return JudgeResultKind.WrongAnswer;
-            }
-        })();
-        const rawTime = userRunSumTime;
-        // sleep(inf);
-        // codeforces: Idleness limit exceeded, time: 0ms
-        // luogu: TLE, time: 1ms
-        // if (kind === JudgeResultKind.TimeLimitExceeded) {
-        //     if (!(userResult.time.usr > userExec.limit.runtime.cpuTime))
-        //         rawTime = userResult.time.real;
-        // }
-        return {
-            kind,
-            time: this.transformTime(rawTime),
-            memory: userResult.memory,
-            extraMessage: sysJudge,
-        };
-    }
-
     async clean(): Promise<void> {
         for (const executableAgent of this.ExecutableAgents) {
             await executableAgent.clean();
@@ -495,8 +365,8 @@ export class NormalJudgeAgent extends JudgeAgent {
                         this.fileAgent.getBuffer(testCase.output),
                     ]);
                     const start = Date.now();
-                    port.write(input);
-                    const timeout = setTimeout(closePort, judgeTimeout, port);
+                    const timeout = setTimeout(closePort, 60000, port);
+                    await port.write(input);
                     try {
                         const { buffer, bytesRead } = await port.read(
                             Buffer.alloc(output.length),
@@ -513,7 +383,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                         kind = JudgeResultKind.TimeLimitExceeded;
                     }
                     clearTimeout(timeout);
-                    closePort(port);
+                    await closePort(port);
                     time = Date.now() - start;
                 }
                 return {
