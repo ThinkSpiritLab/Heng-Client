@@ -35,4 +35,8 @@ export class PlainText extends Language {
             args: [binPath],
         };
     }
+
+    get judgeTimeout() {
+        return 1000;
+    }
 }

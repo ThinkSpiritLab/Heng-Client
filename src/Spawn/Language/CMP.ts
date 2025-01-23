@@ -35,4 +35,8 @@ export class CMP extends Language {
             },
         };
     }
+
+    get judgeTimeout() {
+        return 1000;
+    }
 }

@@ -155,11 +155,7 @@ export class ExecutableAgent {
                 `skip ${this.execType} compile, compiled: ${this.compiled}, compileCached：${this.compileCached}`
             );
             return JSON.parse(
-                (
-                    await fs.promises.readFile(
-                        await this.fileAgent.getPath(CompileStatisticName)
-                    )
-                ).toString("utf-8")
+                await this.fileAgent.getString(CompileStatisticName)
             );
         } else {
             let compileLogFileFH: FileHandle | undefined = undefined;

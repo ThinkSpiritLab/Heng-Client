@@ -49,12 +49,8 @@ export function hengSpawn(
     const basicOption: BasicSpawnOption = {
         cwd: options.cwd,
         shell: getConfig().language.shell,
-        // timeout: 1000,
+        timeout: options.timeLimit,
     };
-
-    // if (options.timeLimit) {
-    //     basicOption.timeout = Math.ceil(options.timeLimit * 1.2) + 250;
-    // }
 
     if (options.stdio === undefined) {
         options.stdio = ["ignore", "ignore", "ignore"];

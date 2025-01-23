@@ -1,8 +1,11 @@
 import * as TOML from "@iarna/toml";
 import { plainToClass, Type } from "class-transformer";
 import {
+    ArrayNotEmpty,
+    ArrayUnique,
     isBoolean,
     IsBoolean,
+    IsHexadecimal,
     IsInt,
     IsNotEmpty,
     IsNumber,
@@ -174,6 +177,14 @@ export class JudgeFactoryConfig {
     @IsPositive()
     remoteFileCacheBytes!: number;
 }
+export class FpgaConfig {
+    @ArrayNotEmpty()
+    @ArrayUnique()
+    @IsHexadecimal({
+        each: true,
+    })
+    serial!: string[];
+}
 export class Config {
     @ValidateNested()
     @IsNotEmpty()
@@ -199,6 +210,10 @@ export class Config {
     @IsNotEmpty()
     @Type(() => JudgeFactoryConfig)
     judger!: JudgeFactoryConfig;
+    @ValidateNested()
+    @IsNotEmpty()
+    @Type(() => FpgaConfig)
+    fpga!: FpgaConfig;
 }
 let config: Config | undefined = undefined;
 

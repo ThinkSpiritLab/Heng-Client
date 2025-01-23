@@ -16,7 +16,14 @@ export class Verilog extends Language {
             skip: false,
             command: getConfig().language.verilog,
             args: [getConfig().language.ise],
+            spawnOption: {
+                timeLimit: 60000,
+            },
         };
+    }
+
+    get judgeTimeout() {
+        return 1000;
     }
 
     pragramOptionGenerator(): RunOption {
@@ -24,6 +31,9 @@ export class Verilog extends Language {
             skip: false,
             command: getConfig().language.impact,
             args: ["-batch", "main.cmd"],
+            spawnOption: {
+                timeLimit: 10000,
+            },
         };
     }
 

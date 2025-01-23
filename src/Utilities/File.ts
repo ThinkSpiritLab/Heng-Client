@@ -8,7 +8,6 @@ import * as crypto from "crypto";
 import { Throttle } from "./Throttle";
 import { getLogger } from "log4js";
 import axios from "axios";
-import { FileHandle } from "fs/promises";
 const pipeline = util.promisify(stream.pipeline);
 
 const logger = getLogger("File");
@@ -379,22 +378,13 @@ export class FileAgent {
         this.nameToFile.set(name, [file, subpath, false, new Throttle(1)]);
         return path;
     }
-    async getStream(name: string): Promise<Readable> {
+    async getBuffer(name: string) {
         this.checkInit();
-        const s = fs.createReadStream(await this.getPath(name));
-        await waitForOpen(s);
-        return s;
+        return fs.promises.readFile(await this.getPath(name));
     }
-    /** @deprecated  no auto close fd */
-    async getFd(name: string): Promise<number> {
+    async getString(name: string) {
         this.checkInit();
-        const s = fs.openSync(await this.getPath(name), "r");
-        return s;
-    }
-    async getFileHandler(name: string): Promise<FileHandle> {
-        this.checkInit();
-        const s = await fs.promises.open(await this.getPath(name), "r");
-        return s;
+        return fs.promises.readFile(await this.getPath(name), "utf-8");
     }
     async getPath(name: string): Promise<string> {
         this.checkInit();

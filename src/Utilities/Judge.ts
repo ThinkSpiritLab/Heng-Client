@@ -26,6 +26,8 @@ import { stat } from "./Statistics";
 import * as crypto from "crypto";
 import { FileHandle } from "fs/promises";
 import { EmptyMeterResult, MeterResult } from "../Spawn/Meter";
+import { SerialPort } from "serialport";
+import { closePort } from "./Serial";
 
 const UsrCompileResultTransformer = {
     mle: JudgeResultKind.CompileMemoryLimitExceeded,
@@ -134,7 +136,7 @@ export abstract class JudgeAgent {
         const compileLog = await executableAgent.fileAgent.getPath(
             CompileLogName
         );
-        const compileLogSize = fs.statSync(compileLog).size;
+        const compileLogSize = (await fs.promises.stat(compileLog)).size;
         const exteaInfo = {
             compileTime: this.transformTime(compileSumTime),
             compileMessage: await readStream(
@@ -199,7 +201,10 @@ export abstract class JudgeAgent {
 
     protected async runJudge(
         executableAgent: ExecutableAgent,
-        judgeFunction: (testCase: TestCase) => Promise<JudgeCaseResult>
+        judgeFunction: (
+            testCase: TestCase,
+            judgeTimeout: number
+        ) => Promise<JudgeCaseResult>
     ): Promise<JudgeCaseResult[]> {
         const programResult = await executableAgent.program();
         let runResult: JudgeResult | undefined = undefined;
@@ -217,7 +222,10 @@ export abstract class JudgeAgent {
         const judgeCaseResults: JudgeCaseResult[] = [];
         if (this.judge.test) {
             for (const testCase of this.judge.test.cases) {
-                const caseResult = await judgeFunction(testCase);
+                const caseResult = await judgeFunction(
+                    testCase,
+                    executableAgent.configuredLanguage.judgeTimeout
+                );
                 judgeCaseResults.push(caseResult);
                 if (
                     caseResult.kind !== JudgeResultKind.Accepted &&
@@ -468,11 +476,50 @@ export class NormalJudgeAgent extends JudgeAgent {
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
-            async (testCase) => {
+            async (testCase, judgeTimeout) => {
+                let kind = JudgeResultKind.SystemError;
+                let time = 0;
+                let memory = 0;
+                const path = (await SerialPort.list()).find(
+                    (info) =>
+                        info.serialNumber &&
+                        getConfig().fpga.serial.includes(info.serialNumber)
+                )?.path;
+                if (path) {
+                    const [port, input, output] = await Promise.all([
+                        SerialPort.binding.open({
+                            baudRate: 250000,
+                            path,
+                        }),
+                        this.fileAgent.getBuffer(testCase.input),
+                        this.fileAgent.getBuffer(testCase.output),
+                    ]);
+                    const start = Date.now();
+                    port.write(input);
+                    const timeout = setTimeout(closePort, judgeTimeout, port);
+                    try {
+                        const { buffer, bytesRead } = await port.read(
+                            Buffer.alloc(output.length),
+                            0,
+                            output.length
+                        );
+                        if (buffer.equals(output)) {
+                            kind = JudgeResultKind.Accepted;
+                        } else {
+                            kind = JudgeResultKind.WrongAnswer;
+                        }
+                        memory = bytesRead;
+                    } catch {
+                        kind = JudgeResultKind.TimeLimitExceeded;
+                    }
+                    clearTimeout(timeout);
+                    closePort(port);
+                    time = Date.now() - start;
+                }
                 return {
-                    kind: JudgeResultKind.OutpuLimitExceeded,
-                    time: 0,
-                    memory: 0,
+                    kind,
+                    time,
+                    memory,
                 };
             }
         );
