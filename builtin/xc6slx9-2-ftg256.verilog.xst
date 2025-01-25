@@ -1,0 +1,1 @@
+run -ifn verilog.prj -ofn main -p xc6slx9-2-ftg256 -top main

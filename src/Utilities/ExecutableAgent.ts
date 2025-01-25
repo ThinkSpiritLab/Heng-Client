@@ -1,10 +1,10 @@
 import * as crypto from "crypto";
-import { Executable } from "heng-protocol";
+import { DynamicFile, Executable } from "heng-protocol";
 import path from "path";
 import fs from "fs";
 import { ExecType, Language } from "../Spawn/Language/decl";
 import { FileAgent } from "./File";
-import { getConfig } from "../Config";
+import { getBuiltin, getConfig } from "../Config";
 import { CompleteStdioOptions } from "../Spawn/BasicSpawn";
 import { getConfiguredLanguage } from "../Spawn/Language";
 import { getLogger } from "log4js";
@@ -29,8 +29,9 @@ export class ExecutableAgent {
     protected logger = getLogger("ExecutableAgent");
 
     constructor(
-        public readonly execType: ExecType,
-        public readonly executable: Executable
+        readonly execType: ExecType,
+        readonly executable: Executable,
+        readonly dynamicFiles: DynamicFile[] = []
     ) {
         this.judgeHash = crypto
             .createHash("sha256")
@@ -98,6 +99,9 @@ export class ExecutableAgent {
                 SourceCodeName,
                 this.configuredLanguage.srcFileName
             );
+            for (const { name } of this.dynamicFiles) {
+                this.fileAgent.register(name, name);
+            }
             // below files may not really exist if skip compile
             this.fileAgent.register(CompileLogName, CompileLogName);
             this.fileAgent.register(CompileStatisticName, CompileStatisticName);
@@ -108,6 +112,23 @@ export class ExecutableAgent {
                 this.executable.source,
                 this.configuredLanguage.srcFileName
             );
+            for (const dynamicFiles of this.dynamicFiles) {
+                switch (dynamicFiles.type) {
+                    case "builtin":
+                        this.fileAgent.add(dynamicFiles.name, {
+                            content: getBuiltin()[dynamicFiles.name],
+                        });
+                        break;
+                    case "remote":
+                        this.fileAgent.add(
+                            dynamicFiles.name,
+                            dynamicFiles.file
+                        );
+                        break;
+                    default:
+                        throw new Error("Unknown dynamic file type");
+                }
+            }
         }
         this.Initialized++;
     }
@@ -222,7 +243,12 @@ export class ExecutableAgent {
         cwd?: string
     ): Promise<MeterResult | void> {
         this.checkInit();
-        await this.fileAgent.getPath(SourceCodeName);
+        await Promise.all([
+            this.fileAgent.getPath(SourceCodeName),
+            ...this.dynamicFiles.map((dynamicFile) =>
+                this.fileAgent.getPath(dynamicFile.name)
+            ),
+        ]);
         const languageRunOption =
             this.configuredLanguage.compileOptionGenerator();
         if (languageRunOption.skip) {

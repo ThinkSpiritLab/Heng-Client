@@ -209,7 +209,7 @@ export abstract class JudgeAgent {
                 const caseResult = await judgeThrottle.withThrottle(() => {
                     return judgeFunction(
                         testCase,
-                        executableAgent.configuredLanguage.judgeTimeout
+                        executableAgent.executable.limit.runtime.cpuTime
                     );
                 });
                 judgeCaseResults.push(caseResult);
@@ -242,7 +242,24 @@ export abstract class JudgeAgent {
         }
     ): Promise<[ExecutableAgent, JudgeResult | undefined]> {
         this.checkInit();
-        const executableAgent = new ExecutableAgent(execType, executable);
+        const executableAgent = new ExecutableAgent(execType, executable, [
+            {
+                name: "ax309.ucf",
+                type: "builtin",
+            },
+            {
+                name: "main.cmd",
+                type: "builtin",
+            },
+            {
+                name: "verilog.prj",
+                type: "builtin",
+            },
+            {
+                name: "xc6slx9-2-ftg256.verilog.xst",
+                type: "builtin",
+            },
+        ]);
         this.ExecutableAgents.push(executableAgent);
         await executableAgent.init();
         const compileResult = await this.compileThrottle.withThrottle(() =>
@@ -358,27 +375,30 @@ export class NormalJudgeAgent extends JudgeAgent {
                 if (path) {
                     const [port, input, output] = await Promise.all([
                         SerialPort.binding.open({
-                            baudRate: 250000,
+                            baudRate: 4000,
                             path,
                         }),
                         this.fileAgent.getBuffer(testCase.input),
                         this.fileAgent.getBuffer(testCase.output),
                     ]);
+                    const buffer = Buffer.alloc(output.length);
                     const start = Date.now();
-                    const timeout = setTimeout(closePort, 60000, port);
                     await port.write(input);
+                    const timeout = setTimeout(closePort, judgeTimeout, port);
                     try {
-                        const { buffer, bytesRead } = await port.read(
-                            Buffer.alloc(output.length),
-                            0,
-                            output.length
-                        );
+                        while (memory < output.length) {
+                            const { bytesRead } = await port.read(
+                                buffer,
+                                memory,
+                                output.length - memory
+                            );
+                            memory += bytesRead;
+                        }
                         if (buffer.equals(output)) {
                             kind = JudgeResultKind.Accepted;
                         } else {
                             kind = JudgeResultKind.WrongAnswer;
                         }
-                        memory = bytesRead;
                     } catch {
                         kind = JudgeResultKind.TimeLimitExceeded;
                     }

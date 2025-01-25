@@ -1,4 +1,3 @@
-import { CMP } from "./CMP";
 import { Language, LanguageConfigureOption } from "./decl";
 import { PlainText } from "./PlainText";
 import { Verilog } from "./Verilog";
@@ -15,8 +14,6 @@ export function getConfiguredLanguage(
         case "plaintext":
             return new PlainText(option);
             break;
-        case "cmp":
-            return new CMP(option);
         default:
             throw new Error("Unrecognized language");
             break;

@@ -61,37 +61,7 @@ const configToml = fs.readFileSync("config/config.toml").toString();
 export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
-    c!: string;
-    @IsString()
-    @IsNotEmpty()
-    cpp!: string;
-    @IsString()
-    @IsNotEmpty()
-    testlib!: string;
-    @IsString()
-    @IsNotEmpty()
-    python!: string;
-    @IsString()
-    @IsNotEmpty()
-    java!: string;
-    @IsString()
-    @IsNotEmpty()
-    javac!: string;
-    @IsString()
-    @IsNotEmpty()
     cat!: string;
-    @IsString()
-    @IsNotEmpty()
-    node!: string;
-    @IsString()
-    @IsNotEmpty()
-    pascal!: string;
-    @IsString()
-    @IsNotEmpty()
-    ojcmp!: string;
-    @IsString()
-    @IsNotEmpty()
-    rustc!: string;
     @IsString()
     @IsNotEmpty()
     ise!: string;
@@ -185,6 +155,20 @@ export class FpgaConfig {
     })
     serial!: string[];
 }
+export class Builtin {
+    @IsString()
+    @IsNotEmpty()
+    "ax309.ucf"!: string;
+    @IsString()
+    @IsNotEmpty()
+    "main.cmd"!: string;
+    @IsString()
+    @IsNotEmpty()
+    "verilog.prj"!: string;
+    @IsString()
+    @IsNotEmpty()
+    "xc6slx9-2-ftg256.verilog.xst"!: string;
+}
 export class Config {
     @ValidateNested()
     @IsNotEmpty()
@@ -214,6 +198,8 @@ export class Config {
     @IsNotEmpty()
     @Type(() => FpgaConfig)
     fpga!: FpgaConfig;
+    @IsNotEmpty()
+    builtin!: { [name: string]: string };
 }
 let config: Config | undefined = undefined;
 
@@ -287,4 +273,16 @@ export function getConfig(): Config {
         logger.info("Loaded Config from file");
     }
     return config;
+}
+
+let builtin: { [name: string]: string } | undefined = undefined;
+
+export function getBuiltin() {
+    if (builtin === undefined) {
+        builtin = {};
+        for (const i in getConfig().builtin) {
+            builtin[i] = fs.readFileSync(getConfig().builtin[i], "utf-8");
+        }
+    }
+    return builtin;
 }
