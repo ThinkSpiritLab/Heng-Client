@@ -76,20 +76,22 @@ export class LanguageConfig {
     vhdl!: string;
     @IsString()
     @IsNotEmpty()
+    xst!: string;
+    @IsString()
+    @IsNotEmpty()
+    ngdbuild!: string;
+    @IsString()
+    @IsNotEmpty()
+    map!: string;
+    @IsString()
+    @IsNotEmpty()
+    par!: string;
+    @IsString()
+    @IsNotEmpty()
+    bitgen!: string;
+    @IsString()
+    @IsNotEmpty()
     impact!: string;
-}
-export class JailConfig {
-    @IsString()
-    @IsNotEmpty()
-    path!: string;
-    @IsString()
-    @IsNotEmpty()
-    configFile!: string;
-}
-export class MeterConfig {
-    @IsString()
-    @IsNotEmpty()
-    path!: string;
 }
 export class ControllerConfig {
     @IsString()
@@ -182,14 +184,6 @@ export class Config {
     @IsNotEmpty()
     @Type(() => LanguageConfig)
     language!: LanguageConfig;
-    @ValidateNested()
-    @IsNotEmpty()
-    @Type(() => JailConfig)
-    nsjail!: JailConfig;
-    @ValidateNested()
-    @IsNotEmpty()
-    @Type(() => MeterConfig)
-    hc!: MeterConfig;
     @ValidateNested()
     @IsNotEmpty()
     @Type(() => JudgeFactoryConfig)
