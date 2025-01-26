@@ -16,7 +16,7 @@ export interface HengSpawnOption {
 
     // args
     cwd?: string; // nsjail(get SE when cwd not mounted)
-    env?: { [key: string]: string }; // nsjail
+    env?: Record<string, string>; // nsjail
     stdio?: CompleteStdioOptions; // nsjail, meter save all fd except meterFd
     uid?: number; // nsjail(append root), meter
     gid?: number; // nsjail(append root), meter

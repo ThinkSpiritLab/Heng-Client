@@ -17,8 +17,8 @@ import { getConfig } from "../Config";
 import { FileAgent, readStream } from "./File";
 import { Throttle } from "./Throttle";
 import { Tests } from "../SelfTest";
-import { CompileLogName, ExecutableAgent } from "./ExecutableAgent";
-import { ExecType } from "../Spawn/Language/decl";
+import { runLogName, ExecutableAgent } from "./ExecutableAgent";
+import { ExecType, RunType } from "../Spawn/Language/decl";
 import { range } from "lodash";
 import { Controller } from "../controller";
 import { stat } from "./Statistics";
@@ -116,21 +116,19 @@ export abstract class JudgeAgent {
         }
     ): Promise<JudgeResult | undefined> {
         const compileSumTime = compileResult.time.sys + compileResult.time.usr;
-        const compileLog = await executableAgent.fileAgent.getPath(
-            CompileLogName
-        );
+        const compileLog = await executableAgent.fileAgent.getPath(runLogName);
         const compileLogSize = (await fs.promises.stat(compileLog)).size;
         const exteaInfo = {
             compileTime: this.transformTime(compileSumTime),
             compileMessage: await readStream(
                 fs.createReadStream(compileLog, {
                     encoding: "utf-8",
-                    start:
+                    start: Math.max(
                         compileLogSize -
-                        Math.min(
                             executableAgent.executable.limit.compiler.message,
-                            10 * 1024
-                        ),
+                        compileLogSize - 10 * 1024,
+                        0
+                    ),
                     end: compileLogSize - 1,
                 }),
                 -1
@@ -262,21 +260,24 @@ export abstract class JudgeAgent {
         ]);
         this.ExecutableAgents.push(executableAgent);
         await executableAgent.init();
-        const compileResult = await this.compileThrottle.withThrottle(() =>
-            executableAgent.compile()
-        );
-        if (compileResult !== undefined) {
-            return [
-                executableAgent,
-                await this.fillExtra(
-                    compileResult,
+        await executableAgent.releaseFile();
+        for (const type of Object.values(RunType)) {
+            const rawResult = await this.compileThrottle.withThrottle(() =>
+                executableAgent.run(type)
+            );
+            let filledResult: JudgeResult | undefined = undefined;
+            if (rawResult) {
+                filledResult = await this.fillExtra(
+                    rawResult,
                     executableAgent,
                     transformer
-                ),
-            ];
-        } else {
-            return [executableAgent, undefined];
+                );
+            }
+            if (filledResult) {
+                return [executableAgent, filledResult];
+            }
         }
+        return [executableAgent, undefined];
     }
 
     protected abstract getResult(): Promise<JudgeResult>;
@@ -287,14 +288,14 @@ export abstract class JudgeAgent {
             stat.tick(this.judge.id);
             await this.init();
             const ret = await this.getResult();
-            await this.clean();
+            // await this.clean();
             stat.finish(this.judge.id);
             return ret;
         } catch (err) {
             this.logger.fatal(err);
-            await this.clean().catch((error) => {
-                this.logger.fatal(error);
-            });
+            // await this.clean().catch((error) => {
+            //     this.logger.fatal(error);
+            // });
             stat.finish(this.judge.id);
             const e = {
                 kind: JudgeResultKind.SystemError,

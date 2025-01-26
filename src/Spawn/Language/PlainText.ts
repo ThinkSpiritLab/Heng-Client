@@ -1,6 +1,12 @@
 import path from "path";
 import { getConfig } from "../../Config";
-import { RunOption, Language, LanguageConfigureOption, ExecType } from "./decl";
+import {
+    RunOption,
+    Language,
+    LanguageConfigureOption,
+    ExecType,
+    RunType,
+} from "./decl";
 
 export class PlainText extends Language {
     private src = "src.in";
@@ -28,7 +34,7 @@ export class PlainText extends Language {
     }
 
     pragramOptionGenerator(): RunOption {
-        const binPath = path.join(this.compileDir, this.src);
+        const binPath = path.join(this.runDir, this.src);
         return {
             skip: false,
             command: getConfig().language.cat,
@@ -39,4 +45,44 @@ export class PlainText extends Language {
     get judgeTimeout() {
         return 1000;
     }
+
+    [RunType.Synthesis] = {
+        cacheable: true,
+        outputFiles: [],
+        optionGenerator(): RunOption {
+            return { skip: true };
+        },
+    };
+
+    [RunType.Translate] = {
+        cacheable: true,
+        outputFiles: [],
+        optionGenerator(): RunOption {
+            return { skip: true };
+        },
+    };
+
+    [RunType.Map] = {
+        cacheable: true,
+        outputFiles: [],
+        optionGenerator(): RunOption {
+            return { skip: true };
+        },
+    };
+
+    [RunType.Implement] = {
+        cacheable: true,
+        outputFiles: [],
+        optionGenerator(): RunOption {
+            return { skip: true };
+        },
+    };
+
+    [RunType.Generate] = {
+        cacheable: true,
+        outputFiles: [],
+        optionGenerator(): RunOption {
+            return { skip: true };
+        },
+    };
 }

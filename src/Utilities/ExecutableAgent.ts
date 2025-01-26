@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import { DynamicFile, Executable } from "heng-protocol";
 import path from "path";
 import fs from "fs";
-import { ExecType, Language } from "../Spawn/Language/decl";
+import { ExecType, Language, RunType } from "../Spawn/Language/decl";
 import { FileAgent } from "./File";
 import { getBuiltin, getConfig } from "../Config";
 import { CompleteStdioOptions } from "../Spawn/BasicSpawn";
@@ -12,18 +12,49 @@ import { FileHandle } from "fs/promises";
 import { hengSpawn, HengSpawnOption } from "../Spawn";
 import { MeterResult } from "../Spawn/Meter";
 
-const compileCachedJudge = new Map<string, string>();
 export const SourceCodeName = "srcCode";
-export const CompileLogName = "compile.log";
-export const CompileStatisticName = "compile.statistic";
+export const runLogName = "run.log";
+
+const runCachedJudge: Record<RunType, Map<string, string>> = {
+    [RunType.Synthesis]: new Map<string, string>(),
+    [RunType.Translate]: new Map<string, string>(),
+    [RunType.Map]: new Map<string, string>(),
+    [RunType.Implement]: new Map<string, string>(),
+    [RunType.Generate]: new Map<string, string>(),
+};
+export const runStatisticsName: Readonly<Record<RunType, string>> = {
+    [RunType.Synthesis]: "synthesis.statistic",
+    [RunType.Translate]: "translate.statistic",
+    [RunType.Map]: "map.statistic",
+    [RunType.Implement]: "implement.statistic",
+    [RunType.Generate]: "generate.statistic",
+};
 
 export class ExecutableAgent {
     private readonly judgeHash: string;
     private readonly dirHash: string;
     readonly fileAgent: FileAgent;
-    private compiled = false; // whether compile in this instance
-    private compileCacheable: boolean;
-    private compileCached = false; // whether use cached dir
+    private ran: Record<RunType, boolean> = {
+        [RunType.Synthesis]: false,
+        [RunType.Translate]: false,
+        [RunType.Map]: false,
+        [RunType.Implement]: false,
+        [RunType.Generate]: false,
+    }; // whether compile in this instance
+    private runCacheable: Record<RunType, boolean> = {
+        [RunType.Synthesis]: false,
+        [RunType.Translate]: false,
+        [RunType.Map]: false,
+        [RunType.Implement]: false,
+        [RunType.Generate]: false,
+    };
+    private runCached: Record<RunType, boolean> = {
+        [RunType.Synthesis]: false,
+        [RunType.Translate]: false,
+        [RunType.Map]: false,
+        [RunType.Implement]: false,
+        [RunType.Generate]: false,
+    }; // whether use cached dir
     readonly configuredLanguage: Language;
     private Initialized = 0;
     protected logger = getLogger("ExecutableAgent");
@@ -47,37 +78,30 @@ export class ExecutableAgent {
             {
                 execType: this.execType,
                 excutable: this.executable,
-                compileDir: "",
+                runDir: "",
             }
         );
 
         let dirHash_t: string | undefined = undefined;
 
-        this.compileCacheable = this.configuredLanguage.compileCacheable;
-
-        switch (execType) {
-            case ExecType.Usr:
-                this.compileCacheable =
-                    this.compileCacheable && getConfig().judger.cacheUsr;
-                break;
-            case ExecType.Spj:
-                this.compileCacheable =
-                    this.compileCacheable && getConfig().judger.cacheSpj;
-                break;
-            case ExecType.Interactive:
-                this.compileCacheable =
-                    this.compileCacheable && getConfig().judger.cacheInteractor;
-                break;
-            default:
-                break;
+        for (const runType of Object.values(RunType)) {
+            this.runCacheable[runType] =
+                this.configuredLanguage[runType].cacheable &&
+                ((execType == ExecType.Usr && getConfig().judger.cacheUsr) ||
+                    (execType == ExecType.Spj && getConfig().judger.cacheSpj) ||
+                    (execType == ExecType.Interactive &&
+                        getConfig().judger.cacheInteractor));
+            if (this.runCacheable[runType]) {
+                const dirHash = runCachedJudge[runType].get(this.judgeHash);
+                if (dirHash) {
+                    dirHash_t = dirHash;
+                    this.runCached[runType] = true;
+                }
+            }
         }
 
-        if (
-            this.compileCacheable &&
-            (dirHash_t = compileCachedJudge.get(this.judgeHash))
-        ) {
+        if (dirHash_t) {
             this.dirHash = dirHash_t;
-            this.compileCached = true;
         } else {
             this.dirHash = crypto.randomBytes(32).toString("hex");
         }
@@ -86,14 +110,14 @@ export class ExecutableAgent {
             path.join("bin", execType, this.dirHash),
             null
         );
-        this.configuredLanguage.compileDir = this.fileAgent.dir;
+        this.configuredLanguage.runDir = this.fileAgent.dir;
     }
 
     /**
      * must use init() after constructor
      */
     async init(): Promise<void> {
-        if (this.compileCached) {
+        if (this.runCached[RunType.Synthesis]) {
             await this.fileAgent.init(true);
             this.fileAgent.register(
                 SourceCodeName,
@@ -103,8 +127,10 @@ export class ExecutableAgent {
                 this.fileAgent.register(name, name);
             }
             // below files may not really exist if skip compile
-            this.fileAgent.register(CompileLogName, CompileLogName);
-            this.fileAgent.register(CompileStatisticName, CompileStatisticName);
+            this.fileAgent.register(runLogName, runLogName);
+            for (const name of Object.values(runStatisticsName)) {
+                this.fileAgent.register(name, name);
+            }
         } else {
             await this.fileAgent.init(false);
             this.fileAgent.add(
@@ -116,7 +142,7 @@ export class ExecutableAgent {
                 switch (dynamicFiles.type) {
                     case "builtin":
                         this.fileAgent.add(dynamicFiles.name, {
-                            content: getBuiltin()[dynamicFiles.name],
+                            content: getBuiltin().get(dynamicFiles.name),
                         });
                         break;
                     case "remote":
@@ -139,14 +165,14 @@ export class ExecutableAgent {
         }
     }
 
-    private signCompileCache(): void {
-        if (
-            this.compileCacheable &&
-            compileCachedJudge.get(this.judgeHash) === undefined
-        ) {
-            compileCachedJudge.set(this.judgeHash, this.dirHash);
-            this.compileCached = true;
-        }
+    async releaseFile() {
+        this.checkInit();
+        await Promise.all([
+            this.fileAgent.getPath(SourceCodeName),
+            ...this.dynamicFiles.map((dynamicFile) =>
+                this.fileAgent.getPath(dynamicFile.name)
+            ),
+        ]);
     }
 
     private async spawn(
@@ -159,9 +185,10 @@ export class ExecutableAgent {
             args?: string[];
             cwd?: string;
             stdio?: CompleteStdioOptions;
-        }
+        },
+        runType?: RunType
     ) {
-        let logFileFH: FileHandle | undefined = undefined;
+        let runLogFileFH: FileHandle | undefined = undefined;
         try {
             if (!runOption.args) {
                 runOption.args = [];
@@ -169,13 +196,13 @@ export class ExecutableAgent {
             if (languageOption.args) {
                 runOption.args = [...languageOption.args, ...runOption.args];
             }
-            const logPath = path.resolve(this.fileAgent.dir, CompileLogName);
-            logFileFH = await fs.promises.open(logPath, "w", 0o700);
+            const runLogPath = path.resolve(this.fileAgent.dir, runLogName);
+            runLogFileFH = await fs.promises.open(runLogPath, "w", 0o700);
             if (runOption.stdio === undefined) {
                 runOption.stdio = ["ignore"];
             }
-            runOption.stdio[1] = logFileFH.fd;
-            runOption.stdio[2] = logFileFH.fd;
+            runOption.stdio[1] = runLogFileFH.fd;
+            runOption.stdio[2] = runLogFileFH.fd;
             const HengSpawnOption: HengSpawnOption = {
                 cwd:
                     languageOption.spawnOption?.cwd ??
@@ -204,28 +231,43 @@ export class ExecutableAgent {
                 HengSpawnOption
             );
             const procResult = await subProc.result;
-            await logFileFH.close();
-            this.fileAgent.register(CompileLogName, CompileLogName);
-            try {
-                for (const file of this.configuredLanguage.compiledFiles) {
-                    await fs.promises.access(file);
+            await runLogFileFH.close();
+            this.fileAgent.register(runLogName, runLogName);
+            if (runType) {
+                try {
+                    for (const file of this.configuredLanguage[runType]
+                        .outputFiles) {
+                        await fs.promises.access(file);
+                    }
+                } catch (error) {
+                    procResult.returnCode = procResult.returnCode || 1;
                 }
-            } catch (error) {
-                procResult.returnCode = procResult.returnCode || 1;
+                await fs.promises.writeFile(
+                    path.resolve(
+                        this.fileAgent.dir,
+                        runStatisticsName[runType]
+                    ),
+                    JSON.stringify(procResult),
+                    { mode: 0o700 }
+                );
+                this.fileAgent.register(
+                    runStatisticsName[runType],
+                    runStatisticsName[runType]
+                );
             }
-            const statisticPath = path.resolve(
-                this.fileAgent.dir,
-                CompileStatisticName
-            );
-            await fs.promises.writeFile(
-                statisticPath,
-                JSON.stringify(procResult),
-                { mode: 0o700 }
-            );
-            this.fileAgent.register(CompileStatisticName, CompileStatisticName);
             return procResult;
         } finally {
-            logFileFH && (await logFileFH.close());
+            runLogFileFH && (await runLogFileFH.close());
+        }
+    }
+
+    private signRunCache(type: RunType): void {
+        if (
+            this.runCacheable[type] &&
+            runCachedJudge[type].get(this.judgeHash) === undefined
+        ) {
+            runCachedJudge[type].set(this.judgeHash, this.dirHash);
+            this.runCached[type] = true;
         }
     }
 
@@ -237,42 +279,36 @@ export class ExecutableAgent {
      * @param cwd
      * @returns
      */
-    async compile(
+    async run(
+        type: RunType,
         args?: string[],
-        stdio?: CompleteStdioOptions,
-        cwd?: string
+        cwd?: string,
+        stdio?: CompleteStdioOptions
     ): Promise<MeterResult | void> {
         this.checkInit();
-        await Promise.all([
-            this.fileAgent.getPath(SourceCodeName),
-            ...this.dynamicFiles.map((dynamicFile) =>
-                this.fileAgent.getPath(dynamicFile.name)
-            ),
-        ]);
         const languageRunOption =
-            this.configuredLanguage.compileOptionGenerator();
+            this.configuredLanguage[type].optionGenerator();
         if (languageRunOption.skip) {
-            this.compiled = true;
-            this.signCompileCache();
+            this.ran[type] = true;
+            this.signRunCache(type);
             return;
         }
-        if (this.compiled || this.compileCached) {
+        if (this.ran[type] || this.runCached[type]) {
             this.logger.info(
-                `skip ${this.execType} compile, compiled: ${this.compiled}, compileCached：${this.compileCached}`
+                `skip ${this.execType} run, ran: ${this.ran[type]}, ${type}Cached：${this.runCached[type]}`
             );
             return JSON.parse(
-                await this.fileAgent.getString(CompileStatisticName)
+                await this.fileAgent.getString(runStatisticsName[type])
             );
-        } else {
-            const procResult = await this.spawn(languageRunOption, {
-                args,
-                cwd,
-                stdio,
-            });
-            this.compiled = true;
-            this.signCompileCache();
-            return procResult;
         }
+        const procResult = await this.spawn(languageRunOption, {
+            args,
+            cwd,
+            stdio,
+        });
+        this.ran[type] = true;
+        this.signRunCache(type);
+        return procResult;
     }
 
     /**
@@ -284,14 +320,14 @@ export class ExecutableAgent {
      * @param cwd
      * @returns
      */
-    async program(cwd?: string, stdio?: CompleteStdioOptions, args?: string[]) {
+    async program(args?: string[], cwd?: string, stdio?: CompleteStdioOptions) {
         this.checkInit();
         const languageRunOption =
             this.configuredLanguage.pragramOptionGenerator();
         if (languageRunOption.skip) {
             throw new Error("Can't skip pragram");
         }
-        if (!this.compiled && !this.compileCached) {
+        if (!this.ran[RunType.Generate] && !this.runCached[RunType.Generate]) {
             throw new Error("Please compile first");
         } else {
             const procResult = await this.spawn(languageRunOption, {
@@ -307,12 +343,15 @@ export class ExecutableAgent {
      * hey, clean me
      */
     async clean(): Promise<void> {
-        if (
-            this.dirHash &&
-            this.judgeHash &&
-            this.dirHash !== compileCachedJudge.get(this.judgeHash)
-        ) {
-            await this.fileAgent.clean();
+        if (this.dirHash && this.judgeHash) {
+            for (const runType of Object.values(RunType)) {
+                if (
+                    this.dirHash == runCachedJudge[runType].get(this.judgeHash)
+                ) {
+                    return;
+                }
+            }
         }
+        await this.fileAgent.clean();
     }
 }

@@ -193,7 +193,7 @@ export class Config {
     @Type(() => FpgaConfig)
     fpga!: FpgaConfig;
     @IsNotEmpty()
-    builtin!: { [name: string]: string };
+    builtin!: Record<string, string>;
 }
 let config: Config | undefined = undefined;
 
@@ -269,13 +269,12 @@ export function getConfig(): Config {
     return config;
 }
 
-let builtin: { [name: string]: string } | undefined = undefined;
+const builtin = new Map<string, string>();
 
 export function getBuiltin() {
-    if (builtin === undefined) {
-        builtin = {};
+    if (builtin.size === 0) {
         for (const i in getConfig().builtin) {
-            builtin[i] = fs.readFileSync(getConfig().builtin[i], "utf-8");
+            builtin.set(i, fs.readFileSync(getConfig().builtin[i], "utf-8"));
         }
     }
     return builtin;
