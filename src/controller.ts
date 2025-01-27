@@ -1,30 +1,30 @@
-import { getLogger } from "log4js";
-import { createHmac, randomInt, createHash } from "crypto";
-import Axios, { AxiosResponse, AxiosRequestConfig } from "axios";
+import Axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import { createHash, createHmac, randomInt } from "crypto";
+import { StatusReport } from "heng-protocol";
+import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
+import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
 import {
+    ControlArgs,
+    ControllerArgs,
     ControllerMethod,
-    JudgerMethod,
-    Message,
-    Request,
-    Response,
     CreateJudgeArgs,
     ExitArgs,
-    ControlArgs,
-    LogArgs,
-    ControllerArgs,
-    ReportStatusArgs,
     FinishJudgesArgs,
+    JudgerMethod,
+    LogArgs,
+    Message,
+    ReportStatusArgs,
+    Request,
+    Response,
     UpdateJudgesArgs,
 } from "heng-protocol/internal-protocol/ws";
-import { AcquireTokenOutput } from "heng-protocol/internal-protocol/http";
-import WebSocket from "ws";
-import { ConnectionSettings, ErrorInfo } from "heng-protocol/internal-protocol";
-import { ControllerConfig } from "./Config";
-import { StatusReport } from "heng-protocol";
 import { Sign } from "heng-sign-js";
-import { stat } from "./Utilities/Statistics";
-import moment from "moment";
 import https from "https";
+import { getLogger } from "log4js";
+import moment from "moment";
+import WebSocket from "ws";
+import { ControllerConfig } from "./Config";
+import { stat } from "./Utilities/Statistics";
 
 export class Controller {
     host: string;

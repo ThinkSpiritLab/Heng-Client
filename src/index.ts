@@ -1,17 +1,17 @@
-import "reflect-metadata";
-import { configure, getLogger } from "log4js";
-import { Controller } from "./controller";
-import os from "os";
 import fs from "fs";
-import { getConfig } from "./Config";
-import { getJudgerFactory } from "./Utilities/Judge";
-import { Throttle } from "./Utilities/Throttle";
+import { ExitArgs } from "heng-protocol/internal-protocol/ws";
+import { configure, getLogger } from "log4js";
+import os from "os";
 import path from "path";
+import "reflect-metadata";
+import { getConfig } from "./Config";
+import { Controller } from "./controller";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
-import { ExitArgs } from "heng-protocol/internal-protocol/ws";
-import version from "./version";
+import { getJudgerFactory } from "./Utilities/Judge";
 import { stat } from "./Utilities/Statistics";
+import { Throttle } from "./Utilities/Throttle";
+import version from "./version";
 
 async function wait(ms: number) {
     return new Promise((resolve) => setTimeout(() => resolve(null), ms));

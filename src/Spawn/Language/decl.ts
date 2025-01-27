@@ -54,10 +54,6 @@ export abstract class Language {
         this.excutable = option.excutable;
         this.runDir = option.runDir;
     }
-    abstract get compileCacheable(): boolean;
-    abstract get compiledFiles(): string[];
-    abstract get judgeTimeout(): number;
-    abstract compileOptionGenerator(): RunOption;
     abstract get srcFileName(): string;
     abstract [RunType.Synthesis]: compileOption;
     abstract [RunType.Translate]: compileOption;

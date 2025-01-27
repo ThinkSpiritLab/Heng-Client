@@ -12,10 +12,6 @@ name = "TestJudger"
 "xc6slx9-2-ftg256.verilog.xst" = "/usr/src/xc6slx9-2-ftg256.verilog.xst"
 [language]
 cat = "/usr/bin/cat"
-ise = "/usr/bin/ise" # TODO: delete
-shell = "/usr/bin/shell" # TODO: delete?
-verilog = "/usr/bin/verilog" # TODO: delete
-vhdl = "/usr/bin/vhdl" # TODO: delete
 xst = "/usr/bin/xst"
 ngdbuild = "/usr/bin/ngdbuild"
 map = "/usr/bin/map"

@@ -3,7 +3,6 @@ import { plainToClass, Type } from "class-transformer";
 import {
     ArrayNotEmpty,
     ArrayUnique,
-    isBoolean,
     IsBoolean,
     IsHexadecimal,
     IsInt,
@@ -11,50 +10,13 @@ import {
     IsNumber,
     IsOptional,
     IsPositive,
-    isString,
     IsString,
     Min,
-    ValidateBy,
     ValidateNested,
     validateSync,
-    ValidationOptions,
 } from "class-validator";
 import fs from "fs";
 import { getLogger } from "log4js";
-
-function Or(...constraints: ((value: unknown) => boolean)[]): PropertyDecorator;
-function Or(
-    validationOptions?: ValidationOptions,
-    ...constraints: ((value: unknown) => boolean)[]
-): PropertyDecorator;
-function Or(
-    validationOptions?: ValidationOptions | ((value: unknown) => boolean),
-    ...constraints: ((value: unknown) => boolean)[]
-): PropertyDecorator {
-    if (typeof validationOptions === "function") {
-        constraints = [validationOptions, ...constraints];
-        validationOptions = undefined;
-    }
-    return ValidateBy(
-        {
-            name: "or",
-            constraints,
-            validator: {
-                validate: (value, validationArguments) => {
-                    if (validationArguments) {
-                        for (const constraint of validationArguments.constraints) {
-                            if (constraint(value)) {
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                },
-            },
-        },
-        validationOptions
-    );
-}
 
 const logger = getLogger("ConfigService");
 const configToml = fs.readFileSync("config/config.toml").toString();
@@ -62,18 +24,6 @@ export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
     cat!: string;
-    @IsString()
-    @IsNotEmpty()
-    ise!: string;
-    @Or(isBoolean, isString)
-    @IsNotEmpty()
-    shell!: string | boolean;
-    @IsString()
-    @IsNotEmpty()
-    verilog!: string;
-    @IsString()
-    @IsNotEmpty()
-    vhdl!: string;
     @IsString()
     @IsNotEmpty()
     xst!: string;
@@ -156,20 +106,6 @@ export class FpgaConfig {
         each: true,
     })
     serial!: string[];
-}
-export class Builtin {
-    @IsString()
-    @IsNotEmpty()
-    "ax309.ucf"!: string;
-    @IsString()
-    @IsNotEmpty()
-    "main.cmd"!: string;
-    @IsString()
-    @IsNotEmpty()
-    "verilog.prj"!: string;
-    @IsString()
-    @IsNotEmpty()
-    "xc6slx9-2-ftg256.verilog.xst"!: string;
 }
 export class Config {
     @ValidateNested()

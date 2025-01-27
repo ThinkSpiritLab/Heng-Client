@@ -1,9 +1,8 @@
-import { ChildProcess, spawn } from "child_process";
+import { spawn } from "child_process";
 import { getLogger } from "log4js";
+import { constants } from "os";
 import { BasicSpawnOption, CompleteStdioOptions } from "./BasicSpawn";
 import { MeteredChildProcess } from "./Meter";
-import { constants } from "os";
-import { getConfig } from "../Config";
 
 const logger = getLogger("JailMeterSpawn");
 
@@ -22,25 +21,6 @@ export interface HengSpawnOption {
     gid?: number; // nsjail(append root), meter
 }
 
-export function loggedSpawn(
-    spawnFunction: (command: string, args: string[]) => ChildProcess
-): (command: string, args: string[]) => ChildProcess {
-    return function (command: string, args: string[]) {
-        logger.info(`${command} ${args.join(" ")}`);
-        return spawnFunction(command, args);
-    };
-}
-
-// intended typo, seted => set
-export function optionSetedSpawn<V, T>(
-    spawn: (command: string, args: string[], options: V) => T,
-    options: V
-): (command: string, args: string[]) => T {
-    return function (command: string, args: string[]) {
-        return spawn(command, args, options);
-    };
-}
-
 export function hengSpawn(
     command: string,
     args: string[],
@@ -48,7 +28,7 @@ export function hengSpawn(
 ): MeteredChildProcess {
     const basicOption: BasicSpawnOption = {
         cwd: options.cwd,
-        shell: getConfig().language.shell,
+        // shell: getConfig().language.shell,
         timeout: options.timeLimit,
     };
 
@@ -59,10 +39,8 @@ export function hengSpawn(
     options.stdio.push("pipe");
     basicOption.stdio = options.stdio;
 
-    const subProcess = loggedSpawn(optionSetedSpawn(spawn, basicOption))(
-        command,
-        args
-    );
+    logger.info(`${command} ${args.join(" ")}`);
+    const subProcess = spawn(command, args, basicOption);
     return {
         ...(subProcess as MeteredChildProcess),
         result: new Promise((resolve, reject) => {

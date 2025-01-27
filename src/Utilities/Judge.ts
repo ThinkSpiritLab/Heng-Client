@@ -1,3 +1,5 @@
+import * as crypto from "crypto";
+import fs from "fs";
 import {
     Executable,
     JudgeCaseResult,
@@ -9,23 +11,21 @@ import {
     TestPolicy,
 } from "heng-protocol";
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
-import path from "path";
-import fs from "fs";
-import os from "os";
-import { getLogger } from "log4js";
-import { getConfig } from "../Config";
-import { FileAgent, readStream } from "./File";
-import { Throttle } from "./Throttle";
-import { Tests } from "../SelfTest";
-import { runLogName, ExecutableAgent } from "./ExecutableAgent";
-import { ExecType, RunType } from "../Spawn/Language/decl";
 import { range } from "lodash";
-import { Controller } from "../controller";
-import { stat } from "./Statistics";
-import * as crypto from "crypto";
-import { MeterResult } from "../Spawn/Meter";
+import { getLogger } from "log4js";
+import os from "os";
+import path from "path";
 import { SerialPort } from "serialport";
+import { getConfig } from "../Config";
+import { Controller } from "../controller";
+import { Tests } from "../SelfTest";
+import { ExecType, RunType } from "../Spawn/Language/decl";
+import { MeterResult } from "../Spawn/Meter";
+import { ExecutableAgent, runLogName } from "./ExecutableAgent";
+import { FileAgent, readStream } from "./File";
 import { closePort } from "./Serial";
+import { stat } from "./Statistics";
+import { Throttle } from "./Throttle";
 
 const UsrCompileResultTransformer = {
     mle: JudgeResultKind.CompileMemoryLimitExceeded,

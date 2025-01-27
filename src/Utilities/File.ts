@@ -1,13 +1,13 @@
+import axios from "axios";
+import * as crypto from "crypto";
 import fs from "fs";
+import { getLogger } from "log4js";
+import path, { PlatformPath } from "path";
 import stream, { Readable } from "stream";
 import unzip from "unzip-stream";
-import path, { PlatformPath } from "path";
 import util from "util";
 import { getConfig } from "../Config";
-import * as crypto from "crypto";
 import { Throttle } from "./Throttle";
-import { getLogger } from "log4js";
-import axios from "axios";
 const pipeline = util.promisify(stream.pipeline);
 
 const logger = getLogger("File");
