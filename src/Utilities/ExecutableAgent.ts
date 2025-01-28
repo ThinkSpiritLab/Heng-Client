@@ -237,7 +237,7 @@ export class ExecutableAgent {
                         .outputFiles) {
                         await access(file);
                     }
-                } catch (error) {
+                } catch {
                     procResult.returnCode = procResult.returnCode || 1;
                 }
                 await writeFile(
@@ -252,7 +252,9 @@ export class ExecutableAgent {
             }
             return procResult;
         } finally {
-            runLogFileFH && (await runLogFileFH.close());
+            if (runLogFileFH) {
+                await runLogFileFH.close();
+            }
         }
     }
 
@@ -279,7 +281,7 @@ export class ExecutableAgent {
         args?: string[],
         cwd?: string,
         stdio?: CompleteStdioOptions
-    ): Promise<MeterResult | void> {
+    ) {
         this.checkInit();
         const languageRunOption =
             this.configuredLanguage[type].optionGenerator();
@@ -294,7 +296,7 @@ export class ExecutableAgent {
             );
             return JSON.parse(
                 await this.fileAgent.getString(runStatisticsName[type])
-            );
+            ) as MeterResult;
         }
         const procResult = await this.spawn(languageRunOption, {
             args,

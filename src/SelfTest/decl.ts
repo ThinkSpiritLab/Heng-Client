@@ -12,11 +12,11 @@ export type TestCase = {
 export type ExpectedResult = {
     expectResultType: JudgeResultKind;
 } & ({ count: true; expectedTime: number } | { count: false });
-export type SelfTest = {
+export interface SelfTest {
     name: string;
     task: CreateJudgeArgs;
     expectedResult: ExpectedResult[];
-};
+}
 export const MaxMemory = 512 * 1024 * 1024;
 export const MaxOutput = 128 * 1024 * 1024;
 export const MaxTime = 10000;

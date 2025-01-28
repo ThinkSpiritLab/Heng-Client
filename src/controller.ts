@@ -22,7 +22,7 @@ import { Sign } from "heng-sign-js";
 import { Agent } from "https";
 import { getLogger } from "log4js";
 import moment from "moment";
-import WebSocket from "ws";
+import { WebSocket } from "ws";
 import { ControllerConfig } from "./Config";
 import { statistics } from "./Utilities/Statistics";
 
@@ -35,7 +35,12 @@ export class Controller {
     statusReportTimer?: NodeJS.Timeout;
     judgerMethods: Map<
         JudgerMethod | "Report",
-        (args: unknown) => Promise<unknown | void>
+        | ((args: CreateJudgeArgs) => null | Promise<null>)
+        | ((args: ExitArgs) => null | Promise<null>)
+        | ((
+              args: ControlArgs
+          ) => ConnectionSettings | Promise<ConnectionSettings>)
+        | ((args: void) => StatusReport | Promise<StatusReport>)
     >;
     messageCallbackMap: Map<
         number,
@@ -74,7 +79,7 @@ export class Controller {
         this.AccessKey = config.AccessKey;
         this.judgerMethods = new Map();
         this.messageCallbackMap = new Map();
-        this.on("Control", async (args) => {
+        this.on("Control", (args) => {
             if (args !== null) {
                 if (args.statusReportInterval !== undefined) {
                     this.connectingSettings.statusReportInterval =
@@ -92,8 +97,8 @@ export class Controller {
         if (this.statusReportTimer !== undefined) {
             this.stopReport();
         }
-        const fn = async () => {
-            this.do("ReportStatus", {
+        const fn = () => {
+            void this.do("ReportStatus", {
                 collectTime: moment().format("YYYY-MM-DDTHH:mm:ssZ"),
                 nextReportTime: moment(Date.now() + interval).format(
                     "YYYY-MM-DDTHH:mm:ssZ"
@@ -112,7 +117,7 @@ export class Controller {
     }
     async exec(req: AxiosRequestConfig): Promise<AxiosResponse<unknown>> {
         req.httpsAgent = this.httpsAgent;
-        return (await Axios.request(req)) as AxiosResponse<unknown>;
+        return await Axios.request(req);
     }
 
     async getToken(
@@ -147,25 +152,29 @@ export class Controller {
 
     on(
         method: "CreateJudge",
-        cb: (args: CreateJudgeArgs) => Promise<null>
+        cb: (args: CreateJudgeArgs) => null | Promise<null>
     ): Controller;
-    on(method: "Exit", cb: (args: ExitArgs) => Promise<null>): Controller;
+    on(
+        method: "Exit",
+        cb: (args: ExitArgs) => null | Promise<null>
+    ): Controller;
     on(
         method: "Control",
-        cb: (args: ControlArgs) => Promise<ConnectionSettings>
+        cb: (
+            args: ControlArgs
+        ) => ConnectionSettings | Promise<ConnectionSettings>
     ): Controller;
     on(
         method: JudgerMethod,
         cb:
-            | ((args: CreateJudgeArgs) => Promise<null>)
-            | ((args: ExitArgs) => Promise<null>)
-            | ((args: ControlArgs) => Promise<ConnectionSettings>)
-            | ((args: void) => Promise<StatusReport>)
+            | ((args: CreateJudgeArgs) => null | Promise<null>)
+            | ((args: ExitArgs) => null | Promise<null>)
+            | ((
+                  args: ControlArgs
+              ) => ConnectionSettings | Promise<ConnectionSettings>)
+            | ((args: void) => StatusReport | Promise<StatusReport>)
     ): Controller {
-        this.judgerMethods.set(
-            method,
-            cb as (args: unknown) => Promise<unknown>
-        );
+        this.judgerMethods.set(method, cb);
         this.logger.info(`Method ${method} Registered`);
         return this;
     }
@@ -184,7 +193,7 @@ export class Controller {
                 reject,
                 timer: setTimeout(() => {
                     this.messageCallbackMap.delete(nonce);
-                    reject("Time out");
+                    reject(Error("Time out"));
                 }, 5000),
             });
             const msg = JSON.stringify({
@@ -223,10 +232,15 @@ export class Controller {
         }
     }
 
-    async handleReq(msg: Request<JudgerMethod>): Promise<unknown> {
+    handleReq(msg: Request<JudgerMethod>) {
         const method = this.judgerMethods.get(msg.body.method);
         if (method !== undefined) {
-            return method(msg.body.args);
+            return method(
+                msg.body.args as CreateJudgeArgs &
+                    ExitArgs &
+                    Partial<ConnectionSettings> &
+                    void
+            );
         } else {
             throw new Error(
                 `Method ${msg.body.method} doesn't exist or not inited.`
@@ -259,35 +273,33 @@ export class Controller {
                 }
             });
             this.ws.on("message", async (msg) => {
-                if (typeof msg === "string") {
-                    const message = JSON.parse(msg) as Message;
-                    if (message.type === "req") {
-                        try {
-                            const res: Response = {
-                                type: "res",
-                                seq: message.seq,
-                                time: new Date().toISOString(),
-                                body: {
-                                    output: await this.handleReq(
-                                        message as Request<JudgerMethod>
-                                    ),
-                                },
-                            };
-                            this.ws.send(JSON.stringify(res));
-                        } catch (e) {
-                            const res: Response = {
-                                type: "res",
-                                seq: message.seq,
-                                time: new Date().toISOString(),
-                                body: {
-                                    error: { code: 500, message: String(e) },
-                                },
-                            };
-                            this.ws.send(JSON.stringify(res));
-                        }
-                    } else if (message.type === "res") {
-                        this.handleRes(message as Response);
+                const message = JSON.parse(msg.toString()) as Message;
+                if (message.type === "req") {
+                    try {
+                        const res: Response = {
+                            type: "res",
+                            seq: message.seq,
+                            time: new Date().toISOString(),
+                            body: {
+                                output: await this.handleReq(
+                                    message as Request<JudgerMethod>
+                                ),
+                            },
+                        };
+                        this.ws.send(JSON.stringify(res));
+                    } catch (e) {
+                        const res: Response = {
+                            type: "res",
+                            seq: message.seq,
+                            time: new Date().toISOString(),
+                            body: {
+                                error: { code: 500, message: String(e) },
+                            },
+                        };
+                        this.ws.send(JSON.stringify(res));
                     }
+                } else if (message.type === "res") {
+                    this.handleRes(message as Response);
                 }
             });
         });

@@ -100,7 +100,6 @@ npm run start # pm2 start ./dist/index.js --name judger
 
 对于 `Normal` 和 `Spj`，用户程序没有正常结束运行时，跳过执行结果判断程序。
 
-
 ## 其他
 
 ### spj 返回值及输出结果汇总
@@ -245,7 +244,6 @@ lojv3：https://github.com/syzoj/judge-v3/tree/master/src/languages
 uoj：https://github.com/UniversalOJ/UOJ-System/blob/230738b770022cc6b882c42b67b82d7b29b82003/judger/uoj_judger/include/uoj_judger.h#L1137
 
 pta: https://github.com/pintia/ljudge/tree/master/etc/ljudge
-
 
 ### todo
 

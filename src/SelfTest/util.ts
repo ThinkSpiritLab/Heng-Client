@@ -6,7 +6,7 @@ export function generateNormalSelfTest(
     name: string,
     language: string,
     usrCode: string,
-    usrOption: { [key: string]: string | number | boolean },
+    usrOption: Record<string, string | number | boolean>,
     cases: TestCase[],
     timeLimit: number = MaxTime,
     data?: File
@@ -115,9 +115,9 @@ export function generateSpjSelfTest(
     name: string,
     language: string,
     usrCode: string,
-    usrOption: { [key: string]: string | number | boolean },
+    usrOption: Record<string, string | number | boolean>,
     spjCode: string,
-    spjOption: { [key: string]: string | number | boolean },
+    spjOption: Record<string, string | number | boolean>,
     cases: TestCase[],
     timeLimit: number = MaxTime,
     data?: File
@@ -252,9 +252,9 @@ export function generateInteractiveSelfTest(
     name: string,
     language: string,
     usrCode: string,
-    usrOption: { [key: string]: string | number | boolean },
+    usrOption: Record<string, string | number | boolean>,
     interactorCode: string,
-    interactorOption: { [key: string]: string | number | boolean },
+    interactorOption: Record<string, string | number | boolean>,
     cases: TestCase[],
     timeLimit: number = MaxTime,
     data?: File

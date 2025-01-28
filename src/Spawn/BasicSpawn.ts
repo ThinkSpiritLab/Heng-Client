@@ -1,9 +1,16 @@
 import { SpawnOptions } from "child_process";
 import { Stream } from "stream";
 
-export type CompleteStdioOptions = Array<
-    "pipe" | "ipc" | "ignore" | "inherit" | Stream | number | null | undefined
->;
+export type CompleteStdioOptions = (
+    | "pipe"
+    | "ipc"
+    | "ignore"
+    | "inherit"
+    | Stream
+    | number
+    | null
+    | undefined
+)[];
 
 // Extract from node/child_process.d.ts
 // show which options is used

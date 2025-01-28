@@ -20,11 +20,11 @@ import { Throttle } from "./Throttle";
 
 const logger = getLogger("File");
 
-export type File = {
+export interface File {
     hashsum?: string;
     content?: string;
     url?: string;
-};
+}
 
 /**
  * maxTry should be small
@@ -91,13 +91,13 @@ export function readStream(s: Readable, size: number): Promise<string> {
 export function waitForOpen(s: EventEmitter) {
     return new Promise<void>((resolve, reject) => {
         s.on("open", () => resolve());
-        s.on("error", (err) => reject(err));
+        s.on("error", (err: Error) => reject(err));
     });
 }
 
-export async function readableFromUrl(url: string): Promise<Readable> {
+export async function readableFromUrl(url: string) {
     logger.info(`Downloading ${url}`);
-    return (await axios.get(url, { responseType: "stream" })).data;
+    return (await axios.get(url, { responseType: "stream" })).data as Readable;
 }
 
 /**
@@ -183,7 +183,9 @@ function freeRemoteFileCache(requiredBtyes: number): Promise<void> {
             try {
                 /** @throw ENOENT fatal error! */
                 const statistic = await stat(filePath);
-                statistic.isFile() && (await unlink(filePath));
+                if (statistic.isFile()) {
+                    await unlink(filePath);
+                }
                 // isFile and deleted
                 remoteFileBytesCount -= statistic.size;
                 remoteFileMap.delete(pendingFreeFileKey);
@@ -226,7 +228,8 @@ export async function readableFromUrlFile(file: File): Promise<Readable> {
             readable.on("open", () => {
                 const record = remoteFileMap.get(fileKey);
                 if (record === undefined) return;
-                record[3]++, (record[4] = Date.now());
+                record[3]++;
+                record[4] = Date.now();
                 remoteFileMap.set(fileKey, record);
             });
             await waitForOpen(readable);
@@ -271,7 +274,7 @@ export async function readableFromUrlFile(file: File): Promise<Readable> {
                 await remoteFileDownloadThrottle.withThrottle(
                     async () =>
                         await pipeline(
-                            await readableFromUrl(file.url as string),
+                            await readableFromUrl(file.url!),
                             createWriteStream(filePath, {
                                 mode: 0o700,
                             })
@@ -332,7 +335,10 @@ export class FileAgent {
         [File | null, string, boolean, Throttle]
     >();
     private Initialized = 0;
-    constructor(readonly prefix: string, readonly primaryFile: File | null) {
+    constructor(
+        readonly prefix: string,
+        readonly primaryFile: File | null
+    ) {
         this.dir = join(getConfig().judger.tmpdirBase, prefix);
     }
 

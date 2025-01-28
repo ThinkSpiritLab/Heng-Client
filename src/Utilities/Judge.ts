@@ -170,7 +170,7 @@ export abstract class JudgeAgent {
             runResult = {
                 cases: range(this.judge.test?.cases.length ?? 1).map(() => {
                     return {
-                        kind: compileJudgeType as JudgeResultKind,
+                        kind: compileJudgeType,
                         time: 0,
                         memory: 0,
                     };
@@ -203,14 +203,11 @@ export abstract class JudgeAgent {
         }
         const judgeCaseResults: JudgeCaseResult[] = [];
         if (this.judge.test) {
-            const judgeThrottle = new Throttle(1);
             for (const testCase of this.judge.test.cases) {
-                const caseResult = await judgeThrottle.withThrottle(() => {
-                    return judgeFunction(
-                        testCase,
-                        executableAgent.executable.limit.runtime.cpuTime
-                    );
-                });
+                const caseResult = await judgeFunction(
+                    testCase,
+                    executableAgent.executable.limit.runtime.cpuTime
+                );
                 judgeCaseResults.push(caseResult);
                 if (
                     caseResult.kind !== JudgeResultKind.Accepted &&
@@ -347,7 +344,7 @@ export class NormalJudgeAgent extends JudgeAgent {
             );
         }
 
-        this.updateStatus(JudgeState.Preparing);
+        void this.updateStatus(JudgeState.Preparing);
         statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult] =
@@ -360,7 +357,7 @@ export class NormalJudgeAgent extends JudgeAgent {
             return judgeResult;
         }
 
-        this.updateStatus(JudgeState.Judging);
+        void this.updateStatus(JudgeState.Judging);
         statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
@@ -449,7 +446,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
             );
         }
 
-        this.updateStatus(JudgeState.Preparing);
+        void this.updateStatus(JudgeState.Preparing);
         statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult1] =
@@ -461,21 +458,21 @@ export class SpecialJudgeAgent extends JudgeAgent {
         if (judgeResult1 !== undefined) {
             return judgeResult1;
         }
-        const [spjExecutableAgent, judgeResult2] =
-            await this.compileAndFillExtra(
-                ExecType.Spj,
-                this.judge.judge.spj,
-                OtherCompileResultTransformer
-            );
+        const [, judgeResult2] = await this.compileAndFillExtra(
+            ExecType.Spj,
+            this.judge.judge.spj,
+            OtherCompileResultTransformer
+        );
         if (judgeResult2 !== undefined) {
             return judgeResult2;
         }
 
-        this.updateStatus(JudgeState.Judging);
+        void this.updateStatus(JudgeState.Judging);
         statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
+            // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
             async (testCase) => {
                 return {
                     kind: JudgeResultKind.OutpuLimitExceeded,
@@ -518,7 +515,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
             );
         }
 
-        this.updateStatus(JudgeState.Preparing);
+        void this.updateStatus(JudgeState.Preparing);
         statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult1] =
@@ -530,21 +527,21 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         if (judgeResult1 !== undefined) {
             return judgeResult1;
         }
-        const [interactorExecutableAgent, judgeResult2] =
-            await this.compileAndFillExtra(
-                ExecType.Interactive,
-                this.judge.judge.interactor,
-                OtherCompileResultTransformer
-            );
+        const [, judgeResult2] = await this.compileAndFillExtra(
+            ExecType.Interactive,
+            this.judge.judge.interactor,
+            OtherCompileResultTransformer
+        );
         if (judgeResult2 !== undefined) {
             return judgeResult2;
         }
 
-        this.updateStatus(JudgeState.Judging);
+        void this.updateStatus(JudgeState.Judging);
         statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
+            // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
             async (testCase) => {
                 return {
                     kind: JudgeResultKind.OutpuLimitExceeded,
@@ -644,9 +641,9 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const _test: CreateJudgeArgs = JSON.parse(
+                const _test = JSON.parse(
                     JSON.stringify(test.task)
-                );
+                ) as CreateJudgeArgs;
                 _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
@@ -672,9 +669,9 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const _test: CreateJudgeArgs = JSON.parse(
+                const _test = JSON.parse(
                     JSON.stringify(test.task)
-                );
+                ) as CreateJudgeArgs;
                 _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
@@ -709,7 +706,7 @@ export async function getJudgerFactory(
         logger.info(
             `Succeed in loading last TimeRatio from ${lastTimeRatioFileName}`
         );
-    } catch (error) {
+    } catch {
         logger.warn(
             `Fail to load last TimeRatio from ${lastTimeRatioFileName}`
         );
@@ -744,9 +741,9 @@ export async function getJudgerFactory(
     for (let round = 0; round < getConfig().judger.selfTestRound; round++) {
         await Promise.all(
             Tests.map(async (test) => {
-                const _test: CreateJudgeArgs = JSON.parse(
+                const _test = JSON.parse(
                     JSON.stringify(test.task)
-                );
+                ) as CreateJudgeArgs;
                 _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
@@ -785,7 +782,7 @@ export async function getJudgerFactory(
             mode: 0o700,
         });
         logger.info(`Succeed in writing TimeRatio to ${lastTimeRatioFileName}`);
-    } catch (error) {
+    } catch {
         logger.warn(`Fail to write TimeRatio to ${lastTimeRatioFileName}`);
     }
     return judgerFactory;

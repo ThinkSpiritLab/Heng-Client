@@ -170,7 +170,7 @@ function tryValidate(
                     )}├─┬${new String().padEnd(10, "─")}`
                 );
                 tryValidate(
-                    err.value,
+                    err.value as Record<string, unknown>,
                     padding + 2,
                     `${prefix}${err.property}.`
                 );

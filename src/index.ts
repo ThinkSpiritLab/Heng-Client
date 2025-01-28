@@ -150,7 +150,7 @@ async function main() {
                         result: judgeResult,
                     });
                     break;
-                } catch (error) {
+                } catch {
                     logger.warn(
                         `返回 ${task.id} 的评测结果失败，${2 << i}秒后重试`
                     );
@@ -173,4 +173,4 @@ async function main() {
     logger.info("Started");
 }
 
-main();
+void main();

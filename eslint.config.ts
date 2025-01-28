@@ -1,25 +1,32 @@
 import js from "@eslint/js";
-import ts from "typescript-eslint";
-import importX from 'eslint-plugin-import-x';
+import ts, { configs } from "typescript-eslint";
+import importX from "eslint-plugin-import-x";
 import prettier from "eslint-plugin-prettier/recommended";
 export default ts.config({
     extends: [
         js.configs.recommended,
-        ...ts.configs.recommendedTypeChecked,
-        ...ts.configs.stylisticTypeChecked,
+        ...configs.recommendedTypeChecked,
+        ...configs.stylisticTypeChecked,
         importX.flatConfigs.recommended,
         importX.flatConfigs.typescript,
         prettier,
     ],
-    ignores: ["*.d.ts", "*.js"],
+    files: ["eslint.config.ts", "src/**/*.ts"],
     languageOptions: {
         parserOptions: {
             projectService: true,
-            tsconfigRootDir: import.meta.dirname,
+            tsconfigRootDir: __dirname, // FIXME: CommonJS
         },
     },
     rules: {
         "no-unused-vars": "off",
+        "@typescript-eslint/no-base-to-string": "off",
+        "@typescript-eslint/no-misused-promises": [
+            "warn",
+            {
+                checksVoidReturn: false,
+            },
+        ],
         "@typescript-eslint/no-unused-vars": ["warn"],
     },
 });
