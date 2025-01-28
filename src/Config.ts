@@ -1,4 +1,4 @@
-import * as TOML from "@iarna/toml";
+import { parse } from "@iarna/toml";
 import { plainToClass, Type } from "class-transformer";
 import {
     ArrayNotEmpty,
@@ -15,11 +15,11 @@ import {
     ValidateNested,
     validateSync,
 } from "class-validator";
-import fs from "fs";
+import { readFileSync } from "fs";
 import { getLogger } from "log4js";
 
 const logger = getLogger("ConfigService");
-const configToml = fs.readFileSync("config/config.toml").toString();
+const configToml = readFileSync("config/config.toml").toString();
 export class LanguageConfig {
     @IsString()
     @IsNotEmpty()
@@ -192,7 +192,7 @@ function tryValidate(
 export function getConfig(): Config {
     if (config === undefined) {
         logger.info("Loading Config from file");
-        const rawConfig = TOML.parse(configToml);
+        const rawConfig = parse(configToml);
         config = plainToClass(Config, rawConfig);
         // logger.fatal(JSON.stringify(rawConfig));
         // logger.fatal(JSON.stringify(config));
@@ -210,7 +210,7 @@ const builtin = new Map<string, string>();
 export function getBuiltin() {
     if (builtin.size === 0) {
         for (const i in getConfig().builtin) {
-            builtin.set(i, fs.readFileSync(getConfig().builtin[i], "utf-8"));
+            builtin.set(i, readFileSync(getConfig().builtin[i], "utf-8"));
         }
     }
     return builtin;

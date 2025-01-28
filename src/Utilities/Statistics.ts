@@ -1,5 +1,5 @@
 import { StatusReport } from "heng-protocol";
-import os from "os";
+import { cpus, freemem, loadavg, totalmem } from "os";
 
 class Statistics {
     private total = 0;
@@ -38,14 +38,14 @@ class Statistics {
     }
 
     collect(): StatusReport {
-        const loadavg = os.loadavg() as [number, number, number];
+        const load = loadavg() as [number, number, number];
         return {
             hardware: {
                 cpu: {
-                    percentage: loadavg[0] / os.cpus().length,
-                    loadavg,
+                    percentage: load[0] / cpus().length,
+                    loadavg: load,
                 },
-                memory: { percentage: 1 - os.freemem() / os.totalmem() },
+                memory: { percentage: 1 - freemem() / totalmem() },
             },
             judge: {
                 pending: this.count[0],
@@ -62,4 +62,4 @@ class Statistics {
     }
 }
 
-export const stat = new Statistics();
+export const statistics = new Statistics();

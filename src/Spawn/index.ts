@@ -25,7 +25,7 @@ export function hengSpawn(
     command: string,
     args: string[],
     options: HengSpawnOption
-): MeteredChildProcess {
+) {
     const basicOption: BasicSpawnOption = {
         cwd: options.cwd,
         // shell: getConfig().language.shell,
@@ -41,8 +41,7 @@ export function hengSpawn(
 
     logger.info(`${command} ${args.join(" ")}`);
     const subProcess = spawn(command, args, basicOption);
-    return {
-        ...(subProcess as MeteredChildProcess),
+    return Object.assign(subProcess, {
         result: new Promise((resolve, reject) => {
             subProcess.on("exit", (code, signal) => {
                 let signalNumber = -1;
@@ -64,5 +63,5 @@ export function hengSpawn(
                 reject(err);
             });
         }),
-    };
+    }) as MeteredChildProcess;
 }

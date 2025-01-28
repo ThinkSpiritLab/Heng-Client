@@ -1,15 +1,15 @@
-import fs from "fs";
+import { mkdir, rmdir } from "fs/promises";
 import { ExitArgs } from "heng-protocol/internal-protocol/ws";
 import { configure, getLogger } from "log4js";
-import os from "os";
-import path from "path";
+import { cpus } from "os";
+import { join } from "path";
 import "reflect-metadata";
 import { getConfig } from "./Config";
 import { Controller } from "./controller";
 import { ExecTypeArray } from "./Spawn/Language/decl";
 import { chownR } from "./Utilities/File";
 import { getJudgerFactory } from "./Utilities/Judge";
-import { stat } from "./Utilities/Statistics";
+import { statistics } from "./Utilities/Statistics";
 import { Throttle } from "./Utilities/Throttle";
 import version from "./version";
 
@@ -42,39 +42,33 @@ async function main() {
         await wait(2000);
         throw e;
     }
-    await fs.promises.rmdir(getConfig().judger.tmpdirBase, {
+    await rmdir(getConfig().judger.tmpdirBase, {
         recursive: true,
     });
     for (const execType of ExecTypeArray) {
-        await fs.promises.mkdir(
-            path.join(getConfig().judger.tmpdirBase, "bin", execType),
-            { recursive: true, mode: 0o700 }
-        );
+        await mkdir(join(getConfig().judger.tmpdirBase, "bin", execType), {
+            recursive: true,
+            mode: 0o700,
+        });
     }
-    await fs.promises.mkdir(path.join(getConfig().judger.tmpdirBase, "file"), {
+    await mkdir(join(getConfig().judger.tmpdirBase, "file"), {
         recursive: true,
         mode: 0o700,
     });
-    await fs.promises.mkdir(
-        path.join(getConfig().judger.tmpdirBase, "workspace"),
-        { recursive: true, mode: 0o700 }
-    );
+    await mkdir(join(getConfig().judger.tmpdirBase, "workspace"), {
+        recursive: true,
+        mode: 0o700,
+    });
     await chownR(
         getConfig().judger.tmpdirBase,
         getConfig().judger.uid,
         getConfig().judger.gid,
         1
     );
-    await fs.promises.mkdir("/sys/fs/cgroup/cpu/hengCore", { recursive: true });
-    await fs.promises.mkdir("/sys/fs/cgroup/cpuacct/hengCore", {
-        recursive: true,
-    });
-    await fs.promises.mkdir("/sys/fs/cgroup/memory/hengCore", {
-        recursive: true,
-    });
-    await fs.promises.mkdir("/sys/fs/cgroup/pids/hengCore", {
-        recursive: true,
-    });
+    await mkdir("/sys/fs/cgroup/cpu/hengCore", { recursive: true });
+    await mkdir("/sys/fs/cgroup/cpuacct/hengCore", { recursive: true });
+    await mkdir("/sys/fs/cgroup/memory/hengCore", { recursive: true });
+    await mkdir("/sys/fs/cgroup/pids/hengCore", { recursive: true });
 
     const config = getConfig().self;
     const judgerFactory = await getJudgerFactory(
@@ -95,7 +89,7 @@ async function main() {
         );
         pendingExit = 1;
         const handler = () => {
-            const col = stat.collect();
+            const col = statistics.collect();
             if (col.judge.total === col.judge.finished) {
                 controller.exitTimer = setTimeout(() => {
                     process.exit(0);
@@ -119,7 +113,7 @@ async function main() {
         await controller.do("Exit", { reason: msg });
         pendingExit = 1;
         const handler = () => {
-            const col = stat.collect();
+            const col = statistics.collect();
             if (col.judge.total === col.judge.finished) {
                 controller.exitTimer = setTimeout(() => {
                     process.exit(0);
@@ -169,7 +163,7 @@ async function main() {
 
     const token = await controller.getToken(
         config.judgeCapability,
-        os.cpus().length,
+        cpus().length,
         config.name,
         version,
         judgerFactory.timeRatio

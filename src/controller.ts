@@ -19,12 +19,12 @@ import {
     UpdateJudgesArgs,
 } from "heng-protocol/internal-protocol/ws";
 import { Sign } from "heng-sign-js";
-import https from "https";
+import { Agent } from "https";
 import { getLogger } from "log4js";
 import moment from "moment";
 import WebSocket from "ws";
 import { ControllerConfig } from "./Config";
-import { stat } from "./Utilities/Statistics";
+import { statistics } from "./Utilities/Statistics";
 
 export class Controller {
     host: string;
@@ -32,7 +32,7 @@ export class Controller {
     AccessKey: string;
     ws!: WebSocket;
     connectingSettings: ConnectionSettings = { statusReportInterval: 1000 };
-    statusReportTimer?: NodeJS.Timer;
+    statusReportTimer?: NodeJS.Timeout;
     judgerMethods: Map<
         JudgerMethod | "Report",
         (args: unknown) => Promise<unknown | void>
@@ -65,7 +65,7 @@ export class Controller {
     }
     logger = getLogger("Controller");
     exitTimer: NodeJS.Timeout | undefined = undefined;
-    httpsAgent = new https.Agent({
+    httpsAgent = new Agent({
         rejectUnauthorized: false,
     });
     constructor(config: ControllerConfig) {
@@ -98,7 +98,7 @@ export class Controller {
                 nextReportTime: moment(Date.now() + interval).format(
                     "YYYY-MM-DDTHH:mm:ssZ"
                 ),
-                report: stat.collect(),
+                report: statistics.collect(),
             });
         };
         this.statusReportTimer = setInterval(fn, interval);

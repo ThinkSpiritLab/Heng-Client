@@ -1,9 +1,8 @@
-import * as crypto from "crypto";
-import fs from "fs";
-import { FileHandle } from "fs/promises";
+import { createHash, randomBytes } from "crypto";
+import { access, FileHandle, open, writeFile } from "fs/promises";
 import { DynamicFile, Executable } from "heng-protocol";
 import { getLogger } from "log4js";
-import path from "path";
+import { join, resolve } from "path";
 import { getBuiltin, getConfig } from "../Config";
 import { hengSpawn, HengSpawnOption } from "../Spawn";
 import { CompleteStdioOptions } from "../Spawn/BasicSpawn";
@@ -64,8 +63,7 @@ export class ExecutableAgent {
         readonly executable: Executable,
         readonly dynamicFiles: DynamicFile[] = []
     ) {
-        this.judgeHash = crypto
-            .createHash("sha256")
+        this.judgeHash = createHash("sha256")
             .update(
                 JSON.stringify({
                     execType,
@@ -103,11 +101,11 @@ export class ExecutableAgent {
         if (dirHash_t) {
             this.dirHash = dirHash_t;
         } else {
-            this.dirHash = crypto.randomBytes(32).toString("hex");
+            this.dirHash = randomBytes(32).toString("hex");
         }
 
         this.fileAgent = new FileAgent(
-            path.join("bin", execType, this.dirHash),
+            join("bin", execType, this.dirHash),
             null
         );
         this.configuredLanguage.runDir = this.fileAgent.dir;
@@ -196,8 +194,8 @@ export class ExecutableAgent {
             if (languageOption.args) {
                 runOption.args = [...languageOption.args, ...runOption.args];
             }
-            const runLogPath = path.resolve(this.fileAgent.dir, runLogName);
-            runLogFileFH = await fs.promises.open(runLogPath, "w", 0o700);
+            const runLogPath = resolve(this.fileAgent.dir, runLogName);
+            runLogFileFH = await open(runLogPath, "w", 0o700);
             if (runOption.stdio === undefined) {
                 runOption.stdio = ["ignore"];
             }
@@ -237,16 +235,13 @@ export class ExecutableAgent {
                 try {
                     for (const file of this.configuredLanguage[runType]
                         .outputFiles) {
-                        await fs.promises.access(file);
+                        await access(file);
                     }
                 } catch (error) {
                     procResult.returnCode = procResult.returnCode || 1;
                 }
-                await fs.promises.writeFile(
-                    path.resolve(
-                        this.fileAgent.dir,
-                        runStatisticsName[runType]
-                    ),
+                await writeFile(
+                    resolve(this.fileAgent.dir, runStatisticsName[runType]),
                     JSON.stringify(procResult),
                     { mode: 0o700 }
                 );

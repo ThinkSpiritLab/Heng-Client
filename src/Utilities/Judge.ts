@@ -1,5 +1,6 @@
-import * as crypto from "crypto";
-import fs from "fs";
+import { randomBytes } from "crypto";
+import { createReadStream } from "fs";
+import { readFile, stat, writeFile } from "fs/promises";
 import {
     Executable,
     JudgeCaseResult,
@@ -13,8 +14,8 @@ import {
 import { CreateJudgeArgs } from "heng-protocol/internal-protocol/ws";
 import { range } from "lodash";
 import { getLogger } from "log4js";
-import os from "os";
-import path from "path";
+import { tmpdir } from "os";
+import { join } from "path";
 import { SerialPort } from "serialport";
 import { getConfig } from "../Config";
 import { Controller } from "../controller";
@@ -24,7 +25,7 @@ import { MeterResult } from "../Spawn/Meter";
 import { ExecutableAgent, runLogName } from "./ExecutableAgent";
 import { FileAgent, readStream } from "./File";
 import { closePort } from "./Serial";
-import { stat } from "./Statistics";
+import { statistics } from "./Statistics";
 import { Throttle } from "./Throttle";
 
 const UsrCompileResultTransformer = {
@@ -69,7 +70,7 @@ export abstract class JudgeAgent {
         protected readonly controller?: Controller
     ) {
         this.fileAgent = new FileAgent(
-            path.join("workspace", judge.id),
+            join("workspace", judge.id),
             judge.data ?? null
         );
     }
@@ -117,11 +118,11 @@ export abstract class JudgeAgent {
     ): Promise<JudgeResult | undefined> {
         const compileSumTime = compileResult.time.sys + compileResult.time.usr;
         const compileLog = await executableAgent.fileAgent.getPath(runLogName);
-        const compileLogSize = (await fs.promises.stat(compileLog)).size;
+        const compileLogSize = (await stat(compileLog)).size;
         const exteaInfo = {
             compileTime: this.transformTime(compileSumTime),
             compileMessage: await readStream(
-                fs.createReadStream(compileLog, {
+                createReadStream(compileLog, {
                     encoding: "utf-8",
                     start: Math.max(
                         compileLogSize -
@@ -285,18 +286,18 @@ export abstract class JudgeAgent {
     async getResultNoException(): Promise<JudgeResult> {
         // this.checkInit();
         try {
-            stat.tick(this.judge.id);
+            statistics.tick(this.judge.id);
             await this.init();
             const ret = await this.getResult();
             // await this.clean();
-            stat.finish(this.judge.id);
+            statistics.finish(this.judge.id);
             return ret;
         } catch (err) {
             this.logger.fatal(err);
             // await this.clean().catch((error) => {
             //     this.logger.fatal(error);
             // });
-            stat.finish(this.judge.id);
+            statistics.finish(this.judge.id);
             const e = {
                 kind: JudgeResultKind.SystemError,
                 time: 0,
@@ -347,7 +348,7 @@ export class NormalJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Preparing);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult] =
             await this.compileAndFillExtra(
@@ -360,7 +361,7 @@ export class NormalJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Judging);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
@@ -449,7 +450,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Preparing);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult1] =
             await this.compileAndFillExtra(
@@ -471,7 +472,7 @@ export class SpecialJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Judging);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
@@ -518,7 +519,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Preparing);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const [userExecutableAgent, judgeResult1] =
             await this.compileAndFillExtra(
@@ -540,7 +541,7 @@ export class InteractiveJudgeAgent extends JudgeAgent {
         }
 
         this.updateStatus(JudgeState.Judging);
-        stat.tick(this.judge.id);
+        statistics.tick(this.judge.id);
 
         const caseResults = await this.runJudge(
             userExecutableAgent,
@@ -646,7 +647,7 @@ export async function getJudgerFactory(
                 const _test: CreateJudgeArgs = JSON.parse(
                     JSON.stringify(test.task)
                 );
-                _test.id = crypto.randomBytes(32).toString("hex");
+                _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
@@ -674,7 +675,7 @@ export async function getJudgerFactory(
                 const _test: CreateJudgeArgs = JSON.parse(
                     JSON.stringify(test.task)
                 );
-                _test.id = crypto.randomBytes(32).toString("hex");
+                _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
@@ -698,12 +699,9 @@ export async function getJudgerFactory(
     }
 
     let timeRatio = getConfig().judger.defaultTimeRatio;
-    const lastTimeRatioFileName = path.join(
-        os.tmpdir(),
-        "Heng_Client.timeratio"
-    );
+    const lastTimeRatioFileName = join(tmpdir(), "Heng_Client.timeratio");
     try {
-        const trStr = await fs.promises.readFile(lastTimeRatioFileName, {
+        const trStr = await readFile(lastTimeRatioFileName, {
             encoding: "utf-8",
         });
         const lastTimeRatio = parseFloat(trStr);
@@ -749,7 +747,7 @@ export async function getJudgerFactory(
                 const _test: CreateJudgeArgs = JSON.parse(
                     JSON.stringify(test.task)
                 );
-                _test.id = crypto.randomBytes(32).toString("hex");
+                _test.id = randomBytes(32).toString("hex");
                 const judgeAgent = judgerFactory.getJudgerAgent(_test);
                 const result = await judgeAgent.getResultNoException();
                 console.log(result);
@@ -783,7 +781,7 @@ export async function getJudgerFactory(
     }
     logger.warn(`timeRatio is ${timeRatio}`);
     try {
-        await fs.promises.writeFile(lastTimeRatioFileName, String(timeRatio), {
+        await writeFile(lastTimeRatioFileName, String(timeRatio), {
             mode: 0o700,
         });
         logger.info(`Succeed in writing TimeRatio to ${lastTimeRatioFileName}`);
