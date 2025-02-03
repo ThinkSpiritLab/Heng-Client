@@ -19,3 +19,15 @@ export function getConfiguredLanguage(
             break;
     }
 }
+
+export function getLanguage(lang: string): typeof Language {
+    lang = lang.toLowerCase();
+    switch (lang) {
+        case "verilog":
+            return Verilog;
+        case "plaintext":
+            return PlainText;
+        default:
+            throw new Error("Unrecognized language");
+    }
+}

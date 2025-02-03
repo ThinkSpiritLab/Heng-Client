@@ -20,6 +20,7 @@ import { SerialPort } from "serialport";
 import { getConfig } from "../Config";
 import { Controller } from "../controller";
 import { Tests } from "../SelfTest";
+import { getLanguage } from "../Spawn/Language";
 import { ExecType, RunType } from "../Spawn/Language/decl";
 import { MeterResult } from "../Spawn/Meter";
 import { ExecutableAgent, runLogName } from "./ExecutableAgent";
@@ -238,24 +239,11 @@ export abstract class JudgeAgent {
         }
     ): Promise<[ExecutableAgent, JudgeResult | undefined]> {
         this.checkInit();
-        const executableAgent = new ExecutableAgent(execType, executable, [
-            {
-                name: "ax309.ucf",
-                type: "builtin",
-            },
-            {
-                name: "main.cmd",
-                type: "builtin",
-            },
-            {
-                name: "verilog.prj",
-                type: "builtin",
-            },
-            {
-                name: "xc6slx9-2-ftg256.verilog.xst",
-                type: "builtin",
-            },
-        ]);
+        const executableAgent = new ExecutableAgent(
+            execType,
+            executable,
+            this.judge.dynamicFiles
+        );
         this.ExecutableAgents.push(executableAgent);
         await executableAgent.init();
         await executableAgent.releaseFile();
@@ -286,14 +274,14 @@ export abstract class JudgeAgent {
             statistics.tick(this.judge.id);
             await this.init();
             const ret = await this.getResult();
-            // await this.clean();
+            await this.clean();
             statistics.finish(this.judge.id);
             return ret;
         } catch (err) {
             this.logger.fatal(err);
-            // await this.clean().catch((error) => {
-            //     this.logger.fatal(error);
-            // });
+            await this.clean().catch((error) => {
+                this.logger.fatal(error);
+            });
             statistics.finish(this.judge.id);
             const e = {
                 kind: JudgeResultKind.SystemError,
@@ -568,6 +556,19 @@ export class JudgeFactory {
     ) {}
 
     getJudgerAgent(judgeInfo: CreateJudgeArgs): JudgeAgent {
+        judgeInfo.dynamicFiles = [
+            {
+                type: "builtin",
+                name: getConfig().fpga.constraints,
+            },
+            {
+                type: "builtin",
+                name: getConfig().fpga.program,
+            },
+            ...getLanguage(
+                judgeInfo.judge.user.environment.language
+            ).modifyDynamicFile(judgeInfo.dynamicFiles),
+        ];
         judgeInfo.judge.user.limit.compiler.cpuTime = Math.ceil(
             judgeInfo.judge.user.limit.compiler.cpuTime / this.timeRatio
         );

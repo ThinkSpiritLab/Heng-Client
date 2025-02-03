@@ -100,6 +100,15 @@ export class JudgeFactoryConfig {
     remoteFileCacheBytes!: number;
 }
 export class FpgaConfig {
+    @IsString()
+    @IsNotEmpty()
+    constraints!: string;
+    @IsString()
+    @IsNotEmpty()
+    program!: string;
+    @IsString()
+    @IsNotEmpty()
+    package!: string;
     @ArrayNotEmpty()
     @ArrayUnique()
     @IsHexadecimal({

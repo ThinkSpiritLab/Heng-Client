@@ -1,9 +1,16 @@
+import { DynamicFile } from "heng-protocol";
 import { join } from "path";
 import { getConfig } from "../../Config";
 import { Language, RunOption, RunType } from "./decl";
+import { getPrj, getXst } from "./XilinxSynthesisTechnology";
 
 export class Verilog extends Language {
-    srcFileName = "main.v";
+    static srcFileName = "main.v";
+    static modifyDynamicFile(files: DynamicFile[] = []) {
+        return [getPrj(this.srcFileName, files), getXst(), ...files];
+    }
+
+    srcFileName = Verilog.srcFileName;
 
     [RunType.Synthesis] = {
         cacheable: true,
@@ -12,7 +19,7 @@ export class Verilog extends Language {
             return {
                 skip: false,
                 command: getConfig().language.xst,
-                args: ["-ifn", "xc6slx9-2-ftg256.verilog.xst"],
+                args: ["-ifn", "main.xst"],
             };
         },
     };

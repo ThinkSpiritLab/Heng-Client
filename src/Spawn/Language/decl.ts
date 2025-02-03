@@ -1,4 +1,4 @@
-import { Executable } from "heng-protocol";
+import { DynamicFile, Executable } from "heng-protocol";
 import { HengSpawnOption } from "..";
 
 export enum RunType {
@@ -55,6 +55,9 @@ export abstract class Language {
         this.runDir = option.runDir;
     }
     abstract get srcFileName(): string;
+    static modifyDynamicFile(files: DynamicFile[] = []) {
+        return files;
+    }
     abstract [RunType.Synthesis]: compileOption;
     abstract [RunType.Translate]: compileOption;
     abstract [RunType.Map]: compileOption;
