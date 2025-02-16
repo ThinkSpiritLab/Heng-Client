@@ -19,6 +19,9 @@ par = "/usr/bin/par"
 bitgen = "/usr/bin/bitgen"
 impact = "/usr/bin/impact"
 [fpga]
+constraints = "ax309.ucf"
+program = "main.cmd"
+package = "xc6slx9-2-ftg256"
 serial = [
     "0123456789ABCDEF0123456789ABCDEF",
 ]

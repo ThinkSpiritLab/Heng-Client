@@ -31,7 +31,7 @@ export class Verilog extends Language {
             return {
                 skip: false,
                 command: getConfig().language.ngdbuild,
-                args: ["-aul", "-uc", "ax309.ucf", "main"],
+                args: ["-aul", "-uc", getConfig().fpga.constraints, "main"],
             };
         },
     };
