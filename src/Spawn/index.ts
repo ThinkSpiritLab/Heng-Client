@@ -43,14 +43,14 @@ export function hengSpawn(
     const subProcess = spawn(command, args, basicOption);
     return Object.assign(subProcess, {
         result: new Promise((resolve, reject) => {
-            subProcess.on("exit", (code, signal) => {
+            subProcess.on("close", (code, signal) => {
                 let signalNumber = -1;
                 if (signal) {
                     signalNumber = constants.signals[signal];
                 }
                 resolve({
                     memory: 0,
-                    returnCode: code ?? 10,
+                    returnCode: code ?? 9,
                     signal: signalNumber,
                     time: {
                         real: 0,

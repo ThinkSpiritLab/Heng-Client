@@ -20,6 +20,9 @@ export class Verilog extends Language {
                 skip: false,
                 command: getConfig().language.xst,
                 args: ["-ifn", "main.xst"],
+                spawnOption: {
+                    timeLimit: 60000,
+                },
             };
         },
     };

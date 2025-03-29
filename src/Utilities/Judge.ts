@@ -371,7 +371,7 @@ export class NormalJudgeAgent extends JudgeAgent {
                     const buffer = Buffer.alloc(output.length);
                     const start = Date.now();
                     await port.write(input);
-                    const timeout = setTimeout(closePort, judgeTimeout, port);
+                    setTimeout(closePort, judgeTimeout, port);
                     try {
                         while (memory < output.length) {
                             const { bytesRead } = await port.read(
@@ -389,7 +389,6 @@ export class NormalJudgeAgent extends JudgeAgent {
                     } catch {
                         kind = JudgeResultKind.TimeLimitExceeded;
                     }
-                    clearTimeout(timeout);
                     await closePort(port);
                     time = Date.now() - start;
                 }
